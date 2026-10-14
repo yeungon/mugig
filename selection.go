@@ -146,11 +146,11 @@ func (u *ui) songsMenu(ts []Track) *fyne.Menu {
 		fyne.NewMenuItem("Copy File Paths", func() {
 			paths := make([]string, len(ts))
 			for i, t := range ts {
-				paths[i] = t.Path
+				paths[i] = fileOf(t.Path)
 			}
 			fyne.CurrentApp().Clipboard().SetContent(strings.Join(paths, "\n"))
 		}),
 		fyne.NewMenuItemSeparator(),
-		fyne.NewMenuItem(trashLabel, func() { u.confirmTrash(ts) }),
+		u.trashItem(ts),
 	)...)
 }

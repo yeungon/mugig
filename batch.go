@@ -84,9 +84,12 @@ func (u *ui) checkSongs(songs []Track) {
 	if u.batch != nil && !u.batch.finished {
 		return // already running
 	}
+	// The songs of a disc image share its file, which is checked once.
 	var todo []Track
+	files := map[string]bool{}
 	for _, t := range songs {
-		if !lossyFormats[t.Format] {
+		if f := fileOf(t.Path); !lossyFormats[t.Format] && !files[f] {
+			files[f] = true
 			todo = append(todo, t)
 		}
 	}
@@ -129,7 +132,7 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 		go func() {
 			defer wg.Done()
 			for t := range jobs {
-				if r, ok := u.checkOne(ctx, t.Path); ok {
+				if r, ok := u.checkOne(ctx, fileOf(t.Path)); ok {
 					results <- r
 				}
 			}

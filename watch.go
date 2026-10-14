@@ -154,6 +154,11 @@ func readChanges(root string, paths []string, cache *libraryCache) folderChanges
 		if !within(p, root) || skippedWithin(p, root) {
 			continue
 		}
+		// A CUE sheet, or a file beside one, changes the songs of the
+		// folder's disc images: read the folder again, whole.
+		if p != root && (isCueFile(p) || isAudioFile(p) && hasCueBeside(p)) {
+			p = filepath.Dir(p)
+		}
 		if slices.ContainsFunc(read, func(d string) bool { return within(p, d) }) {
 			continue
 		}
@@ -169,9 +174,12 @@ func readChanges(root string, paths []string, cache *libraryCache) folderChanges
 				case err != nil:
 				case d.IsDir() && f != p && skipFolder(f):
 					return filepath.SkipDir
-				case !d.IsDir() && isAudioFile(f) && !isEmpty(d):
-					found[f] = true
-					ch.tracks = append(ch.tracks, scanFile(cache, f))
+				case !d.IsDir() && (isAudioFile(f) || isCueFile(f)) && !isEmpty(d):
+					r := scanFile(cache, f)
+					for _, t := range r.songs() {
+						found[t.Path] = true
+					}
+					ch.tracks = append(ch.tracks, r)
 				}
 				return nil
 			})
@@ -200,7 +208,7 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 	}
 	var removed []string
 	u.all = slices.DeleteFunc(u.all, func(t Track) bool {
-		gone := slices.ContainsFunc(ch.gone, func(g string) bool { return within(t.Path, g) })
+		gone := slices.ContainsFunc(ch.gone, func(g string) bool { return within(songFile(t), g) })
 		for dir, found := range ch.folders {
 			if within(t.Path, dir) && !found[t.Path] {
 				gone = true
@@ -218,19 +226,25 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 	added, seen := 0, map[string]cacheEntry{}
 	var changed []string
 	for _, r := range ch.tracks {
-		if i, ok := index[r.track.Path]; ok {
-			u.all[i] = r.track
-		} else {
-			index[r.track.Path] = len(u.all)
-			u.all = append(u.all, r.track)
-		}
-		if !had[r.track.Path] {
-			added++
-		} else if !r.cached {
-			changed = append(changed, r.track.Path) // re-read: the file is different now
+		for _, t := range r.songs() {
+			if i, ok := index[t.Path]; ok {
+				u.all[i] = t
+			} else {
+				index[t.Path] = len(u.all)
+				u.all = append(u.all, t)
+			}
+			if had[t.Path] && !r.cached && t.File == "" {
+				changed = append(changed, t.Path) // re-read: the file is different now
+			}
 		}
 		if r.modTime != 0 {
-			seen[r.track.Path] = cacheEntry{Size: r.size, ModTime: r.modTime, Track: r.track}
+			seen[r.path] = r.entry()
+		}
+	}
+	u.all = dropImages(u.all)
+	for _, t := range u.all {
+		if !had[t.Path] {
+			added++
 		}
 	}
 	sort.SliceStable(u.all, func(i, j int) bool { return libraryLess(u.all[i], u.all[j]) })

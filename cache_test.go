@@ -21,7 +21,7 @@ func TestCacheSkipsUnchangedFiles(t *testing.T) {
 	if r.cached || r.track.Title != "First" {
 		t.Fatalf("first scan: %+v", r)
 	}
-	c.update(dir, map[string]cacheEntry{song: {r.size, r.modTime, r.track}}, true)
+	c.update(dir, map[string]cacheEntry{song: r.entry()}, true)
 	if err := c.save(); err != nil {
 		t.Fatal(err)
 	}

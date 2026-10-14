@@ -25,6 +25,10 @@ type cacheEntry struct {
 	Size    int64
 	ModTime int64 // UnixNano
 	Track   Track
+	// For a CUE sheet: its songs, and the size and modification time of
+	// the disc images they are in, which change the songs too.
+	Cue    []Track
+	Images map[string][2]int64
 }
 
 // cacheVersion is bumped whenever Track or cacheEntry change shape, so old
@@ -49,13 +53,19 @@ func loadCache(path string) *libraryCache {
 
 // lookup returns the cached track for path if the file is unchanged.
 func (c *libraryCache) lookup(path string, size, modTime int64) (Track, bool) {
+	e, ok := c.entry(path, size, modTime)
+	return e.Track, ok
+}
+
+// entry returns the cache's entry for path if the file is unchanged.
+func (c *libraryCache) entry(path string, size, modTime int64) (cacheEntry, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	e, ok := c.entries[path]
 	if !ok || e.Size != size || e.ModTime != modTime {
-		return Track{}, false
+		return cacheEntry{}, false
 	}
-	return e.Track, true
+	return e, true
 }
 
 // modTime is when the file at path was last changed, as the cache has it,

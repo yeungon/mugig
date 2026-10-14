@@ -42,7 +42,11 @@ type Track struct {
 	Size   int64         // bytes
 	Length time.Duration // 0 if unknown
 	NoTags bool          // true if tags were missing or unreadable
-	search string        // lower-cased title, artist and album for the search box
+	// A song from a CUE sheet is a stretch of a disc image: File is the
+	// image, and the song runs from Start to End in it (see cue.go).
+	File       string
+	Start, End time.Duration
+	search     string // lower-cased title, artist and album for the search box
 }
 
 // audioExts maps lower-case extensions to a display format name.
@@ -89,8 +93,8 @@ const (
 // Scanning (runs entirely off the UI thread)
 // ---------------------------------------------------------------------------
 
-// walk finds audio files under root and sends their paths to the channel.
-// It closes paths when finished or cancelled.
+// walk finds audio files and CUE sheets under root and sends their paths
+// to the channel. It closes paths when finished or cancelled.
 func walk(ctx context.Context, root string, paths chan<- string) {
 	defer close(paths)
 	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
@@ -106,7 +110,7 @@ func walk(ctx context.Context, root string, paths chan<- string) {
 			}
 			return nil
 		}
-		if !isAudioFile(p) || isEmpty(d) {
+		if !isAudioFile(p) && !isCueFile(p) || isEmpty(d) {
 			return nil
 		}
 		select {
@@ -118,12 +122,29 @@ func walk(ctx context.Context, root string, paths chan<- string) {
 	})
 }
 
-// scanResult is one scanned file, with what the cache needs to know.
+// scanResult is one scanned file, with what the cache needs to know. For
+// a CUE sheet, track is empty and cue holds its songs.
 type scanResult struct {
 	track   Track
+	cue     []Track
+	images  map[string][2]int64 // a sheet's disc images: their size and modification time
+	path    string              // the file scanned
 	size    int64
 	modTime int64 // 0 if the file couldn't be checked; not cached then
 	cached  bool  // tags came from the cache, not the file
+}
+
+// songs are the songs the file gives the library.
+func (r scanResult) songs() []Track {
+	if r.path != "" && isCueFile(r.path) {
+		return r.cue
+	}
+	return []Track{r.track}
+}
+
+// entry is what the cache keeps of the file.
+func (r scanResult) entry() cacheEntry {
+	return cacheEntry{Size: r.size, ModTime: r.modTime, Track: r.track, Cue: r.cue, Images: r.images}
 }
 
 // worker reads tags for each path, unless the cache has them, and sends the
@@ -143,7 +164,10 @@ func worker(ctx context.Context, cache *libraryCache, paths <-chan string, resul
 }
 
 func scanFile(cache *libraryCache, path string) scanResult {
-	var r scanResult
+	if isCueFile(path) {
+		return scanCue(cache, path)
+	}
+	r := scanResult{path: path}
 	if fi, err := os.Stat(path); err == nil {
 		r.size, r.modTime = fi.Size(), fi.ModTime().UnixNano()
 		r.track, r.cached = cache.lookup(path, r.size, r.modTime)
@@ -719,7 +743,7 @@ func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult
 				return
 			}
 			if r.modTime != 0 {
-				seen[r.track.Path] = cacheEntry{Size: r.size, ModTime: r.modTime, Track: r.track}
+				seen[r.path] = r.entry()
 			}
 			if r.cached {
 				tally.fromCache++
@@ -727,8 +751,10 @@ func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult
 			if r.track.NoTags {
 				tally.noTags++
 			}
-			tally.found[r.track.Path] = true
-			batch = append(batch, r.track)
+			for _, t := range r.songs() {
+				tally.found[t.Path] = true
+				batch = append(batch, t)
+			}
 		case <-ticker.C:
 			if len(batch) > 0 {
 				u.flush(root, batch)
@@ -764,6 +790,9 @@ func (u *ui) flush(root string, batch []Track) {
 				u.tracks = append(u.tracks, t)
 			}
 		}
+		if images := cueImages(u.all); len(images) > 0 {
+			u.all, u.tracks = withoutImages(u.all, images), withoutImages(u.tracks, images)
+		}
 		u.table.Refresh()
 		u.updateCount()
 		u.status.SetText(fmt.Sprintf("Scanning %s… %s found", filepath.Base(root), plural(u.countIn(root), "track")))
@@ -793,6 +822,7 @@ func (u *ui) finish(root string, tally scanTally) {
 			// Songs no longer there are taken off the list.
 			u.all = slices.DeleteFunc(u.all, func(t Track) bool { return within(t.Path, root) && !tally.found[t.Path] })
 		}
+		u.all = dropImages(u.all)
 		// Sort once at the end rather than on every batch.
 		sort.SliceStable(u.all, func(i, j int) bool {
 			return libraryLess(u.all[i], u.all[j])

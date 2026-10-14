@@ -67,9 +67,10 @@ func (u *ui) loadQuality(t Track) {
 	ctx, cancel := context.WithCancel(context.Background())
 	u.quality.cancel = cancel
 	u.async(func() {
-		info, err := probe(t.Path)
+		file := fileOf(t.Path)
+		info, err := probe(file)
 		var rep qualityReport
-		saved := err == nil && canAnalyse(info) && u.qualityStore.get(t.Path, fileStamp(t.Path), &rep)
+		saved := err == nil && canAnalyse(info) && u.qualityStore.get(file, fileStamp(file), &rep)
 		onUI(func() {
 			if ctx.Err() != nil {
 				return // the track has changed
@@ -565,9 +566,9 @@ func (u *ui) trackMenu(t Track) *fyne.Menu {
 		fyne.NewMenuItem("Check Audio Quality…", func() { u.checkTrack(t) }),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem(revealLabel, func() { u.revealTrack(t) }),
-		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(t.Path) }),
+		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(fileOf(t.Path)) }),
 		fyne.NewMenuItemSeparator(),
-		fyne.NewMenuItem(trashLabel, func() { u.confirmTrash([]Track{t}) }),
+		u.trashItem([]Track{t}),
 	)...)
 }
 
@@ -613,7 +614,8 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 				}
 			})
 		}
-		info, err := probe(t.Path)
+		file := fileOf(t.Path) // a song from a CUE sheet: its whole disc image
+		info, err := probe(file)
 		if err != nil || !canAnalyse(info) {
 			post(func() {
 				p.show(qualityText(info, err, nil, notChecked, false))
@@ -627,10 +629,10 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 			levels.Hidden = img == nil
 		}
 
-		stamp := fileStamp(t.Path)
+		stamp := fileStamp(file)
 		var rep qualityReport
-		if u.qualityStore.get(t.Path, stamp, &rep) {
-			if img, ok := u.qualityStore.picture(t.Path); ok {
+		if u.qualityStore.get(file, stamp, &rep) {
+			if img, ok := u.qualityStore.picture(file); ok {
 				post(func() { show(rep, img) })
 				return
 			}
@@ -640,15 +642,15 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 			spec.set(nil, info.SampleRate, 0, 0, "Analysing…")
 			bar.Show()
 		})
-		rep, img, err := analyse(ctx, t.Path, info, true, func(done float64) {
+		rep, img, err := analyse(ctx, file, info, true, func(done float64) {
 			post(func() { bar.SetValue(done) })
 		})
 		if err != nil {
 			return // closed
 		}
 		level := assess(info, &rep).level
-		u.qualityStore.putPicture(t.Path, img)
-		u.qualityStore.put(t.Path, stamp, rep, level)
+		u.qualityStore.putPicture(file, img)
+		u.qualityStore.put(file, stamp, rep, level)
 		post(func() {
 			bar.Hide()
 			show(rep, img)

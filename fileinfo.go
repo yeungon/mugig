@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -19,12 +20,13 @@ import (
 // revealTrack shows t's file in the file manager, or says it can't be
 // found, as when its disk is unplugged.
 func (u *ui) revealTrack(t Track) {
-	if _, err := os.Stat(t.Path); err != nil {
+	file := fileOf(t.Path) // a song from a CUE sheet: its disc image
+	if _, err := os.Stat(file); err != nil {
 		u.missingFile(t)
 		return
 	}
 	u.async(func() {
-		if err := u.reveal(t.Path); err != nil {
+		if err := u.reveal(file); err != nil {
 			onUI(func() { dialog.ShowError(err, u.win) })
 		}
 	})
@@ -32,13 +34,17 @@ func (u *ui) revealTrack(t Track) {
 
 func (u *ui) missingFile(t Track) {
 	dialog.ShowInformation("File Not Found",
-		fmt.Sprintf("Can't find %s.\nIf it's on a removable disk, connect it and try again.", filepath.Base(t.Path)), u.win)
+		fmt.Sprintf("Can't find %s.\nIf it's on a removable disk, connect it and try again.", filepath.Base(fileOf(t.Path))), u.win)
 }
 
 // showInfo shows t's file details. The format is read from the file, which
 // can take a moment on a slow disk, so it fills in when ready.
+//
+// For a song from a CUE sheet, the file is its disc image, and the dialog
+// says where in it the song is.
 func (u *ui) showInfo(t Track) dialog.Dialog {
-	st, err := os.Stat(t.Path)
+	file := fileOf(t.Path)
+	st, err := os.Stat(file)
 	if err != nil {
 		u.missingFile(t)
 		return nil
@@ -51,7 +57,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 	}
 	format, length := value("Reading…"), value("Reading…")
 	quality := "Not checked yet"
-	if l, ok := u.levels[t.Path]; ok && l != qualityUnknown {
+	if l := u.levelOf(t); l != qualityUnknown {
 		quality = levelNames[l]
 	}
 	year := ""
@@ -59,8 +65,8 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 		year = fmt.Sprint(t.Year)
 	}
 	form := widget.NewForm(
-		widget.NewFormItem("Name", value(filepath.Base(t.Path))),
-		widget.NewFormItem("Where", value(filepath.Dir(t.Path))),
+		widget.NewFormItem("Name", value(filepath.Base(file))),
+		widget.NewFormItem("Where", value(filepath.Dir(file))),
 		widget.NewFormItem("Size", value(fmt.Sprintf("%s (%s bytes)", fileSize(st.Size()), thousands(int(st.Size()))))),
 		widget.NewFormItem("Modified", value(st.ModTime().Format("2 Jan 2006 at 15:04"))),
 		widget.NewFormItem("Format", format),
@@ -71,6 +77,11 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 		widget.NewFormItem("Year", value(year)),
 		widget.NewFormItem("Quality", value(quality)),
 	)
+	cue := fromCue(t.Path)
+	if cue {
+		at := fmt.Sprintf("A disc image, with a CUE sheet: this song runs from %s to %s", formatTime(t.Start), formatTime(t.Start+t.Length))
+		form.Items = slices.Insert(form.Items, 2, widget.NewFormItem("Part", value(at)))
+	}
 	show := widget.NewButtonWithIcon(revealLabel, theme.FolderOpenIcon(), func() { u.revealTrack(t) })
 	content := container.NewVBox(form, container.NewHBox(show))
 	d := dialog.NewCustom("Get Info", "Close", content, u.win)
@@ -78,7 +89,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 	d.Show()
 
 	u.async(func() {
-		info, err := probe(t.Path)
+		info, err := probe(file)
 		onUI(func() {
 			if err != nil {
 				format.SetText("Can't read the format: " + err.Error())
@@ -87,6 +98,9 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 			}
 			format.SetText(describe(info))
 			length.SetText(formatTime(info.Duration))
+			if cue {
+				length.SetText(fmt.Sprintf("%s, of %s for the whole image", formatTime(t.Length), formatTime(info.Duration)))
+			}
 			content.Refresh()
 		})
 	})

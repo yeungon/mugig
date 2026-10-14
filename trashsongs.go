@@ -28,6 +28,14 @@ func trashName() string {
 	return "the Trash"
 }
 
+// trashItem is Move to Trash for songs. It is off for songs from a CUE
+// sheet: their file is the whole disc image, with the album's other songs.
+func (u *ui) trashItem(ts []Track) *fyne.MenuItem {
+	item := fyne.NewMenuItem(trashLabel, func() { u.confirmTrash(ts) })
+	item.Disabled = slices.ContainsFunc(ts, func(t Track) bool { return fromCue(t.Path) })
+	return item
+}
+
 // confirmTrash asks before moving songs to the Trash.
 func (u *ui) confirmTrash(ts []Track) {
 	title := fmt.Sprintf("Move %s to %s?", plural(len(ts), "song"), trashName())

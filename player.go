@@ -252,12 +252,25 @@ func (p *player) openOutput(rate int) error {
 // decode opens path and returns a decoder for it, which owns the file. The
 // format is taken from the file's contents, so a misnamed file still plays,
 // falling back to its extension.
+//
+// A song from a CUE sheet plays its stretch of the disc image.
 func decode(path string) (beep.StreamSeekCloser, beep.Format, error) {
+	span := spanOf(path)
+	path = span.file
 	kind := sniff(path)
 	if kind == unknownFile {
 		kind = map[string]fileKind{".mp3": mp3File, ".flac": flacFile, ".wav": wavFile, ".ogg": oggFile}[strings.ToLower(filepath.Ext(path))]
 	}
-	return decodeAs(path, kind)
+	s, format, err := decodeAs(path, kind)
+	if err != nil {
+		return nil, format, err
+	}
+	cut, err := span.cut(s, format)
+	if err != nil {
+		s.Close()
+		return nil, format, fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
+	}
+	return cut, format, nil
 }
 
 func decodeAs(path string, kind fileKind) (s beep.StreamSeekCloser, format beep.Format, err error) {

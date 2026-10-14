@@ -248,6 +248,20 @@ silicon).
 - **go-mp3 puts out up to two frames of noise after a seek**, as the bit
   reservoir and filter bank lack the frames before. Seek 4 frames early
   and decode up to the spot.
+- **CUE sheets: give each song a path of its own** (`Album.wav#03`) so
+  playlists, the selection, Up Next and the cache keep working by path,
+  and resolve it to the image and its span only where a file is read
+  (`spanOf`). Key quality verdicts by the image, so its songs share one
+  check. Convert the sheet's 1/75 s times to samples by rounding:
+  beep's `SampleRate.N` truncates, and a time held in nanoseconds is a
+  fraction short, so consecutive songs would overlap by a sample. Tested
+  bit-exact: the songs played back to back equal the image.
+- **Find a CUE sheet's encoding by the file it names.** Sheets from
+  Chinese Windows are GBK, Japanese Shift-JIS, Western Windows-1252, and
+  nothing in the file says which. Decode with each in turn and keep the
+  one whose FILE is on disk. Ignore sheets whose files hold one song
+  each: those are left over from rips already split into songs (15 of
+  the 18 sheets on the test disks).
 - **Get song lengths from the headers, not a decoder.** go-mp3 works out an
   MP3's length by reading every frame, far too slow for a library scan.
   Read it instead from FLAC's STREAMINFO, WAV's data size, the last Ogg

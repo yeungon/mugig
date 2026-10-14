@@ -67,6 +67,12 @@ Written in Go with [Fyne](https://fyne.io).
   changes. When a disk is unplugged, its folder stays listed as
   "Not connected" with its songs hidden, and it is scanned again as soon as
   the disk is back.
+- **CUE sheets**: an album ripped to one big file, with a `.cue` sheet
+  beside it, is listed song by song with the sheet's titles and artists,
+  and plays without gaps, as on the CD. Sheets in Chinese, Japanese,
+  Korean or Western Windows encodings are read too. The songs share the
+  file's quality check; Move to Trash is off for them, as it would take
+  the whole album.
 - **Playlists**: right-click songs and choose **Add to Playlist**, or save
   Up Next as one. A playlist plays in its own order; right-click a song in
   it to take it out or move it up or down. **Smart playlists** are rules
@@ -195,6 +201,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
 | `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `skip.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, folders left out, the music folders, the saved library, folder watching |
+| `cue.go` | CUE sheets: an album in one file, listed and played song by song |
 | `playlists.go`, `playlistview.go` | Playlists and smart playlists |
 | `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
