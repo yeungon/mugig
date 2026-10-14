@@ -298,6 +298,7 @@ type ui struct {
 }
 
 func main() {
+	quietFLACNotes()
 	a := app.NewWithID(appID)
 	a.Settings().SetTheme(appTheme{})
 	a.SetIcon(appIcon)
