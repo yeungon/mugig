@@ -29,6 +29,10 @@ type audioPlayer interface {
 	Position() time.Duration
 	Duration() time.Duration
 	Seek(d time.Duration) error
+	// Prepare readies the song at path to follow the current one without a
+	// gap, or none for "". Once it has taken over, Play with its path
+	// carries on with it rather than starting it again.
+	Prepare(path string)
 	SetVolume(level float64)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
 	// Samples fills dst with the most recent audio, mono and oldest first,
@@ -48,22 +52,24 @@ type audioPlayer interface {
 	DevicesChanged()
 }
 
-// player plays one track at a time through out. Its fields are only
-// touched on the UI thread, except what the audio thread reads through
-// out's lock.
+// player plays one track at a time through out, the next one joined on
+// without a gap if it is readied in time. Its fields are only touched on
+// the UI thread, except what the audio thread reads through out's lock.
 type player struct {
 	out output
 
-	stream beep.StreamSeekCloser // decoder for the current track; owns the file
-	format beep.Format
-	tap    *tap
-	vol    *effects.Volume
-	ctrl   *beep.Ctrl
-	gen    int     // bumped on every Stop so stale end-of-track callbacks are ignored
-	level  float64 // volume from 0 (silent) to 1 (full), kept across tracks
-	speed  float64 // playback speed, kept across tracks
+	decks *decks // the song playing and the one readied to follow; nil if stopped
+	tap   *tap
+	vol   *effects.Volume
+	ctrl  *beep.Ctrl
+	gen   int     // bumped on every Stop so stale end-of-track callbacks are ignored
+	level float64 // volume from 0 (silent) to 1 (full), kept across tracks
+	speed float64 // playback speed, kept across tracks
 
-	stretch *stretcher // between the stream and the tap: changes the speed
+	onEnd     func(error) // the current song's end-of-track callback
+	nextPath  string      // the song asked to follow, "" for none
+	handedOff bool        // the next song has taken over, and Play hasn't yet claimed it
+	events    []func()    // from the audio thread, for the UI thread in order; out.mu guards it
 
 	device    string             // chosen output device's ID, "" for the system default
 	matchRate bool               // switch the device to each track's rate
@@ -77,41 +83,129 @@ func newPlayer() *player {
 // Play stops any current track and starts the one at path. onEnd is called
 // on the UI thread when the track ends: with nil if it played through, or
 // with why it stopped early.
+//
+// If the song at path is the one readied that has just taken over, it
+// carries on: the song before ended, and this is the UI moving on to it.
 func (p *player) Play(path string, onEnd func(error)) error {
+	if p.handedOff && p.current().path == path {
+		p.handedOff = false
+		p.onEnd = onEnd
+		return nil
+	}
 	p.Stop()
-	s, format, err := decode(path)
+	d, err := openDeck(path, p.speed)
 	if err != nil {
 		return err
 	}
-	if err := p.openOutput(int(format.SampleRate)); err != nil {
-		s.Close()
+	if err := p.openOutput(int(d.format.SampleRate)); err != nil {
+		d.stream.Close()
 		return fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
 	}
-	ra := newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate)
-	s = ra
-	p.stretch = newStretcher(ra, int(format.SampleRate), p.speed)
 
 	gen := p.gen
-	p.stream, p.format = s, format
+	p.onEnd = onEnd
+	ds := &decks{cur: d}
+	ds.switched = func(old *deck) { p.notify(func() { p.switched(gen, old) }) }
+	p.decks = ds
 	// The tap sits before the volume so the visualizer still moves when
 	// the sound is turned down.
-	p.tap = newTap(p.stretch, 8192)
+	p.tap = newTap(ds, 8192)
 	p.vol = &effects.Volume{Streamer: p.tap, Base: 2}
 	p.applyLevel()
 	p.ctrl = &beep.Ctrl{Streamer: beep.Seq(p.vol, beep.Callback(func() {
-		// Runs on the audio thread with the output locked, so hand off to
-		// the UI thread from a goroutine that doesn't hold the lock.
-		go onUI(func() {
+		p.notify(func() {
 			if p.gen == gen {
-				err := s.Err()
+				err := ds.Err()
 				p.release()
 				p.out.idle()
-				onEnd(err)
+				p.onEnd(err)
 			}
 		})
 	}))}
 	p.out.play(p.ctrl)
 	return nil
+}
+
+// notify runs f on the UI thread, after anything notified before it, so a
+// song's end is never seen before the switch to it. It is called on the
+// audio thread with the output locked, so f is handed over by a goroutine
+// that doesn't hold the lock.
+func (p *player) notify(f func()) {
+	p.events = append(p.events, f)
+	go onUI(func() {
+		p.out.mu.Lock()
+		fs := p.events
+		p.events = nil
+		p.out.mu.Unlock()
+		for _, f := range fs {
+			f()
+		}
+	})
+}
+
+// switched runs when the readied song has taken over from old. The UI is
+// told old ended, and moves on: with Play for the song that has already
+// begun, which claims it, or by stopping or playing something else.
+func (p *player) switched(gen int, old *deck) {
+	old.stream.Close()
+	if p.gen != gen {
+		return
+	}
+	p.nextPath = ""
+	p.handedOff = true
+	p.onEnd(nil)
+}
+
+// current is the song playing, or nil.
+func (p *player) current() *deck {
+	if p.decks == nil {
+		return nil
+	}
+	p.out.mu.Lock()
+	defer p.out.mu.Unlock()
+	return p.decks.cur
+}
+
+// Prepare opens the song at path in the background and, if it is at the
+// current song's sample rate, has it follow on.
+func (p *player) Prepare(path string) {
+	cur := p.current()
+	if cur == nil || path == p.nextPath {
+		return
+	}
+	p.nextPath = path
+	p.setNext(nil)
+	if path == "" {
+		return
+	}
+	gen, rate, speed := p.gen, cur.format.SampleRate, p.speed
+	go func() {
+		d, err := openDeck(path, speed)
+		if err != nil {
+			return // Play will fail too, and say why
+		}
+		onUI(func() {
+			if p.gen != gen || p.nextPath != path || d.format.SampleRate != rate {
+				d.stream.Close()
+				return
+			}
+			p.setNext(d)
+		})
+	}()
+}
+
+// setNext makes d the song to follow, closing any readied before.
+func (p *player) setNext(d *deck) {
+	p.out.mu.Lock()
+	old := p.decks.next
+	p.decks.next = d
+	if d != nil {
+		d.stretch.setTempo(p.speed)
+	}
+	p.out.mu.Unlock()
+	if old != nil {
+		old.stream.Close()
+	}
 }
 
 // openOutput readies the device for a track at rate, first switching the
@@ -164,7 +258,9 @@ func decodeAs(path string, kind fileKind) (s beep.StreamSeekCloser, format beep.
 	}
 	switch kind {
 	case mp3File:
-		s, format, err = mp3.Decode(f)
+		if s, format, err = mp3.Decode(f); err == nil {
+			s = newMP3Stream(s, f)
+		}
 	case flacFile:
 		var fs *flacStream
 		if fs, format, err = newFLACStream(f); err == nil {
@@ -210,44 +306,50 @@ func (p *player) TogglePause() bool {
 
 // Position reports how far into the current track playback is.
 func (p *player) Position() time.Duration {
-	if p.stream == nil {
+	if p.decks == nil {
 		return 0
 	}
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
-	return p.format.SampleRate.D(p.stream.Position())
+	d := p.decks.cur
+	return d.format.SampleRate.D(d.stream.Position())
 }
 
 // Duration reports the length of the current track, or 0 if unknown.
 func (p *player) Duration() time.Duration {
-	if p.stream == nil {
+	if p.decks == nil {
 		return 0
 	}
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
-	return p.format.SampleRate.D(max(p.stream.Len(), 0))
+	d := p.decks.cur
+	return d.format.SampleRate.D(max(d.stream.Len(), 0))
 }
 
 // Seek jumps to d within the current track. The stream reads ahead and
 // guards itself, so the audio thread isn't held up while it seeks.
 func (p *player) Seek(d time.Duration) error {
-	if p.stream == nil {
+	cur := p.current()
+	if cur == nil {
 		return nil
 	}
-	n := min(max(p.format.SampleRate.N(d), 0), p.stream.Len())
-	return p.stream.Seek(n)
+	n := min(max(cur.format.SampleRate.N(d), 0), cur.stream.Len())
+	return cur.stream.Seek(n)
 }
 
 // SetSpeed sets the playback speed, keeping the pitch, for this track and
 // the ones after.
 func (p *player) SetSpeed(speed float64) {
 	p.speed = speed
-	if p.stretch == nil {
+	if p.decks == nil {
 		return
 	}
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
-	p.stretch.setTempo(speed)
+	p.decks.cur.stretch.setTempo(speed)
+	if p.decks.next != nil {
+		p.decks.next.stretch.setTempo(speed)
+	}
 }
 
 // SetVolume sets the volume from 0 (silent) to 1 (full).
@@ -275,14 +377,15 @@ func (p *player) Samples(dst []float64) int {
 		return 0
 	}
 	p.tap.latest(dst)
-	return int(p.format.SampleRate)
+	return int(p.current().format.SampleRate)
 }
 
 func (p *player) Output() (deviceRate, trackRate int) {
-	if p.stream == nil {
+	cur := p.current()
+	if cur == nil {
 		return 0, 0
 	}
-	return p.out.deviceRate(), int(p.format.SampleRate)
+	return p.out.deviceRate(), int(cur.format.SampleRate)
 }
 
 func (p *player) Devices() []outputDevice {
@@ -325,12 +428,12 @@ func (p *player) DevicesChanged() {
 // reopen moves the current track to a freshly opened device, after the
 // device or its rate has changed.
 func (p *player) reopen() {
-	if p.stream == nil {
-		p.out.closeDevice() // the next track opens the right one
-		return
-	}
+	cur := p.current()
 	p.out.closeDevice()
-	if err := p.openOutput(int(p.format.SampleRate)); err != nil {
+	if cur == nil {
+		return // the next track opens the right one
+	}
+	if err := p.openOutput(int(cur.format.SampleRate)); err != nil {
 		fyne.LogError("reopening audio output", err)
 		return
 	}
@@ -340,7 +443,7 @@ func (p *player) reopen() {
 // Stop halts playback and closes the current file.
 func (p *player) Stop() {
 	p.gen++
-	if p.stream == nil {
+	if p.decks == nil {
 		return
 	}
 	p.out.idle() // once this returns the audio thread no longer reads the stream
@@ -348,8 +451,12 @@ func (p *player) Stop() {
 }
 
 func (p *player) release() {
-	p.stream.Close()
-	p.stream, p.stretch, p.tap, p.vol, p.ctrl = nil, nil, nil, nil, nil
+	p.decks.cur.stream.Close()
+	if p.decks.next != nil {
+		p.decks.next.stream.Close()
+	}
+	p.decks, p.tap, p.vol, p.ctrl = nil, nil, nil, nil
+	p.nextPath, p.handedOff = "", false
 }
 
 // Close stops playback, closes the device and puts back the device rates

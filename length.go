@@ -175,16 +175,10 @@ func parseMPEGHeader(h []byte) (mpegFrame, bool) {
 	return fr, true
 }
 
-// mp3Length counts the frames from the Xing or VBRI tag that encoders put
-// in the first frame. Without one the file has a constant bitrate, so its
-// size gives the length.
-func mp3Length(f *os.File, start, size int64) time.Duration {
-	buf := make([]byte, 16<<10)
-	n, _ := f.ReadAt(buf, start)
-	buf = buf[:n]
-	// Find a frame whose next frame follows where it says, so stray bytes
-	// that happen to look like a header aren't taken for one.
-	at, fr := -1, mpegFrame{}
+// firstMPEGFrame finds the first frame in buf whose next frame follows
+// where it says, so stray bytes that happen to look like a header aren't
+// taken for one. at is -1 if there is none.
+func firstMPEGFrame(buf []byte) (at int, fr mpegFrame) {
 	for i := 0; i+4 <= len(buf); i++ {
 		h, ok := parseMPEGHeader(buf[i:])
 		if !ok {
@@ -195,24 +189,70 @@ func mp3Length(f *os.File, start, size int64) time.Duration {
 				continue
 			}
 		}
-		at, fr = i, h
-		break
+		return i, h
 	}
+	return -1, mpegFrame{}
+}
+
+// xingTag is what the Xing or Info tag in an MP3's first frame says. LAME,
+// and FFmpeg which uses it, add a note of the silence the encoder added
+// before and after the music.
+type xingTag struct {
+	frames         int // not counting the frame the tag is in
+	delay, padding int // samples added before and after; 0 without the note
+}
+
+// readXing reads the Xing or Info tag in the frame at at, if it has the
+// frame count.
+func readXing(buf []byte, at int, fr mpegFrame) (xingTag, bool) {
+	x := at + 4 + fr.sideInfo
+	if x+12 > len(buf) || (string(buf[x:x+4]) != "Xing" && string(buf[x:x+4]) != "Info") {
+		return xingTag{}, false
+	}
+	flags := binary.BigEndian.Uint32(buf[x+4:])
+	if flags&1 == 0 {
+		return xingTag{}, false
+	}
+	tag := xingTag{frames: int(binary.BigEndian.Uint32(buf[x+8:]))}
+	lame := x + 12
+	for bit, size := range []int{4, 100, 4} { // byte count, seek table, quality
+		if flags&(2<<bit) != 0 {
+			lame += size
+		}
+	}
+	if lame+24 > len(buf) || fr.layer != 3 {
+		return tag, true
+	}
+	switch string(buf[lame : lame+4]) {
+	case "LAME", "Lavc", "Lavf", "L3.9":
+		v := buf[lame+21:]
+		delay, padding := int(v[0])<<4|int(v[1])>>4, int(v[1]&15)<<8|int(v[2])
+		if delay+padding < tag.frames*fr.samples {
+			tag.delay, tag.padding = delay, padding
+		}
+	}
+	return tag, true
+}
+
+// mp3Length counts the frames from the Xing or VBRI tag that encoders put
+// in the first frame. Without one the file has a constant bitrate, so its
+// size gives the length.
+func mp3Length(f *os.File, start, size int64) time.Duration {
+	buf := make([]byte, 16<<10)
+	n, _ := f.ReadAt(buf, start)
+	buf = buf[:n]
+	at, fr := firstMPEGFrame(buf)
 	if at < 0 {
 		return 0
 	}
-	frames := func(count uint32) time.Duration {
-		return time.Duration(count) * time.Duration(fr.samples) * time.Second / time.Duration(fr.rate)
+	samples := func(n int) time.Duration {
+		return time.Duration(n) * time.Second / time.Duration(fr.rate)
 	}
-	if x := at + 4 + fr.sideInfo; x+12 <= len(buf) {
-		if tag := string(buf[x : x+4]); tag == "Xing" || tag == "Info" {
-			if binary.BigEndian.Uint32(buf[x+4:])&1 != 0 { // has the frame count
-				return frames(binary.BigEndian.Uint32(buf[x+8:]))
-			}
-		}
+	if x, ok := readXing(buf, at, fr); ok {
+		return samples(x.frames*fr.samples - x.delay - x.padding)
 	}
 	if v := at + 4 + 32; v+18 <= len(buf) && string(buf[v:v+4]) == "VBRI" {
-		return frames(binary.BigEndian.Uint32(buf[v+14:]))
+		return samples(int(binary.BigEndian.Uint32(buf[v+14:])) * fr.samples)
 	}
 	audio := size - start - int64(at)
 	var tail [128]byte

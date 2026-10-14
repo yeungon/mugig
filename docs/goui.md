@@ -177,6 +177,31 @@ silicon).
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at
   192 kHz). Bypass it entirely at 1×.
+- **Gapless: join the next song inside the audio callback**, not by
+  reacting to the end of the last one. The end callback reaches the UI
+  thread, which opens the next file and restarts the device: 50–200 ms of
+  silence. Instead the UI names the next song 20 s before the end (asked
+  again every tick, so changes to Up Next, shuffle or repeat are followed),
+  a goroutine opens it, and the streamer (`gapless.go`) moves on to it in
+  the same buffer. Only at the same sample rate: another rate needs the
+  device reopened. Then the UI's usual "song ended, play the next" call
+  finds that song already playing and just claims it, so the play-order
+  logic stays in one place.
+- **Deliver events from the audio thread in order.** Each `go onUI(f)`
+  is its own goroutine, so two of them can arrive in either order: a short
+  song's "ended" could beat the "switched to it". Append events to a
+  slice under the output lock and have each goroutine drain the slice.
+- **MP3s carry silence that must be cut for gapless**: the frame holding
+  the Xing/Info tag decodes as 1,152 samples of silence, then come the
+  encoder's delay and the decoder's 529 samples. LAME and FFmpeg record the
+  delay and the padding at the end in the LAME tag. Checked against the
+  WAV the test MP3 was made from: the music starts exactly 1,152 + delay +
+  529 samples in. go-mp3 doesn't flush its decoder, so with less than 529
+  samples of padding the very end is missing: cap the length at what it
+  decodes.
+- **go-mp3 puts out up to two frames of noise after a seek**, as the bit
+  reservoir and filter bank lack the frames before. Seek 4 frames early
+  and decode up to the spot.
 - **Get song lengths from the headers, not a decoder.** go-mp3 works out an
   MP3's length by reading every frame, far too slow for a library scan.
   Read it instead from FLAC's STREAMINFO, WAV's data size, the last Ogg

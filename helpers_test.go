@@ -20,6 +20,7 @@ type fakePlayer struct {
 	level  float64
 	speed  float64
 	bad    map[string]bool // paths that fail to play
+	next   string          // the path readied to follow, by Prepare
 
 	device    string
 	matchRate bool
@@ -30,12 +31,14 @@ func (f *fakePlayer) Play(path string, onEnd func(error)) error {
 		return errors.New("cannot play " + filepath.Base(path))
 	}
 	f.played = append(f.played, path)
-	f.onEnd, f.paused, f.pos = onEnd, false, 0
+	f.onEnd, f.paused, f.pos, f.next = onEnd, false, 0, ""
 	return nil
 }
 
+func (f *fakePlayer) Prepare(path string) { f.next = path }
+
 func (f *fakePlayer) TogglePause() bool          { f.paused = !f.paused; return f.paused }
-func (f *fakePlayer) Stop()                      { f.onEnd = nil }
+func (f *fakePlayer) Stop()                      { f.onEnd, f.next = nil, "" }
 func (f *fakePlayer) Position() time.Duration    { return f.pos }
 func (f *fakePlayer) Duration() time.Duration    { return 3 * time.Minute }
 func (f *fakePlayer) Seek(d time.Duration) error { f.pos = d; return nil }

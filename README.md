@@ -19,6 +19,9 @@ Written in Go with [Fyne](https://fyne.io).
   and on macOS the device itself is switched to that rate (and put back on
   quit), so the audio reaches it unconverted. The Now Playing page says
   whether it is.
+- **Gapless**: songs at the same sample rate follow each other without a
+  pause, so live albums, classical works and mixes play as recorded. MP3s
+  have the silence their encoder added cut off.
 - Choice of **output device**.
 - **Playback speed** from 0.5× to 2× with the **pitch kept**. At 1× the audio
   passes through untouched.
@@ -173,7 +176,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
-| `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |
+| `player.go`, `gapless.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, gapless playback, read-ahead, damage-tolerant FLAC, speed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
 | `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |
 | `tools/mkicon` | Draws the app icon (`make icon`) |

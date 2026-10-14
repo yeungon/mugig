@@ -291,11 +291,16 @@ func (u *ui) advance() bool {
 // upNext picks the list's track after the current one, following shuffle
 // and repeat. ok is false when playback should stop.
 func (u *ui) upNext() (t Track, ok bool) {
+	if u.shuffle && len(u.tracks) > 0 {
+		return u.nextShuffled()
+	}
+	return u.listNext()
+}
+
+// listNext is the track after the current one in list order.
+func (u *ui) listNext() (t Track, ok bool) {
 	if len(u.tracks) == 0 {
 		return Track{}, false
-	}
-	if u.shuffle {
-		return u.nextShuffled()
 	}
 	i := u.listIndex() // -1 if nothing is playing, so this starts at the top
 	switch {
@@ -329,6 +334,54 @@ func (u *ui) nextShuffled() (Track, bool) {
 			return u.tracks[i], true
 		}
 	}
+}
+
+// following is the song that will play when the current one ends, as
+// trackEnded would choose it, without taking it from Up Next or the
+// shuffle round. ok is false if playback would stop, or the song can't be
+// known yet.
+func (u *ui) following() (t Track, ok bool) {
+	if u.repeat == repeatOne {
+		return u.playing, true
+	}
+	for _, q := range u.queued {
+		if t, ok := u.inLibrary(q.Path); ok {
+			return t, true
+		}
+	}
+	if !u.shuffle {
+		return u.listNext()
+	}
+	if !u.queueValid {
+		u.refillQueue(false)
+	}
+	for _, p := range u.queue {
+		if i := u.indexOf(p); i >= 0 {
+			return u.tracks[i], true
+		}
+	}
+	if u.repeat != repeatAll {
+		return Track{}, false
+	}
+	u.refillQueue(true) // the round is over: shuffle the next now, as nextShuffled would
+	if len(u.queue) == 0 {
+		return Track{}, false
+	}
+	return u.tracks[u.indexOf(u.queue[0])], true
+}
+
+// prepareNext readies the song that follows, once the current one is
+// near its end, so the two join without a gap. Asked again as the end
+// nears, it follows changes to Up Next, shuffle, repeat or the list.
+func (u *ui) prepareNext() {
+	if u.playing.Path == "" {
+		return
+	}
+	if d := u.player.Duration(); d <= 0 || d-u.player.Position() > gaplessLead {
+		return
+	}
+	t, _ := u.following()
+	u.player.Prepare(t.Path)
 }
 
 // refillQueue shuffles the listed tracks into a new round. When a round is
@@ -515,6 +568,7 @@ func (u *ui) trackProgress() {
 			if u.playing.Path != "" && !u.seeking {
 				u.setSeek(u.player.Position())
 			}
+			u.prepareNext()
 		})
 	}
 }
