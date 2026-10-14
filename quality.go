@@ -1013,6 +1013,12 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 
 	// Integrity.
 	switch {
+	case rep.Damaged != "" && info.kind == flacFile:
+		// The check stops at the first damage; playback skips each damaged
+		// frame (see flacStream).
+		a.checks = append(a.checks, check{checkBad, fmt.Sprintf(
+			"Damaged: unreadable audio at %s, and perhaps later. It plays with a short silence in place of each damaged part",
+			formatTime(rep.DamageAt))})
 	case rep.Damaged != "":
 		a.checks = append(a.checks, check{checkBad, fmt.Sprintf("Damaged: the audio can't be read from %s on", formatTime(rep.DamageAt))})
 	case rep.Checksum == checksumBad:

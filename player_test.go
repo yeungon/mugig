@@ -31,7 +31,7 @@ func testPlayer(t *testing.T) *player {
 func TestPlayerPlaysToTheEnd(t *testing.T) {
 	p := testPlayer(t)
 	ended := make(chan struct{}, 1)
-	if err := p.Play("testdata/sample.flac", func() { ended <- struct{}{} }); err != nil {
+	if err := p.Play("testdata/sample.flac", func(error) { ended <- struct{}{} }); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -59,7 +59,7 @@ func TestPlayerOpensDeviceAtTrackRate(t *testing.T) {
 	p := testPlayer(t)
 	hires, cd, cd2 := longFLAC(t, 96000, 24, 4), longFLAC(t, 44100, 16, 4), longFLAC(t, 44100, 16, 4)
 
-	if err := p.Play(hires, func() {}); err != nil {
+	if err := p.Play(hires, func(error) {}); err != nil {
 		t.Fatal(err)
 	}
 	if d := p.Duration(); d != 4*time.Second {
@@ -69,12 +69,12 @@ func TestPlayerOpensDeviceAtTrackRate(t *testing.T) {
 		t.Errorf("96 kHz track: device %d, track %d", dev, track)
 	}
 	first := p.out.dev
-	p.Play(cd, func() {})
+	p.Play(cd, func(error) {})
 	if dev, _ := p.Output(); dev != 44100 || p.out.dev == first {
 		t.Errorf("44.1 kHz track: device at %d, reopened %v", dev, p.out.dev != first)
 	}
 	second := p.out.dev
-	p.Play(cd2, func() {})
+	p.Play(cd2, func(error) {})
 	if p.out.dev != second {
 		t.Error("a track at the same rate should keep the device")
 	}
@@ -82,7 +82,7 @@ func TestPlayerOpensDeviceAtTrackRate(t *testing.T) {
 
 func TestPlayerPauseAndSeek(t *testing.T) {
 	p := testPlayer(t)
-	p.Play(longFLAC(t, 44100, 16, 5), func() {})
+	p.Play(longFLAC(t, 44100, 16, 5), func(error) {})
 
 	time.Sleep(300 * time.Millisecond)
 	if p.Position() == 0 {
@@ -141,7 +141,7 @@ func TestPlayerDevices(t *testing.T) {
 	}
 	// A device that has gone falls back to the default.
 	p.SetDevice("ffff")
-	if err := p.Play(longFLAC(t, 44100, 16, 3), func() {}); err != nil {
+	if err := p.Play(longFLAC(t, 44100, 16, 3), func(error) {}); err != nil {
 		t.Errorf("unplugged device: %v", err)
 	}
 }

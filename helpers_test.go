@@ -14,7 +14,7 @@ import (
 // fakePlayer stands in for real audio so tests make no sound.
 type fakePlayer struct {
 	played []string // every path Play was called with, in order
-	onEnd  func()
+	onEnd  func(error)
 	paused bool
 	pos    time.Duration
 	level  float64
@@ -24,7 +24,7 @@ type fakePlayer struct {
 	matchRate bool
 }
 
-func (f *fakePlayer) Play(path string, onEnd func()) error {
+func (f *fakePlayer) Play(path string, onEnd func(error)) error {
 	if f.bad[path] {
 		return errors.New("cannot play " + filepath.Base(path))
 	}
@@ -76,7 +76,18 @@ func (f *fakePlayer) finish(t *testing.T) {
 	}
 	end := f.onEnd
 	f.onEnd = nil
-	end()
+	end(nil)
+}
+
+// fail simulates the current track stopping early with err.
+func (f *fakePlayer) fail(t *testing.T, err error) {
+	t.Helper()
+	if f.onEnd == nil {
+		t.Fatal("fail called with nothing playing")
+	}
+	end := f.onEnd
+	f.onEnd = nil
+	end(err)
 }
 
 // last returns the title of the most recently played track.

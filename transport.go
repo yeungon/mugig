@@ -219,8 +219,16 @@ func (u *ui) stop() {
 	u.setStopped()
 }
 
-// trackEnded runs when a track plays to the end, giving continuous playback.
-func (u *ui) trackEnded() {
+// trackEnded runs when a track ends, giving continuous playback. If it
+// stopped early because it couldn't be read, playback stops and says why,
+// rather than moving on as if the song had finished.
+func (u *ui) trackEnded(err error) {
+	if err != nil {
+		title := u.playing.Title
+		u.stop()
+		dialog.ShowError(fmt.Errorf("Stopped playing %s: %w", title, err), u.win)
+		return
+	}
 	if u.repeat == repeatOne {
 		u.play(u.playing)
 		return

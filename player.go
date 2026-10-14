@@ -14,7 +14,6 @@ import (
 	"fyne.io/fyne/v2"
 	"github.com/gopxl/beep/v2"
 	"github.com/gopxl/beep/v2/effects"
-	"github.com/gopxl/beep/v2/flac"
 	"github.com/gopxl/beep/v2/mp3"
 	"github.com/gopxl/beep/v2/vorbis"
 	"github.com/gopxl/beep/v2/wav"
@@ -24,7 +23,7 @@ import (
 // audioPlayer is what the UI needs from playback. The real one is player;
 // tests use a fake so they make no sound.
 type audioPlayer interface {
-	Play(path string, onEnd func()) error
+	Play(path string, onEnd func(error)) error
 	TogglePause() bool
 	Stop()
 	Position() time.Duration
@@ -72,8 +71,9 @@ func newPlayer() *player {
 }
 
 // Play stops any current track and starts the one at path. onEnd is called
-// on the UI thread if the track plays through to the end.
-func (p *player) Play(path string, onEnd func()) error {
+// on the UI thread when the track ends: with nil if it played through, or
+// with why it stopped early.
+func (p *player) Play(path string, onEnd func(error)) error {
 	p.Stop()
 	s, format, err := decode(path)
 	if err != nil {
@@ -97,9 +97,10 @@ func (p *player) Play(path string, onEnd func()) error {
 		// the UI thread from a goroutine that doesn't hold the lock.
 		go fyne.Do(func() {
 			if p.gen == gen {
+				err := s.Err()
 				p.release()
 				p.out.idle()
-				onEnd()
+				onEnd(err)
 			}
 		})
 	}))}
@@ -159,7 +160,10 @@ func decodeAs(path string, kind fileKind) (s beep.StreamSeekCloser, format beep.
 	case mp3File:
 		s, format, err = mp3.Decode(f)
 	case flacFile:
-		s, format, err = flac.Decode(f)
+		var fs *flacStream
+		if fs, format, err = newFLACStream(f); err == nil {
+			s = fs
+		}
 	case wavFile:
 		s, format, err = wav.Decode(f)
 	case oggFile:
