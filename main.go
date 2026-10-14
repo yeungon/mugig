@@ -304,6 +304,9 @@ type ui struct {
 	listPath        string   // the last track played from the list, where it carries on from
 	queueBtn        *widget.Button
 	queuePop        *widget.PopUp
+	cued            *cuedSong // the last session's song, waiting for Play (see resume.go)
+	resumePending   bool      // the last session is still to be restored
+	sessionSaved    bool      // saved on quit already
 	clearQueueItem  *fyne.MenuItem
 
 	// The fields below are only read or modified on the UI thread (inside
@@ -386,15 +389,29 @@ func main() {
 	watchDevices(u.devicesChanged)
 	go u.watchConnections()
 
-	// Pick up where the user left off.
+	// Pick up where the user left off: the library, then the song.
 	a.Lifecycle().SetOnStarted(func() {
 		if len(u.folders) > 0 {
 			u.scanLibrary()
 		}
+		if u.cancel == nil { // nothing to scan
+			u.restoreSession()
+		}
 	})
 	w.SetOnDropped(u.dropped)
 
+	// Quitting from the menu or with ⌘Q stops the app without always
+	// closing the window first, so the session is saved on whichever
+	// comes first, while the player still knows the position.
+	saveOnce := func() {
+		if !u.sessionSaved {
+			u.sessionSaved = true
+			u.saveSession()
+		}
+	}
+	a.Lifecycle().SetOnStopped(saveOnce)
 	w.SetOnClosed(func() {
+		saveOnce()
 		u.stopAllWatching()
 		if u.batch != nil && !u.batch.finished {
 			u.batch.cancel()
@@ -514,6 +531,7 @@ func (u *ui) build() {
 	pages := container.NewStack(u.buildSongsPage(), u.buildVisualizer()) // one shown at a time
 	bar := u.buildTransport()
 	u.loadFolders()
+	u.resumePending = u.prefs.String(prefResumeSong) != "" || len(u.prefs.StringList(prefUpNext)) > 0
 	sidebar := u.buildSidebar()
 	u.updateCount()
 	if len(u.folders) == 0 {
@@ -788,6 +806,7 @@ func (u *ui) finish(root string, tally scanTally) {
 			verb, plural(u.run.tracks, "track"), in, elapsed.Round(10*time.Millisecond),
 			thousands(u.run.fromCache), thousands(u.run.noTags)))
 		u.run = scanRun{}
+		u.restoreSession()
 	})
 }
 

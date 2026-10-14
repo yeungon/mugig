@@ -29,6 +29,9 @@ Written in Go with [Fyne](https://fyne.io).
 - **Up Next**: right-click a song and choose **Play Next** or **Play Later**.
   Those songs play first, then the list carries on where it was. The queue
   button in the player bar lights up while songs are waiting and lists them.
+- **Picks up where you left off**: reopen Mugig and the last song waits in the
+  player bar, paused where you stopped, with Up Next as you left it. Press
+  Play to carry on; nothing plays by itself.
 - Shuffle, repeat, seeking, keyboard shortcuts, a spectrum or waveform
   **visualizer**, and on macOS the system's Now Playing controls and media keys.
 - **Light and dark** appearance, following the system or chosen in
@@ -154,7 +157,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
 | `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, the music folders, the saved library, folder watching |
-| `transport.go`, `upnext.go` | The player bar, play order, shuffle, repeat and Up Next |
+| `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
 | `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
 | `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |

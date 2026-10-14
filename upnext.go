@@ -97,6 +97,7 @@ func (u *ui) removeQueued(i int) {
 // queueChanged shows whether songs are waiting: on the queue button, in
 // the menu, and in the Up Next list if it is open.
 func (u *ui) queueChanged() {
+	u.saveQueue()
 	if u.queueBtn != nil {
 		setToggle(u.queueBtn, queueIcon, len(u.queued) > 0)
 	}

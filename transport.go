@@ -163,10 +163,15 @@ func (u *ui) start(t Track, queued bool) {
 	}
 	u.playing = t
 	u.paused = false
+	u.cued = nil
 	u.fromQueue = queued
 	if !queued {
 		u.listPath = t.Path
 	}
+	// Remembered now, not only on quit, in case Mugig doesn't get to quit
+	// normally; the position is saved on pause and quit.
+	u.prefs.SetString(prefResumeSong, t.Path)
+	u.prefs.SetFloat(prefResumeAt, 0)
 	if u.queueValid {
 		u.queue = slices.DeleteFunc(u.queue, func(p string) bool { return p == t.Path })
 	}
@@ -218,10 +223,17 @@ func (u *ui) showArt(data []byte) {
 // the list.
 func (u *ui) togglePlay() {
 	if u.playing.Path == "" {
-		u.advance()
+		if u.cued != nil {
+			u.playCued()
+		} else {
+			u.advance()
+		}
 		return
 	}
 	u.paused = u.player.TogglePause()
+	if u.paused {
+		u.saveSession()
+	}
 	if u.paused {
 		u.playBtn.SetIcon(theme.MediaPlayIcon())
 	} else {
@@ -385,6 +397,10 @@ func (u *ui) restart() {
 // seekTo jumps to d within the playing track.
 func (u *ui) seekTo(d time.Duration) {
 	if u.playing.Path == "" {
+		if u.cued != nil { // moves where Play will start
+			u.cued.at = min(max(d, 0), u.cued.track.Length)
+			u.setSeek(u.cued.at)
+		}
 		return
 	}
 	d = max(d, 0)
@@ -468,6 +484,7 @@ func (u *ui) toggleMute() {
 func (u *ui) setStopped() {
 	u.playing = Track{}
 	u.paused = false
+	u.cued = nil
 	u.fromQueue = false
 	u.queueValid = false // the next play starts a fresh shuffle round
 	u.history = nil

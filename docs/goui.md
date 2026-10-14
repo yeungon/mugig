@@ -76,6 +76,15 @@ silicon).
   Adding a field to a gob-encoded struct is safe (it reads as zero); fill
   it from elsewhere if possible instead of discarding the cache.
 
+- **Save state on quit in two places.** Quitting from the menu or with ⌘Q
+  runs the app's `Lifecycle().SetOnStopped` hook but doesn't always close
+  the window first, so `SetOnClosed` alone can miss it. Save from both,
+  once, before the audio player is closed (its position is gone after).
+  Preferences set in `OnStopped` are still written to disk.
+- **Restore the last session after the library loads**, not at start: the
+  saved song has to be found in the library first. Until then, don't save
+  over the saved state (here, Up Next).
+
 ## 4. Fyne: icons and packaging
 
 - **`fyne package` reshapes the macOS icon itself.** It shrinks the picture
