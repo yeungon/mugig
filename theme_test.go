@@ -152,7 +152,7 @@ func TestFolderPlace(t *testing.T) {
 
 func TestTrackCellStyles(t *testing.T) {
 	newTestApp(t)
-	c := newTrackCell(nil).(*trackCell)
+	c := newTrackCell().(*trackCell)
 	for _, tc := range []struct {
 		col     int
 		playing bool

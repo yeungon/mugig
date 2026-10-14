@@ -76,11 +76,16 @@ func (u *ui) batchWorkers() int {
 
 // checkAllSongs starts checking every lossless song.
 func (u *ui) checkAllSongs() {
+	u.checkSongs(u.all)
+}
+
+// checkSongs starts checking the lossless songs among songs.
+func (u *ui) checkSongs(songs []Track) {
 	if u.batch != nil && !u.batch.finished {
 		return // already running
 	}
 	var todo []Track
-	for _, t := range u.all {
+	for _, t := range songs {
 		if !lossyFormats[t.Format] {
 			todo = append(todo, t)
 		}

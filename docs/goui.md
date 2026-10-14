@@ -44,6 +44,17 @@ silicon).
   cell; to act on rows, act and then `UnselectAll()`, and mark the current
   row yourself. Clicking a cell inside a custom cell widget that handles
   taps needs forwarding to the table (`tapTable`).
+- **Modifier keys on click**: `Tapped` doesn't say whether ⌘ or ⇧ was
+  held. Ask the driver: `fyne.CurrentApp().Driver().(desktop.Driver)
+  .CurrentKeyModifiers()` (Fyne 2.4+). The test driver doesn't have it, so
+  make it replaceable in tests.
+- **Don't make ⌘A a menu shortcut** in an app with a search box: menu
+  shortcuts fire wherever focus is, so it would stop ⌘A selecting the
+  search text. Handle `fyne.ShortcutSelectAll` in the list's
+  `TypedShortcut`, and on the canvas for when nothing has focus.
+- **Highlighting a table row**: the table leaves a padding between cells,
+  so a background per cell shows as separate blocks. Lay the background out
+  half a padding wider on each side and the row reads as one.
 - **Right-click** needs a widget implementing `fyne.SecondaryTappable`
   (`TappedSecondary`), here the table cell, which then shows a
   `widget.NewPopUpMenu` at the pointer.

@@ -19,15 +19,15 @@ import (
 // queueIcon is Material Design's "queue_music" (Apache 2.0).
 var queueIcon = svgIcon("queue_music.svg", "M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z")
 
-// playNext puts t at the front of Up Next.
-func (u *ui) playNext(t Track) {
-	u.queued = slices.Insert(u.queued, 0, t)
+// playNext puts songs at the front of Up Next, in the order given.
+func (u *ui) playNext(ts ...Track) {
+	u.queued = slices.Insert(u.queued, 0, ts...)
 	u.queueChanged()
 }
 
-// playLater puts t at the end of Up Next.
-func (u *ui) playLater(t Track) {
-	u.queued = append(u.queued, t)
+// playLater puts songs at the end of Up Next.
+func (u *ui) playLater(ts ...Track) {
+	u.queued = append(u.queued, ts...)
 	u.queueChanged()
 }
 

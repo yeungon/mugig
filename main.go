@@ -225,6 +225,7 @@ type ui struct {
 	async     func(func())            // runs slow work off the UI thread
 	pick      picker                  // shows an Open panel (see open.go)
 	reveal    func(path string) error // shows a file in Finder or Explorer; tests replace it
+	modifiers func() fyne.KeyModifier // the modifier keys held down; tests replace it
 	mainMenu  *fyne.MainMenu
 	table     *trackTable
 	search    *widget.Entry
@@ -304,9 +305,11 @@ type ui struct {
 	listPath        string   // the last track played from the list, where it carries on from
 	queueBtn        *widget.Button
 	queuePop        *widget.PopUp
-	cued            *cuedSong // the last session's song, waiting for Play (see resume.go)
-	resumePending   bool      // the last session is still to be restored
-	sessionSaved    bool      // saved on quit already
+	cued            *cuedSong       // the last session's song, waiting for Play (see resume.go)
+	selected        map[string]bool // paths of the songs selected (see selection.go)
+	anchor          string          // the song last ⌘- or ⇧-clicked, where ⇧-click selects from
+	resumePending   bool            // the last session is still to be restored
+	sessionSaved    bool            // saved on quit already
 	clearQueueItem  *fyne.MenuItem
 
 	// The fields below are only read or modified on the UI thread (inside
@@ -445,7 +448,8 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	}
 	u.levels = u.qualityStore.levels()
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
-	u.reveal = reveal
+	u.reveal, u.modifiers = reveal, keyModifiers
+	u.selected = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker
 	}
@@ -479,15 +483,18 @@ func (u *ui) build() {
 
 	u.table = newTrackTable(
 		func() (int, int) { return len(u.tracks), len(columns) },
-		func() fyne.CanvasObject { return newTrackCell(u.tapTable) },
+		func() fyne.CanvasObject { return newTrackCell() },
 		func(id widget.TableCellID, o fyne.CanvasObject) {
 			c := o.(*trackCell)
 			if id.Row < 0 || id.Row >= len(u.tracks) {
 				c.set("", id.Col, false)
-				c.onMenu = nil
+				c.setSelected(false)
+				c.onMenu, c.onTap = nil, nil
 				return
 			}
 			t := u.tracks[id.Row]
+			c.setSelected(u.selected[t.Path])
+			c.onTap = func(at fyne.Position) { u.clickTrack(t, at) }
 			if id.Col == qualityCol {
 				l := u.levelOf(t)
 				c.setColoured(levelNames[l], levelColours[l])
@@ -495,11 +502,13 @@ func (u *ui) build() {
 				c.set(cellText(t, id.Col), id.Col, t.Path == u.playing.Path)
 			}
 			c.onMenu = func(at fyne.Position) {
-				widget.ShowPopUpMenuAtPosition(u.trackMenu(t), u.win.Canvas(), at)
+				widget.ShowPopUpMenuAtPosition(u.rowMenu(t), u.win.Canvas(), at)
 			}
 		},
 		u.togglePlay, // Space
 	)
+	u.table.onEscape, u.table.onSelectAll = u.clearSelection, u.selectAll
+	u.win.Canvas().AddShortcut(&fyne.ShortcutSelectAll{}, func(fyne.Shortcut) { u.selectAll() }) // nothing focused
 	u.table.OnSelected = func(id widget.TableCellID) {
 		// Skip the playing row so highlighting it (or clicking another
 		// cell in it) doesn't restart the track.

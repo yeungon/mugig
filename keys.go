@@ -19,7 +19,7 @@ const volumeStep = 0.1
 // a row is clicked.
 type trackTable struct {
 	widget.Table
-	onSpace func()
+	onSpace, onEscape, onSelectAll func()
 }
 
 func newTrackTable(
@@ -35,11 +35,22 @@ func newTrackTable(
 }
 
 func (t *trackTable) TypedKey(e *fyne.KeyEvent) {
-	if e.Name == fyne.KeySpace {
+	switch e.Name {
+	case fyne.KeySpace:
 		t.onSpace()
-		return
+	case fyne.KeyEscape:
+		t.onEscape()
+	default:
+		t.Table.TypedKey(e)
 	}
-	t.Table.TypedKey(e)
+}
+
+// TypedShortcut selects every song on ⌘A. It isn't a menu shortcut, which
+// would also fire in the search box, where ⌘A selects the text.
+func (t *trackTable) TypedShortcut(s fyne.Shortcut) {
+	if _, ok := s.(*fyne.ShortcutSelectAll); ok {
+		t.onSelectAll()
+	}
 }
 
 // buildMenu creates the main menu. Its shortcuts work wherever keyboard
@@ -128,6 +139,8 @@ func (u *ui) onTypedKey(e *fyne.KeyEvent) {
 		u.togglePlay()
 	case e.Name == fyne.KeyEscape && u.visView.Visible():
 		u.showVisualizer(false)
+	case e.Name == fyne.KeyEscape:
+		u.clearSelection()
 	}
 }
 

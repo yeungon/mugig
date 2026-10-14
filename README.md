@@ -52,6 +52,10 @@ Written in Go with [Fyne](https://fyne.io).
 - Search, and sort by any column: title, artist, album, **time**, year,
   format, **size**, **quality** or path. The line under the title totals the
   songs shown: tracks, artists, albums, listening time and size.
+- **Select several songs** with ⌘-click (Ctrl-click on Windows and Linux),
+  ⇧-click for a run of them, or ⌘A for the whole list. Right-click them to
+  play them, queue them, check their quality or copy their paths; the line
+  under the title totals them. A plain click still plays a song.
 - Right-click a song to **Play Next**, **Play Later**, **Get Info**, **Check Audio Quality**, **Show in
   Finder** (Explorer on Windows, the file manager on Linux) or **Copy File
   Path**.
@@ -137,6 +141,8 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | Keys | Action |
 |---|---|
 | Space | Play / pause |
+| ⌘-click / ⇧-click | Select songs / a run of songs |
+| ⌘A / Esc | Select every song listed / clear the selection |
 | ⌘→ / ⌘← | Next / previous song |
 | ⌥⌘→ / ⌥⌘← | Skip forward / back 10 seconds |
 | ⌘↑ / ⌘↓ | Volume up / down |
@@ -157,6 +163,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
 | `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, the music folders, the saved library, folder watching |
+| `selection.go` | Selecting several songs and acting on them |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
 | `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |

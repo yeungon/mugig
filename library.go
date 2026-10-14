@@ -58,6 +58,7 @@ func (u *ui) applyView() {
 		})
 	}
 	u.tracks = view
+	u.pruneSelection()
 	u.queueValid = false // shuffle starts a fresh round over the new list
 	u.table.Refresh()
 	u.updateCount()
@@ -79,6 +80,10 @@ func (u *ui) updateCount() {
 	shown := u.all
 	if u.filter != "" {
 		shown = slices.DeleteFunc(slices.Clone(u.all), func(t Track) bool { return !u.inFilter(t) })
+	}
+	if len(u.selected) > 0 {
+		u.count.SetText(selectionStats(u.selectedTracks()))
+		return
 	}
 	if len(u.searchWords()) > 0 {
 		u.count.SetText(fmt.Sprintf("%s of %s match", thousands(len(u.tracks)), plural(len(shown), "track")))

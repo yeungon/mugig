@@ -127,6 +127,24 @@ func libraryStats(tracks []Track) string {
 	return s
 }
 
+// selectionStats totals the selected songs, for the line under the title.
+func selectionStats(ts []Track) string {
+	var size int64
+	var length time.Duration
+	for _, t := range ts {
+		size += t.Size
+		length += t.Length
+	}
+	s := plural(len(ts), "song") + " selected"
+	if length > 0 {
+		s += " · " + totalTime(length)
+	}
+	if size > 0 {
+		s += " · " + fileSize(size)
+	}
+	return s
+}
+
 // totalTime formats how long a list of songs plays for: "48 min",
 // "9 h 12 min", "7.4 days".
 func totalTime(d time.Duration) string {
@@ -183,6 +201,7 @@ func thousands(n int) string {
 // speaker icon, and its title and artist are drawn in the accent colour.
 type trackCell struct {
 	widget.BaseWidget
+	bg     *canvas.Rectangle // shown when the row is selected
 	text   *widget.RichText
 	seg    *widget.TextSegment
 	icon   *widget.Icon
@@ -206,12 +225,13 @@ func (c *trackCell) Tapped(e *fyne.PointEvent) {
 	}
 }
 
-func newTrackCell(onTap func(at fyne.Position)) fyne.CanvasObject {
+func newTrackCell() fyne.CanvasObject {
 	c := &trackCell{
-		onTap: onTap,
-		seg:   &widget.TextSegment{Style: widget.RichTextStyleInline},
-		icon:  widget.NewIcon(theme.NewColoredResource(theme.VolumeUpIcon(), colorNameAccent)),
+		bg:   canvas.NewRectangle(color.Transparent),
+		seg:  &widget.TextSegment{Style: widget.RichTextStyleInline},
+		icon: widget.NewIcon(theme.NewColoredResource(theme.VolumeUpIcon(), colorNameAccent)),
 	}
+	c.bg.Hide()
 	c.text = widget.NewRichText(c.seg)
 	c.text.Truncation = fyne.TextTruncateEllipsis
 	c.icon.Hide()
@@ -220,7 +240,31 @@ func newTrackCell(onTap func(at fyne.Position)) fyne.CanvasObject {
 }
 
 func (c *trackCell) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(container.NewBorder(nil, nil, c.icon, nil, c.text))
+	bg := container.New(&bleed{x: theme.Padding() / 2}, c.bg)
+	return widget.NewSimpleRenderer(container.NewStack(bg, container.NewBorder(nil, nil, c.icon, nil, c.text)))
+}
+
+// bleed lays an object out x wider than its space on each side: the table
+// leaves a padding between cells, which a selected row's highlight covers so
+// the row reads as one.
+type bleed struct{ x float32 }
+
+func (b *bleed) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	for _, o := range objs {
+		o.Move(fyne.NewPos(-b.x, 0))
+		o.Resize(size.AddWidthHeight(2*b.x, 0))
+	}
+}
+
+func (b *bleed) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.Size{} }
+
+// setSelected shows whether the cell's row is selected.
+func (c *trackCell) setSelected(on bool) {
+	if on {
+		c.bg.FillColor = c.Theme().Color(theme.ColorNameSelection, fyne.CurrentApp().Settings().ThemeVariant())
+	}
+	c.bg.Hidden = !on
+	c.bg.Refresh()
 }
 
 // secondaryColumns are shown in muted text.
