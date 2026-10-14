@@ -43,6 +43,10 @@ Written in Go with [Fyne](https://fyne.io).
   removable and network disks. Click a folder in the sidebar to see just its
   songs; right-click it to rescan it, show it in Finder or remove it (the
   files are never touched).
+- **Leaves out audio that isn't music**: the sounds inside apps and plug-ins
+  (`.app`, `.bundle`, …), `node_modules`, hidden folders, the Trash and the
+  Recycle Bin, and on macOS the Library folders. A folder you add yourself
+  is always scanned.
 - Remembers what it read, so rescans are quick. Watches each folder for
   changes. When a disk is unplugged, its folder stays listed as
   "Not connected" with its songs hidden, and it is scanned again as soon as
@@ -165,7 +169,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | Files | What they do |
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
-| `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, the music folders, the saved library, folder watching |
+| `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `skip.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, folders left out, the music folders, the saved library, folder watching |
 | `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |

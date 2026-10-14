@@ -101,8 +101,8 @@ func walk(ctx context.Context, root string, paths chan<- string) {
 			return nil // unreadable file or folder: skip it, keep going
 		}
 		if d.IsDir() {
-			if p != root && hidden(p) {
-				return filepath.SkipDir // e.g. .Trashes, which holds deleted songs
+			if p != root && skipFolder(p) {
+				return filepath.SkipDir // e.g. .Trashes, which holds deleted songs (see skip.go)
 			}
 			return nil
 		}

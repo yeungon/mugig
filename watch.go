@@ -151,7 +151,7 @@ func readChanges(root string, paths []string, cache *libraryCache) folderChanges
 	sort.Strings(paths) // folders come before what is in them
 	var read []string   // folders read whole, which cover their contents
 	for _, p := range paths {
-		if !within(p, root) || hiddenWithin(p, root) {
+		if !within(p, root) || skippedWithin(p, root) {
 			continue
 		}
 		if slices.ContainsFunc(read, func(d string) bool { return within(p, d) }) {
@@ -167,7 +167,7 @@ func readChanges(root string, paths []string, cache *libraryCache) folderChanges
 			filepath.WalkDir(p, func(f string, d fs.DirEntry, err error) error {
 				switch {
 				case err != nil:
-				case d.IsDir() && f != p && hidden(f):
+				case d.IsDir() && f != p && skipFolder(f):
 					return filepath.SkipDir
 				case !d.IsDir() && isAudioFile(f) && !isEmpty(d):
 					found[f] = true
@@ -181,18 +181,6 @@ func readChanges(root string, paths []string, cache *libraryCache) folderChanges
 		}
 	}
 	return ch
-}
-
-// hiddenWithin reports whether any part of path below root is hidden, as
-// in root/.Trashes/501/song.mp3: the scan leaves those out too.
-func hiddenWithin(path, root string) bool {
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return false
-	}
-	return slices.ContainsFunc(strings.Split(rel, string(filepath.Separator)), func(part string) bool {
-		return hidden(part) && part != "." && part != ".."
-	})
 }
 
 // within reports whether path is dir or inside it.

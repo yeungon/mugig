@@ -231,6 +231,11 @@ silicon).
 - **Tell "disk unplugged" from "folder deleted"** by the nearest folder
   above that still exists: `/Volumes` (or `/media/<user>`, `/mnt`) means the
   disk is gone.
+- **Leave out folders whose audio isn't music** once people can add big
+  folders: an app bundle copied to a music disk brought 23 VS Code
+  interface sounds into the library. Skip bundles (`.app`, `.bundle`, …),
+  `node_modules`, `$RECYCLE.BIN`, `~/Library`, but never the folder the
+  user chose, and apply the same rule to the folder watcher's events.
 - **Listing folders is rarely the slow part of a scan.** Reading tags is.
   A parallel walker (fastwalk) saved milliseconds on real music folders,
   and nothing on a spinning USB disk, where the heads are the limit.

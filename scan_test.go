@@ -31,6 +31,45 @@ func TestWalkFindsOnlyAudio(t *testing.T) {
 	}
 }
 
+// walkAll lists what walk finds under root, relative to dir.
+func walkAll(dir, root string) []string {
+	paths := make(chan string)
+	go walk(context.Background(), root, paths)
+	var got []string
+	for p := range paths {
+		rel, _ := filepath.Rel(dir, p)
+		got = append(got, rel)
+	}
+	slices.Sort(got)
+	return got
+}
+
+// The scan leaves out the sounds in apps, plug-ins and code, and Windows'
+// system folders; but a folder added on purpose is scanned even if it is
+// one of those.
+func TestWalkSkipsFoldersThatArentMusic(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"Album/song.mp3",
+		"Game.app/Contents/Resources/click.wav",
+		"Synth.component/Contents/x.mp3", // not a bundle type skipped
+		"Plug.bundle/beep.ogg",
+		"site/node_modules/pkg/test.mp3",
+		"$RECYCLE.BIN/S-1-5-21/old.mp3",
+		"System Volume Information/x.wav",
+		"Apps I Like/song.flac",
+	} {
+		writeFile(t, filepath.Join(dir, name), []byte("x"))
+	}
+	want := []string{"Album/song.mp3", "Apps I Like/song.flac", "Synth.component/Contents/x.mp3"}
+	if got := walkAll(dir, dir); !slices.Equal(got, want) {
+		t.Errorf("walk found %v, want %v", got, want)
+	}
+	if got := walkAll(dir, filepath.Join(dir, "Plug.bundle")); !slices.Equal(got, []string{"Plug.bundle/beep.ogg"}) {
+		t.Errorf("a folder added on purpose should be scanned: %v", got)
+	}
+}
+
 func TestReadTrackTags(t *testing.T) {
 	audio, err := os.ReadFile("testdata/sample.mp3")
 	if err != nil {
