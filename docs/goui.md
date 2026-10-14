@@ -181,6 +181,12 @@ silicon).
   coreaudiod gives the device back if the process dies, so a crash
   can't leave other apps silent. Mugig's own playback through miniaudio
   carries on while it holds the device (checked on the built-in output).
+- **Crossfeed (bs2b)** is two first-order filters per channel: a low-pass
+  on the signal sent to the far ear and a treble lift on the near one,
+  with a gain that keeps centred bass at its level. Test it by
+  measurement: a hard-panned 60 Hz tone reaches the far ear exactly the
+  preset's dB down (4.5, 6, 9.5), 10 kHz at least 20 dB down. Centred
+  treble drops by up to 2 dB; that is bs2b's design, not a bug.
 - **Speed with pitch kept**: WSOLA (`stretch.go`) — overlapping pieces of
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at

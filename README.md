@@ -26,6 +26,10 @@ Written in Go with [Fyne](https://fyne.io).
   plays or is paused, Mugig has the device to itself, so no other app's
   sound or alert is mixed into the music or changes the device's rate.
   Stop gives it back. Off unless turned on.
+- **Crossfeed for headphones** (Controls → Crossfeed): each ear hears a
+  little of the other channel, as from speakers, so music panned hard to
+  one side doesn't sit inside one ear. Light, Medium and Strong are bs2b's
+  presets.
 - Choice of **output device**.
 - **Playback speed** from 0.5× to 2× with the **pitch kept**. At 1× the audio
   passes through untouched.
@@ -180,7 +184,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
-| `player.go`, `gapless.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, gapless playback, read-ahead, damage-tolerant FLAC, speed, audio output |
+| `player.go`, `gapless.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go`, `crossfeed.go` | Decoding, gapless playback, read-ahead, damage-tolerant FLAC, speed, crossfeed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
 | `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |
 | `tools/mkicon` | Draws the app icon (`make icon`) |
@@ -190,6 +194,9 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 
 - The UI font is [Inter](https://rsms.me/inter/), under the SIL Open Font
   License (`fonts/LICENSE-Inter.txt`).
+- Crossfeed follows Boris Mikhaylov's design in
+  [bs2b](https://bs2b.sourceforge.net/), with its presets by Chu Moy and
+  Jan Meier.
 - The idea of measuring loudness and peaks alongside the quality check comes
   from [AudioAuditor](https://github.com/Angel2mp3/AudioAuditor) (Apache 2.0);
   the code follows the published standards.

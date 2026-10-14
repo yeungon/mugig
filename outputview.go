@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"fyne.io/fyne/v2"
 )
@@ -116,7 +117,7 @@ func (u *ui) updateOutputInfo() {
 	}
 	var text string
 	switch {
-	case device == track && u.speed == 1:
+	case device == track && u.speed == 1 && u.crossfeed == crossfeedOff:
 		text = fmt.Sprintf("Playing on %s at %s, unconverted", name, kHz(float64(track)))
 	case device == track:
 		text = fmt.Sprintf("Playing on %s at %s", name, kHz(float64(track)))
@@ -126,6 +127,9 @@ func (u *ui) updateOutputInfo() {
 	}
 	if u.speed != 1 {
 		text += fmt.Sprintf(", at %s speed with the pitch kept", speedLabel(u.speed))
+	}
+	if u.crossfeed != crossfeedOff {
+		text += fmt.Sprintf(", with %s crossfeed", strings.ToLower(crossfeedNames[u.crossfeed]))
 	}
 	switch {
 	case u.player.Exclusive():

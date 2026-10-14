@@ -35,6 +35,7 @@ type audioPlayer interface {
 	Prepare(path string)
 	SetVolume(level float64)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
+	SetCrossfeed(level crossfeedLevel)
 	// Samples fills dst with the most recent audio, mono and oldest first,
 	// and returns its sample rate, or 0 if nothing is playing.
 	Samples(dst []float64) int
@@ -63,12 +64,14 @@ type player struct {
 	out output
 
 	decks *decks // the song playing and the one readied to follow; nil if stopped
+	cross *crossfeed
 	tap   *tap
 	vol   *effects.Volume
 	ctrl  *beep.Ctrl
 	gen   int     // bumped on every Stop so stale end-of-track callbacks are ignored
 	level float64 // volume from 0 (silent) to 1 (full), kept across tracks
 	speed float64 // playback speed, kept across tracks
+	feed  crossfeedLevel
 
 	onEnd     func(error) // the current song's end-of-track callback
 	nextPath  string      // the song asked to follow, "" for none
@@ -114,9 +117,11 @@ func (p *player) Play(path string, onEnd func(error)) error {
 	ds := &decks{cur: d}
 	ds.switched = func(old *deck) { p.notify(func() { p.switched(gen, old) }) }
 	p.decks = ds
+	p.cross = &crossfeed{s: ds}
+	p.cross.set(p.feed, int(d.format.SampleRate))
 	// The tap sits before the volume so the visualizer still moves when
 	// the sound is turned down.
-	p.tap = newTap(ds, 8192)
+	p.tap = newTap(p.cross, 8192)
 	p.vol = &effects.Volume{Streamer: p.tap, Base: 2}
 	p.applyLevel()
 	p.ctrl = &beep.Ctrl{Streamer: beep.Seq(p.vol, beep.Callback(func() {
@@ -368,6 +373,18 @@ func (p *player) SetSpeed(speed float64) {
 	}
 }
 
+// SetCrossfeed sets how much of each channel reaches the other ear, for
+// this track and the ones after.
+func (p *player) SetCrossfeed(level crossfeedLevel) {
+	p.feed = level
+	if p.decks == nil {
+		return
+	}
+	p.out.mu.Lock()
+	defer p.out.mu.Unlock()
+	p.cross.set(level, int(p.decks.cur.format.SampleRate))
+}
+
 // SetVolume sets the volume from 0 (silent) to 1 (full).
 func (p *player) SetVolume(level float64) {
 	p.level = level
@@ -492,7 +509,7 @@ func (p *player) release() {
 	if p.decks.next != nil {
 		p.decks.next.stream.Close()
 	}
-	p.decks, p.tap, p.vol, p.ctrl = nil, nil, nil, nil
+	p.decks, p.cross, p.tap, p.vol, p.ctrl = nil, nil, nil, nil, nil
 	p.nextPath, p.handedOff = "", false
 }
 

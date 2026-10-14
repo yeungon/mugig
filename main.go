@@ -295,6 +295,8 @@ type ui struct {
 	speed           float64          // playback speed, 1 being normal (see speed.go)
 	speedBtn        *widget.Button   // in the player bar
 	speedItems      []*fyne.MenuItem // one per speed, in the Controls menu
+	crossfeed       crossfeedLevel
+	crossfeedItems  []*fyne.MenuItem // one per level, in the Controls menu
 	appearanceItems []*fyne.MenuItem // View > Appearance (see appearance.go)
 	repeatAllItem   *fyne.MenuItem
 	repeatOneItem   *fyne.MenuItem

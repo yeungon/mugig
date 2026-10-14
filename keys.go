@@ -120,6 +120,7 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		fyne.NewMenuItemSeparator(),
 	)
 	controls.Items = append(controls.Items, u.buildSpeedMenu(item)...)
+	controls.Items = append(controls.Items, u.buildCrossfeedMenu())
 	controls.Items = append(controls.Items,
 		fyne.NewMenuItemSeparator(),
 		u.shuffleItem, u.repeatAllItem, u.repeatOneItem,
