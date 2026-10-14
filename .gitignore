@@ -1,0 +1,6 @@
+# Build outputs (make build / make package)
+/mugig
+*.app
+
+# macOS clutter
+.DS_Store
