@@ -83,7 +83,7 @@ func (p *player) Play(path string, onEnd func(error)) error {
 		s.Close()
 		return fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
 	}
-	s = &safeStream{StreamSeekCloser: s}
+	s = newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate)
 
 	gen := p.gen
 	p.stream, p.format = s, format
@@ -222,13 +222,12 @@ func (p *player) Duration() time.Duration {
 	return p.format.SampleRate.D(max(p.stream.Len(), 0))
 }
 
-// Seek jumps to d within the current track.
+// Seek jumps to d within the current track. The stream reads ahead and
+// guards itself, so the audio thread isn't held up while it seeks.
 func (p *player) Seek(d time.Duration) error {
 	if p.stream == nil {
 		return nil
 	}
-	p.out.mu.Lock()
-	defer p.out.mu.Unlock()
 	n := min(max(p.format.SampleRate.N(d), 0), p.stream.Len())
 	return p.stream.Seek(n)
 }

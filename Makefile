@@ -8,8 +8,11 @@ APP  := Mugig.app
 run:
 	go run .
 
+# Fyne drops cached drawing objects it thinks unused after a minute; the
+# race detector makes the tests run longer than that, and the test window
+# then draws without them. FYNE_CACHE keeps them for the whole run.
 test:
-	go test -race ./...
+	FYNE_CACHE=1h go test -race ./...
 
 # Feeds corrupt files to everything that reads them, a minute per target.
 # Crashers found are saved under testdata/fuzz and replayed by `make test`.
