@@ -5,15 +5,16 @@ package main
 // the Now Playing page.
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	hexenc "encoding/hex"
+	"fmt"
 	"image"
 	"image/color"
-	"image/jpeg"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -404,6 +405,7 @@ func loadQualityStore(path string) *qualityStore {
 	if path != "" && loadGob(path, &f) == nil && f.Version == qualityVersion && f.Entries != nil {
 		s.entries = f.Entries
 	}
+	s.dropOldPictures()
 	return s
 }
 
@@ -473,16 +475,33 @@ func (s *qualityStore) levels() map[string]qualityLevel {
 	return out
 }
 
-// Spectrograms are kept as JPEG files beside the store, named after a hash
-// of the track's path, and only read when shown.
+// Spectrograms are kept as PNG files of their levels beside the store,
+// named after a hash of the track's path, and only read when shown.
 func (s *qualityStore) picturePath(path string) string {
 	sum := sha256.Sum256([]byte(path))
-	return filepath.Join(filepath.Dir(s.path), "spectrograms", hexenc.EncodeToString(sum[:12])+".jpg")
+	return filepath.Join(s.pictureDir(), hexenc.EncodeToString(sum[:12])+".png")
+}
+
+func (s *qualityStore) pictureDir() string {
+	return filepath.Join(filepath.Dir(s.path), "spectrograms")
+}
+
+// dropOldPictures deletes spectrograms saved as coloured JPEGs by earlier
+// versions, which can't be drawn for another range of levels. Their tracks
+// are analysed again when next shown.
+func (s *qualityStore) dropOldPictures() {
+	if s.path == "" {
+		return
+	}
+	old, _ := filepath.Glob(filepath.Join(s.pictureDir(), "*.jpg"))
+	for _, f := range old {
+		os.Remove(f)
+	}
 }
 
 // putPicture saves the spectrogram for path. Saving errors are ignored, as
 // for put.
-func (s *qualityStore) putPicture(path string, img image.Image) {
+func (s *qualityStore) putPicture(path string, img *image.Gray) {
 	if img == nil {
 		return
 	}
@@ -503,7 +522,7 @@ func (s *qualityStore) putPicture(path string, img image.Image) {
 }
 
 // picture returns the saved spectrogram for path.
-func (s *qualityStore) picture(path string) (image.Image, bool) {
+func (s *qualityStore) picture(path string) (*image.Gray, bool) {
 	s.mu.Lock()
 	data, ok := s.pictures[path]
 	s.mu.Unlock()
@@ -515,8 +534,7 @@ func (s *qualityStore) picture(path string) (image.Image, bool) {
 	if !ok {
 		return nil, false
 	}
-	img, err := jpeg.Decode(bytes.NewReader(data))
-	return img, err == nil
+	return decodePicture(data)
 }
 
 func fileStamp(path string) string {
@@ -556,8 +574,10 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 			detail = append(detail, s)
 		}
 	}
+	levels := u.levelsControl(spec)
+	levels.Hide()
 	content := container.NewVBox(title, secondaryLabel(strings.Join(detail, " · ")),
-		p.format, p.findings, spec, bar)
+		p.format, p.findings, spec, levels, bar)
 	d := dialog.NewCustom("Audio Quality", "Close", content, u.win)
 	ctx, cancel := context.WithCancel(context.Background())
 	d.SetOnClosed(cancel)
@@ -587,9 +607,10 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 			})
 			return
 		}
-		show := func(rep qualityReport, img image.Image) {
+		show := func(rep qualityReport, img *image.Gray) {
 			p.show(qualityText(info, nil, &rep, checked, false))
 			spec.set(img, info.SampleRate, info.Duration, rep.Spectrum.Cutoff, "No sound to draw")
+			levels.Hidden = img == nil
 		}
 
 		stamp := fileStamp(t.Path)
@@ -621,4 +642,62 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 		fyne.Do(func() { u.qualityChecked(t.Path, rep, level) }) // it may be playing by now
 	})
 	return p, spec, d
+}
+
+// The range of levels the spectrogram shows can be changed, as in Spek:
+// lowering the floor brings out quiet detail such as noise and dither;
+// raising it, or lowering the top, separates loud sounds.
+const (
+	prefSpecTop   = "spectrogramTop"
+	prefSpecFloor = "spectrogramFloor"
+)
+
+var (
+	topChoices   = []float64{0, -10, -20, -30, -40}
+	floorChoices = []float64{-60, -70, -80, -90, -100, -110, -120, -130, -140}
+)
+
+// levelsControl creates the dialog's choice of levels shown in spec, set to
+// the range last chosen. A new choice is remembered for next time.
+func (u *ui) levelsControl(spec *spectrogramView) *fyne.Container {
+	top := nearest(topChoices, u.prefs.FloatWithFallback(prefSpecTop, defaultTopDB))
+	floor := nearest(floorChoices, u.prefs.FloatWithFallback(prefSpecFloor, defaultFloorDB))
+	spec.setRange(top, floor)
+	choice := func(choices []float64, chosen float64, pref string, set func(float64)) *widget.Select {
+		labels := make([]string, len(choices))
+		for i, db := range choices {
+			labels[i] = fmt.Sprintf("%g dB", db)
+		}
+		sel := widget.NewSelect(labels, nil)
+		sel.SetSelectedIndex(slices.Index(choices, chosen))
+		sel.OnChanged = func(string) {
+			db := choices[sel.SelectedIndex()]
+			u.prefs.SetFloat(pref, db)
+			set(db)
+			spec.setRange(top, floor)
+		}
+		return sel
+	}
+	label := func(text string) *widget.Label {
+		l := widget.NewLabel(text)
+		l.Importance = widget.LowImportance
+		return l
+	}
+	return container.NewHBox(
+		label("Levels from"),
+		choice(topChoices, top, prefSpecTop, func(db float64) { top = db }),
+		label("to"),
+		choice(floorChoices, floor, prefSpecFloor, func(db float64) { floor = db }),
+	)
+}
+
+// nearest returns the choice closest to v.
+func nearest(choices []float64, v float64) float64 {
+	best := choices[0]
+	for _, c := range choices {
+		if math.Abs(c-v) < math.Abs(best-v) {
+			best = c
+		}
+	}
+	return best
 }

@@ -365,7 +365,7 @@ func verify(ctx context.Context, path string, info audioInfo) (qualityReport, er
 // analyse decodes the whole file, checking lossless audio (see verify) and,
 // if picture is set, drawing a spectrogram of any audio. progress, if not
 // nil, is called with the fraction done as decoding goes on.
-func analyse(ctx context.Context, path string, info audioInfo, picture bool, progress func(float64)) (rep qualityReport, img image.Image, err error) {
+func analyse(ctx context.Context, path string, info audioInfo, picture bool, progress func(float64)) (rep qualityReport, img *image.Gray, err error) {
 	defer func() {
 		if r := recover(); r != nil { // a decoder choking on a damaged file
 			rep, img, err = qualityReport{Damaged: fmt.Sprint("the decoder failed: ", r)}, nil, nil

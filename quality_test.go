@@ -509,7 +509,7 @@ func TestUnreadableFileExplained(t *testing.T) {
 		t.Errorf("badge visible %v, checks %q", u.barBadge.Visible(), checkTexts(u))
 	}
 	p, spec, _ := u.checkTrack(Track{Path: path, Title: "junk"})
-	if !strings.Contains(strings.Join(p.texts(), ""), "Can't read") || spec.img != nil || spec.note == "" {
+	if !strings.Contains(strings.Join(p.texts(), ""), "Can't read") || spec.levels != nil || spec.note == "" {
 		t.Errorf("dialog: %q, note %q", p.texts(), spec.note)
 	}
 }
@@ -578,7 +578,7 @@ func TestQualityResultsSaved(t *testing.T) {
 	_, spec, _ := u.checkTrack(tr)
 	start := time.Now()
 	pending[0]()
-	if spec.img == nil || time.Since(start) > 200*time.Millisecond {
+	if spec.levels == nil || time.Since(start) > 200*time.Millisecond {
 		t.Errorf("saved spectrogram not shown promptly (%v)", time.Since(start))
 	}
 
@@ -709,8 +709,8 @@ func TestCheckAnyTrack(t *testing.T) {
 	if p.badge.level != qualitySuspect || !strings.Contains(strings.Join(p.texts(), "|"), "lossy") {
 		t.Errorf("dialog shows %v %q", p.badge.level, p.texts())
 	}
-	if spec.img == nil || !near(spec.cutoff, 16150, 250) || spec.rate != 44100 {
-		t.Errorf("spectrogram: img %v, cutoff %v, rate %v", spec.img != nil, spec.cutoff, spec.rate)
+	if spec.levels == nil || !near(spec.cutoff, 16150, 250) || spec.rate != 44100 {
+		t.Errorf("spectrogram: img %v, cutoff %v, rate %v", spec.levels != nil, spec.cutoff, spec.rate)
 	}
 	if u.quality.state != notChecked {
 		t.Error("the playing track's state changed")
@@ -727,8 +727,8 @@ func TestLossySpectrogram(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	mp3, _ := filepath.Abs("testdata/sample.mp3")
 	p, spec, _ := u.checkTrack(Track{Path: mp3, Title: "mp3"})
-	if p.badge.level != qualityLossy || spec.img == nil || spec.rate != 44100 {
-		t.Errorf("badge %v, img %v", p.badge.level, spec.img != nil)
+	if p.badge.level != qualityLossy || spec.levels == nil || spec.rate != 44100 {
+		t.Errorf("badge %v, img %v", p.badge.level, spec.levels != nil)
 	}
 }
 

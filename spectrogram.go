@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/jpeg"
+	"image/png"
 	"math"
 	"time"
 
@@ -21,18 +21,28 @@ import (
 )
 
 const (
-	specRows       = 256  // frequency rows, from 0 Hz to half the sample rate
-	pictureWidth   = 720  // time columns
-	pictureFloorDB = -120 // dBFS drawn as black, about 16-bit dither's level
+	specRows     = 256 // frequency rows, from 0 Hz to half the sample rate
+	pictureWidth = 720 // time columns
+
+	// A picture keeps each point's level, from 0 dBFS down to keptFloorDB,
+	// so it can be drawn for any range of levels without analysing again.
+	keptFloorDB = -140
+
+	// The range of levels drawn, from black to pale yellow, unless changed.
+	// -120 dBFS is about the level of 16-bit dither.
+	defaultTopDB   = 0
+	defaultFloorDB = -120
 )
 
-// picture draws the spectrogram, or returns nil if no audio was analysed.
-func (s *spectrum) picture() image.Image {
+// picture returns the spectrogram's levels, or nil if no audio was
+// analysed. Each pixel is a level: 0 for keptFloorDB or quieter, up to 255
+// for full scale. paint turns it into colours.
+func (s *spectrum) picture() *image.Gray {
 	n := len(s.columns)
 	if n == 0 {
 		return nil
 	}
-	img := image.NewRGBA(image.Rect(0, 0, pictureWidth, specRows))
+	img := image.NewGray(image.Rect(0, 0, pictureWidth, specRows))
 	fullScale := math.Pow(specSize/4, 2) // a full-scale tone's bin, after the Hann window
 	binsPerRow := float64(specSize / 2 / specRows)
 	for x := range pictureWidth {
@@ -45,7 +55,32 @@ func (s *spectrum) picture() image.Image {
 			}
 			p /= float64(b-a) * binsPerRow
 			db := 10 * math.Log10(p/fullScale+1e-30)
-			img.Set(x, specRows-1-r, heat((db-pictureFloorDB)/-pictureFloorDB))
+			v := math.Round((db - keptFloorDB) / -keptFloorDB * 255)
+			img.Pix[(specRows-1-r)*img.Stride+x] = uint8(min(max(v, 0), 255))
+		}
+	}
+	return img
+}
+
+// levelDB is the level a picture's pixel value stands for.
+func levelDB(v uint8) float64 { return keptFloorDB * (1 - float64(v)/255) }
+
+// paint colours a spectrogram's levels, from black at floor dBFS or below
+// to pale yellow at top or above.
+func paint(levels *image.Gray, top, floor float64) *image.RGBA {
+	var lut [256]color.RGBA
+	for v := range lut {
+		c := heat((levelDB(uint8(v)) - floor) / (top - floor))
+		lut[v] = color.RGBA{c.R, c.G, c.B, 0xFF}
+	}
+	b := levels.Bounds()
+	img := image.NewRGBA(b)
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		src := levels.Pix[(y-b.Min.Y)*levels.Stride:]
+		dst := img.Pix[(y-b.Min.Y)*img.Stride:]
+		for x := range b.Dx() {
+			c := lut[src[x]]
+			dst[4*x], dst[4*x+1], dst[4*x+2], dst[4*x+3] = c.R, c.G, c.B, c.A
 		}
 	}
 	return img
@@ -69,10 +104,27 @@ func heat(t float64) color.NRGBA {
 	return blend(heatStops[i], heatStops[i+1], t-float64(i))
 }
 
-func encodePicture(img image.Image) ([]byte, error) {
+// heatScale is the colour scale as a picture, loudest at the top, for the
+// legend.
+func heatScale() image.Image {
+	img := image.NewNRGBA(image.Rect(0, 0, 1, 256))
+	for y := range 256 {
+		img.SetNRGBA(0, y, heat(1-float64(y)/255))
+	}
+	return img
+}
+
+// Levels are saved losslessly, as a greyscale PNG.
+func encodePicture(levels *image.Gray) ([]byte, error) {
 	var buf bytes.Buffer
-	err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 88})
+	err := png.Encode(&buf, levels)
 	return buf.Bytes(), err
+}
+
+func decodePicture(data []byte) (*image.Gray, bool) {
+	img, err := png.Decode(bytes.NewReader(data))
+	g, ok := img.(*image.Gray)
+	return g, err == nil && ok && g.Bounds().Dx() > 0
 }
 
 // ---------------------------------------------------------------------------
@@ -80,25 +132,34 @@ func encodePicture(img image.Image) ([]byte, error) {
 // ---------------------------------------------------------------------------
 
 // spectrogramView shows a spectrogram with a frequency scale on the left, a
-// time scale below, and the cut-off, if one was found, marked across it.
+// time scale below, a colour legend in dB on the right, and the cut-off, if
+// one was found, marked across it.
 type spectrogramView struct {
 	widget.BaseWidget
-	img    image.Image // nil until there is one
-	rate   int         // sample rate, for the frequency scale
-	length time.Duration
-	cutoff float64 // Hz, or 0
-	note   string  // shown in place of the picture
+	levels     *image.Gray // nil until there is one
+	rate       int         // sample rate, for the frequency scale
+	length     time.Duration
+	cutoff     float64 // Hz, or 0
+	note       string  // shown in place of the picture
+	top, floor float64 // dBFS drawn brightest and black
 }
 
 func newSpectrogramView() *spectrogramView {
-	v := &spectrogramView{}
+	v := &spectrogramView{top: defaultTopDB, floor: defaultFloorDB}
 	v.ExtendBaseWidget(v)
 	return v
 }
 
-// set shows img, or note in its place if img is nil.
-func (v *spectrogramView) set(img image.Image, rate int, length time.Duration, cutoff float64, note string) {
-	v.img, v.rate, v.length, v.cutoff, v.note = img, rate, length, cutoff, note
+// set shows levels, or note in its place if levels is nil.
+func (v *spectrogramView) set(levels *image.Gray, rate int, length time.Duration, cutoff float64, note string) {
+	v.levels, v.rate, v.length, v.cutoff, v.note = levels, rate, length, cutoff, note
+	v.Refresh()
+}
+
+// setRange changes the levels drawn: top dBFS and louder are brightest,
+// floor and quieter black.
+func (v *spectrogramView) setRange(top, floor float64) {
+	v.top, v.floor = top, min(floor, top-1)
 	v.Refresh()
 }
 
@@ -112,10 +173,14 @@ func (v *spectrogramView) CreateRenderer() fyne.WidgetRenderer {
 		note:   canvas.NewText("", nil),
 		line:   canvas.NewLine(nil),
 		marker: canvas.NewText("", nil),
+		scale:  canvas.NewImageFromImage(heatScale()),
+		unit:   axisText("dB", nil),
 	}
 	r.frame.CornerRadius = 4
 	r.pic.FillMode = canvas.ImageFillStretch
 	r.pic.ScaleMode = canvas.ImageScaleSmooth
+	r.scale.FillMode = canvas.ImageFillStretch
+	r.scale.ScaleMode = canvas.ImageScaleSmooth
 	r.note.TextSize = theme.CaptionTextSize()
 	r.line.StrokeWidth = 1.5
 	r.marker.TextSize = axisTextSize
@@ -124,7 +189,11 @@ func (v *spectrogramView) CreateRenderer() fyne.WidgetRenderer {
 	return r
 }
 
-const axisTextSize = 10
+const (
+	axisTextSize = 10
+	legendGap    = 10 // between the picture and the legend
+	legendWidth  = 10
+)
 
 type spectrogramRenderer struct {
 	v      *spectrogramView
@@ -136,14 +205,25 @@ type spectrogramRenderer struct {
 	times  []*canvas.Text // time labels, evenly spaced
 	line   *canvas.Line   // the cut-off
 	marker *canvas.Text   // its label
+
+	scale *canvas.Image  // the legend: the colours…
+	dbs   []*canvas.Text // …with levels beside them…
+	db    []float64
+	unit  *canvas.Text // …and "dB" below
+
+	// The picture last painted, kept until the levels or range change.
+	painted               *image.RGBA
+	paintedOf             *image.Gray
+	paintedTop, paintedFl float64
 }
 
 // plot returns the picture's area within size, leaving room for the scales.
 func (r *spectrogramRenderer) plot(size fyne.Size) (pos fyne.Position, s fyne.Size) {
 	left := fyne.MeasureText("20k", axisTextSize, fyne.TextStyle{}).Width + 8
+	right := legendGap + legendWidth + 4 + fyne.MeasureText("-140", axisTextSize, fyne.TextStyle{}).Width + 2
 	bottom := fyne.MeasureText("0:00", axisTextSize, fyne.TextStyle{}).Height + 4
 	top := float32(6) // half a label, so the top one fits
-	return fyne.NewPos(left, top), fyne.NewSize(size.Width-left-4, size.Height-top-bottom)
+	return fyne.NewPos(left, top), fyne.NewSize(size.Width-left-right, size.Height-top-bottom)
 }
 
 func (r *spectrogramRenderer) Layout(size fyne.Size) {
@@ -174,6 +254,17 @@ func (r *spectrogramRenderer) Layout(size fyne.Size) {
 		ms := r.marker.MinSize()
 		r.marker.Move(fyne.NewPos(at.X+ps.Width-ms.Width-6, cy-ms.Height-1))
 	}
+
+	lx := at.X + ps.Width + legendGap
+	r.scale.Move(fyne.NewPos(lx, at.Y))
+	r.scale.Resize(fyne.NewSize(legendWidth, ps.Height))
+	span := r.v.top - r.v.floor
+	for i, t := range r.dbs {
+		s := t.MinSize()
+		ty := at.Y + ps.Height*float32((r.v.top-r.db[i])/span)
+		t.Move(fyne.NewPos(lx+legendWidth+4, ty-s.Height/2))
+	}
+	r.unit.Move(fyne.NewPos(lx, at.Y+ps.Height+2))
 }
 
 func (r *spectrogramRenderer) MinSize() fyne.Size { return r.v.MinSize() }
@@ -182,10 +273,10 @@ func (r *spectrogramRenderer) Refresh() {
 	v := r.v
 	muted := themeColor(theme.ColorNamePlaceHolder)
 	r.frame.FillColor = themeColor(theme.ColorNameInputBackground)
-	r.pic.Image = v.img
-	r.pic.Hidden = v.img == nil
+	r.pic.Image = r.paint()
+	r.pic.Hidden = v.levels == nil
 	r.note.Text, r.note.Color = v.note, muted
-	r.note.Hidden = v.img != nil
+	r.note.Hidden = v.levels != nil
 
 	// Frequency labels every 2, 5, 10 or 20 kHz, whichever gives about five.
 	r.freqs, r.hz = nil, nil
@@ -208,17 +299,29 @@ func (r *spectrogramRenderer) Refresh() {
 		}
 	}
 	r.times = nil
-	if v.length > 0 && v.img != nil {
+	if v.length > 0 && v.levels != nil {
 		for i := range 5 {
 			r.times = append(r.times, axisText(formatTime(v.length*time.Duration(i)/4), muted))
 		}
 	}
 
+	// Legend labels every 10 or 20 dB, whichever gives no more than seven.
+	r.dbs, r.db = nil, nil
+	step := 10.0
+	if (v.top-v.floor)/step > 6 {
+		step = 20
+	}
+	for db := math.Floor(v.top/step) * step; db >= v.floor; db -= step {
+		r.dbs = append(r.dbs, axisText(fmt.Sprintf("%g", db), muted))
+		r.db = append(r.db, db)
+	}
+	r.unit.Color = muted
+
 	warn := themeColor(theme.ColorNameWarning)
 	r.line.StrokeColor = warn
 	r.marker.Color = warn
 	r.marker.Text = kHz(v.cutoff) + " cut-off"
-	r.line.Hidden = v.cutoff <= 0 || v.img == nil
+	r.line.Hidden = v.cutoff <= 0 || v.levels == nil
 	r.marker.Hidden = r.line.Hidden
 
 	r.frame.Refresh()
@@ -226,7 +329,22 @@ func (r *spectrogramRenderer) Refresh() {
 	r.note.Refresh()
 	r.line.Refresh()
 	r.marker.Refresh()
+	r.unit.Refresh()
 	r.Layout(v.Size())
+}
+
+// paint returns the picture in colour for the current range, painting it
+// only when the levels or the range have changed.
+func (r *spectrogramRenderer) paint() image.Image {
+	v := r.v
+	if v.levels == nil {
+		return nil
+	}
+	if r.paintedOf != v.levels || r.paintedTop != v.top || r.paintedFl != v.floor {
+		r.painted = paint(v.levels, v.top, v.floor)
+		r.paintedOf, r.paintedTop, r.paintedFl = v.levels, v.top, v.floor
+	}
+	return r.painted
 }
 
 func axisText(s string, c color.Color) *canvas.Text {
@@ -236,11 +354,14 @@ func axisText(s string, c color.Color) *canvas.Text {
 }
 
 func (r *spectrogramRenderer) Objects() []fyne.CanvasObject {
-	objs := []fyne.CanvasObject{r.frame, r.pic, r.note, r.line, r.marker}
+	objs := []fyne.CanvasObject{r.frame, r.pic, r.note, r.line, r.marker, r.scale, r.unit}
 	for _, t := range r.freqs {
 		objs = append(objs, t)
 	}
 	for _, t := range r.times {
+		objs = append(objs, t)
+	}
+	for _, t := range r.dbs {
 		objs = append(objs, t)
 	}
 	return objs
