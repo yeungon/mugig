@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mugig — a music player that tells you the truth about your files</title>
+<meta name="description" content="Mugig is a desktop music player for people who care how their music sounds. It plays FLAC, MP3, WAV and Ogg Vorbis bit-perfect and gapless, and checks whether a “lossless” file really is lossless, intact, and how loud it is.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#121217" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f6f8" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Mugig — a music player that tells you the truth about your files">
+<meta property="og:description" content="Bit-perfect, gapless playback, and an honest check of every file: lossless or not, intact or not, and how loud.">
+<link rel="icon" type="image/png" href="images/favicon.png">
+<link rel="apple-touch-icon" href="images/icon.png">
+<style>
+  :root {
+    --bg: #0f0f13;
+    --bg-raised: #17171d;
+    --bg-card: #1c1c23;
+    --line: #2a2a33;
+    --text: #ececf1;
+    --text-soft: #a3a3b2;
+    --text-faint: #6f6f7d;
+    --accent: #8b5cf6;
+    --accent-strong: #7c3aed;
+    --accent-soft: rgba(139, 92, 246, .14);
+    --warm: #fb923c;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --glow: linear-gradient(180deg, #fde68a 0%, #fb923c 38%, #e64980 70%, #9d3fb8 100%);
+    --radius: 14px;
+    --shadow: 0 30px 80px -20px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .06);
+    --max: 1160px;
+    --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f6f8;
+      --bg-raised: #ffffff;
+      --bg-card: #ffffff;
+      --line: #e3e3ea;
+      --text: #17171d;
+      --text-soft: #555563;
+      --text-faint: #8a8a98;
+      --accent: #7c3aed;
+      --accent-strong: #6d28d9;
+      --accent-soft: rgba(124, 58, 237, .09);
+      --warm: #ea580c;
+      --good: #059669;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --shadow: 0 30px 70px -25px rgba(40, 20, 80, .35), 0 0 0 1px rgba(0, 0, 0, .06);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 var(--font);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd, pre { font-family: var(--mono); font-size: .9em; }
+  h1, h2, h3 { line-height: 1.15; letter-spacing: -.02em; margin: 0; }
+  p { margin: 0; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--accent); color: #fff; padding: 8px 14px; border-radius: 8px; z-index: 100; }
+  .skip:focus { left: 8px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  /* Navigation */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav .wrap { display: flex; align-items: center; gap: 28px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; font-size: 18px; }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  .nav nav { margin-left: auto; }
+  .nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; }
+  .nav ul a { color: var(--text-soft); font-size: 14.5px; font-weight: 500; }
+  .nav ul a:hover { color: var(--text); text-decoration: none; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 20px; border-radius: 999px;
+    font-weight: 600; font-size: 15px; line-height: 1;
+    border: 1px solid transparent; transition: transform .15s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .btn-primary { background: var(--accent-strong); color: #fff; box-shadow: 0 8px 24px -8px rgba(124, 58, 237, .7); }
+  .btn-primary:hover { background: var(--accent); }
+  .btn-ghost { color: var(--text); border-color: var(--line); background: var(--bg-raised); }
+  .btn-ghost:hover { border-color: var(--text-faint); }
+  .nav .btn { padding: 8px 14px; font-size: 14px; }
+  @media (max-width: 860px) { .nav ul { display: none; } .nav .btn { margin-left: auto; } }
+
+  /* Hero */
+  .hero { position: relative; overflow: hidden; padding: 88px 0 40px; text-align: center; }
+  .hero::before {
+    content: ""; position: absolute; inset: -30% -10% auto; height: 760px; z-index: -1;
+    background:
+      radial-gradient(40% 50% at 30% 30%, rgba(139, 92, 246, .30), transparent 70%),
+      radial-gradient(35% 45% at 72% 25%, rgba(230, 73, 128, .22), transparent 70%),
+      radial-gradient(30% 40% at 55% 60%, rgba(251, 146, 60, .12), transparent 70%);
+    filter: blur(10px);
+  }
+  .hero-icon { width: 104px; height: 104px; margin: 0 auto 28px; border-radius: 24px; filter: drop-shadow(0 18px 40px rgba(124, 58, 237, .45)); }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--text-soft);
+    padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-raised);
+    margin-bottom: 22px;
+  }
+  .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 10px var(--good); }
+  .hero h1 { font-size: clamp(38px, 6vw, 68px); font-weight: 800; max-width: 900px; margin: 0 auto; }
+  .gradient-text {
+    background: linear-gradient(92deg, #fcd34d 0%, #fb923c 30%, #ec4899 62%, #a855f7 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero .lede { font-size: clamp(17px, 2.1vw, 20px); color: var(--text-soft); max-width: 700px; margin: 22px auto 0; }
+  .cta { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+  .platforms { margin-top: 18px; font-size: 13.5px; color: var(--text-faint); }
+  .shot-hero { margin: 64px auto 0; max-width: 1100px; }
+  .frame {
+    border-radius: 12px; overflow: hidden; background: #111; box-shadow: var(--shadow);
+  }
+  .frame .bar { display: flex; gap: 7px; padding: 11px 14px; background: #24242b; }
+  @media (prefers-color-scheme: light) { .frame .bar { background: #e9e9ee; } }
+  .frame .bar i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
+  .frame .bar i:nth-child(2) { background: #febc2e; }
+  .frame .bar i:nth-child(3) { background: #28c840; }
+
+  /* Format strip */
+  .formats { padding: 46px 0 10px; }
+  .formats ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 12px; }
+  .formats li {
+    font-size: 14px; font-weight: 600; color: var(--text-soft);
+    padding: 7px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-raised);
+  }
+  .formats li span { color: var(--text-faint); font-weight: 500; }
+
+  /* Sections */
+  section { padding: 96px 0; }
+  .section-head { max-width: 760px; margin-bottom: 48px; }
+  .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  h2 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; }
+  .section-head p:not(.kicker) { color: var(--text-soft); font-size: 18px; margin-top: 16px; }
+  .alt { background: var(--bg-raised); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+
+  .split { display: grid; grid-template-columns: 1fr 1.25fr; gap: 56px; align-items: center; }
+  .split.flip { grid-template-columns: 1.25fr 1fr; }
+  .split.flip .split-text { order: 2; }
+  @media (max-width: 960px) { .split, .split.flip { grid-template-columns: 1fr; gap: 36px; } .split.flip .split-text { order: 0; } }
+
+  .checks { list-style: none; margin: 28px 0 0; padding: 0; display: grid; gap: 18px; }
+  .checks li { display: grid; grid-template-columns: 36px 1fr; gap: 14px; align-items: start; }
+  .checks .ico {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .checks .ico svg { width: 19px; height: 19px; }
+  .checks strong { display: block; font-size: 16px; margin-bottom: 2px; }
+  .checks span { color: var(--text-soft); font-size: 15px; }
+
+  .verdicts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+  .verdict { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; border: 1px solid currentColor; }
+  .v-lossless { color: var(--accent); }
+  .v-hires { color: #a78bfa; background: var(--accent-soft); }
+  .v-suspect { color: var(--warn); }
+  .v-lossy { color: var(--text-faint); }
+  .v-damaged { color: var(--bad); }
+
+  .note {
+    margin-top: 28px; padding: 16px 18px; border-radius: 12px;
+    background: var(--bg-card); border: 1px solid var(--line); font-size: 14.5px; color: var(--text-soft);
+  }
+  .note strong { color: var(--text); }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 28px; }
+  .stat { padding: 18px 20px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--line); }
+  .stat b { display: block; font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+  .stat b.warm { color: var(--warm); }
+  .stat b.cool { color: var(--good); }
+  .stat span { font-size: 13.5px; color: var(--text-soft); }
+
+  /* Feature cards */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 960px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: 1fr; } }
+  .card {
+    position: relative; padding: 26px 24px; border-radius: var(--radius);
+    background: var(--bg-card); border: 1px solid var(--line);
+    transition: border-color .2s ease, transform .2s ease;
+  }
+  .card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); transform: translateY(-2px); }
+  .card .ico {
+    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 18px;
+    background: linear-gradient(140deg, rgba(251, 146, 60, .18), rgba(139, 92, 246, .22)); color: var(--warm);
+  }
+  .card .ico svg { width: 22px; height: 22px; }
+  .card h3 { font-size: 17.5px; font-weight: 700; margin-bottom: 8px; }
+  .card p { color: var(--text-soft); font-size: 15px; }
+  .card .where { display: block; margin-top: 12px; font-size: 13px; color: var(--text-faint); }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 5px; margin-left: 6px; vertical-align: 2px; }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 56px; }
+  @media (max-width: 960px) { .duo { grid-template-columns: 1fr; } }
+  figure { margin: 0; }
+  figcaption { margin-top: 14px; font-size: 14px; color: var(--text-faint); text-align: center; }
+  .frame.plain { border-radius: 12px; }
+
+  .list-cols { columns: 2; column-gap: 48px; margin: 0; padding: 0; list-style: none; }
+  .list-cols li { break-inside: avoid; padding: 16px 0; border-top: 1px solid var(--line); }
+  .list-cols li strong { display: block; margin-bottom: 4px; }
+  .list-cols li span { color: var(--text-soft); font-size: 15px; }
+  @media (max-width: 760px) { .list-cols { columns: 1; } }
+
+  /* Keyboard */
+  .keys { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 48px; }
+  @media (max-width: 760px) { .keys { grid-template-columns: 1fr; } }
+  .keys div { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .keys div span { color: var(--text-soft); }
+  kbd {
+    display: inline-block; min-width: 26px; text-align: center; padding: 2px 7px; margin-left: 4px;
+    border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px;
+    background: var(--bg-card); color: var(--text); font-size: 13px; font-family: var(--font); font-weight: 600;
+  }
+
+  /* Install */
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: step; }
+  .step {
+    display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1.35fr); gap: 0 24px; align-items: start;
+    padding: 26px 28px; border-radius: var(--radius); background: var(--bg-card); border: 1px solid var(--line);
+  }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--accent-strong); color: #fff; font-weight: 700; font-size: 15px;
+  }
+  .step h3 { font-size: 18px; margin: 4px 0 8px; }
+  .step p { color: var(--text-soft); font-size: 15px; }
+  .step pre, .step .reqs { margin: 0; }
+  @media (max-width: 860px) {
+    .step { grid-template-columns: 34px minmax(0, 1fr); gap: 16px; padding: 22px 20px; }
+    .step pre, .step .reqs { grid-column: 1 / -1; }
+  }
+  pre {
+    margin: 14px 0 0; padding: 14px 16px; border-radius: 10px; overflow-x: auto;
+    background: #0b0b0f; color: #e7e7ee; border: 1px solid #23232b; line-height: 1.7;
+  }
+  pre .c { color: #7d7d8c; }
+  .reqs { font-size: 14.5px; }
+  .reqs dt { font-weight: 600; margin-top: 12px; }
+  .reqs dt:first-child { margin-top: 0; }
+  .reqs dt span { font-weight: 400; color: var(--text-faint); }
+  .reqs dd { margin: 4px 0 0; color: var(--text-soft); }
+  .reqs code { display: inline-block; background: var(--accent-soft); color: var(--text); padding: 3px 8px; border-radius: 6px; font-size: 13px; }
+  .panel code { font-size: 13px; }
+  .install-extra { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+  @media (max-width: 960px) { .install-extra { grid-template-columns: minmax(0, 1fr); } }
+  .panel { padding: 26px 24px; border-radius: var(--radius); background: var(--bg-card); border: 1px solid var(--line); }
+  .panel h3 { font-size: 17px; margin-bottom: 6px; }
+  .panel p { color: var(--text-soft); font-size: 15px; }
+
+  /* Closing */
+  .closing { text-align: center; padding: 40px 0 110px; position: relative; overflow: hidden; }
+  .closing::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(40% 70% at 50% 100%, rgba(139, 92, 246, .22), transparent 70%);
+  }
+  .bars { display: flex; justify-content: center; align-items: flex-end; gap: 9px; height: 70px; margin-bottom: 34px; }
+  .bars i { width: 12px; border-radius: 6px; background: var(--glow); opacity: .95; animation: bounce 1.6s ease-in-out infinite; transform-origin: bottom; }
+  .bars i:nth-child(1), .bars i:nth-child(7) { height: 100%; }
+  .bars i:nth-child(2), .bars i:nth-child(6) { height: 80%; animation-delay: -.3s; }
+  .bars i:nth-child(3), .bars i:nth-child(5) { height: 60%; animation-delay: -.6s; }
+  .bars i:nth-child(4) { height: 44%; animation-delay: -.9s; }
+  @keyframes bounce { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
+  @media (prefers-reduced-motion: reduce) { .bars i { animation: none; } }
+  .closing h2 { max-width: 760px; margin: 0 auto; }
+  .closing p { color: var(--text-soft); font-size: 18px; margin: 18px auto 0; max-width: 620px; }
+
+  footer { border-top: 1px solid var(--line); padding: 48px 0 56px; font-size: 14px; color: var(--text-faint); }
+  footer .wrap { display: grid; grid-template-columns: 1.2fr 2fr; gap: 40px; }
+  @media (max-width: 760px) { footer .wrap { grid-template-columns: 1fr; } }
+  footer .brand { margin-bottom: 12px; }
+  footer h4 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-soft); margin: 0 0 10px; }
+  footer p + p { margin-top: 8px; }
+  footer a { color: var(--text-soft); }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="images/icon.png" alt="" width="30" height="30">Mugig</a>
+    <nav aria-label="Sections">
+      <ul>
+        <li><a href="#quality">Quality check</a></li>
+        <li><a href="#listening">Listening</a></li>
+        <li><a href="#library">Library</a></li>
+        <li><a href="#shortcuts">Shortcuts</a></li>
+        <li><a href="#get">Get Mugig</a></li>
+      </ul>
+    </nav>
+    <a class="btn btn-ghost" href="https://github.com/yeungon/mugig">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <img class="hero-icon" src="images/icon.png" alt="Mugig app icon" width="104" height="104">
+    <div class="eyebrow"><span class="dot"></span>A desktop music player, written in Go</div>
+    <h1>The music player that tells you <span class="gradient-text">the truth about your files</span></h1>
+    <p class="lede">Mugig plays your music bit-perfect and gapless, and checks every file while it’s at it: is that “lossless” FLAC really lossless, is it intact, and how loud is it?</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#get">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+        Get Mugig
+      </a>
+      <a class="btn btn-ghost" href="#quality">See the quality check</a>
+    </div>
+    <p class="platforms">macOS · Windows · Linux &nbsp;—&nbsp; made and tested on macOS</p>
+
+    <div class="shot-hero">
+      <div class="frame">
+        <div class="bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <picture>
+          <source media="(prefers-color-scheme: light)" srcset="images/songs-light.png">
+          <img src="images/songs-dark.png" width="1280" height="760" alt="Mugig’s song list: folders and playlists in the sidebar, and columns for time, year, format, size and a quality verdict for each song, such as Lossless, Lossless?, Hi-Res, Lossy and Damaged">
+        </picture>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="formats" aria-label="What Mugig plays">
+  <div class="wrap">
+    <ul>
+      <li>FLAC</li>
+      <li>MP3</li>
+      <li>WAV</li>
+      <li>Ogg Vorbis</li>
+      <li>CUE sheets</li>
+      <li>Hi-res <span>24-bit, 96 and 192 kHz</span></li>
+    </ul>
+  </div>
+</div>
+
+<!-- Quality check -->
+<section id="quality">
+  <div class="wrap">
+    <div class="split">
+      <div class="split-text">
+        <p class="kicker">Audio quality check</p>
+        <h2>Is that FLAC really lossless?</h2>
+        <p style="margin-top:16px;color:var(--text-soft);font-size:18px">A FLAC made from an MP3 is still an MP3 underneath. Mugig looks at the audio itself, not the file name, and tells you what it finds in plain words.</p>
+        <ul class="checks">
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.4 8.3 8 9 4.6-.7 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+            <div><strong>Integrity</strong><span>Decodes the whole file and compares it with the MD5 checksum stored in the FLAC. Finds WAV files that were cut short.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+            <div><strong>Lossy source</strong><span>Spots files converted from MP3 or AAC by the encoder’s frequency cut-off and the gaps lossy encoders leave in the spectrum.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h3l3-8 4 16 3-8h5"/></svg></div>
+            <div><strong>Fake hi-res</strong><span>Finds 24-bit files padded from 16 bits, and 96 kHz files upsampled from CD quality.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18V9M9 18V5M14 18v-6M19 18V8"/></svg></div>
+            <div><strong>Loudness and peaks</strong><span>Integrated loudness (ITU-R BS.1770-4, in LUFS), true peak, the DR dynamic range figure, and clipping.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg></div>
+            <div><strong>Spectrogram</strong><span>With a colour legend, an adjustable range of levels, and the cut-off marked, so you can see for yourself.</span></div>
+          </li>
+        </ul>
+      </div>
+      <figure>
+        <div class="frame">
+          <picture>
+            <source media="(prefers-color-scheme: light)" srcset="images/quality-light.png">
+            <img src="images/quality-dark.png" width="700" height="584" loading="lazy" alt="The Audio Quality window for a FLAC file: intact, but the sound drops 69 dB at 16.2 kHz like an MP3 of about 128 kbps, so it is very likely converted from a lossy file. A spectrogram shows the cut-off.">
+          </picture>
+        </div>
+        <figcaption>A “lossless” FLAC that started life as a 128 kbps MP3.</figcaption>
+      </figure>
+    </div>
+
+    <div class="split" style="margin-top:64px;align-items:start">
+      <div>
+        <h3 style="font-size:22px">A verdict for every song</h3>
+        <p style="color:var(--text-soft);margin-top:10px">Check one song, or <strong>Check All Songs</strong> in the background. Results are saved, so each file is only checked once, until it changes. The Quality column sorts like any other.</p>
+        <div class="verdicts" aria-label="Possible verdicts">
+          <span class="verdict v-lossless">Lossless</span>
+          <span class="verdict v-hires">Hi-Res</span>
+          <span class="verdict v-suspect">Lossless?</span>
+          <span class="verdict v-lossy">Lossy</span>
+          <span class="verdict v-damaged">Damaged</span>
+        </div>
+      </div>
+      <div>
+        <h3 style="font-size:22px">Honest about how sure it is</h3>
+        <p style="color:var(--text-soft);margin-top:10px">Mugig says “very likely” or “probably”, never a made-up percentage. Measured on a real library of 833 files:</p>
+        <div class="stats">
+          <div class="stat"><b class="warm">93%</b><span>of MP3s decoded to 16-bit files were caught</span></div>
+          <div class="stat"><b class="cool">1.6%</b><span>of genuine lossless files were flagged by mistake</span></div>
+        </div>
+        <p class="note">A <strong>Lossless?</strong> verdict is a reason to look at the spectrogram, not proof.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Listening -->
+<section id="listening" class="alt">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="kicker">Listening</p>
+      <h2>Your music, exactly as it was recorded</h2>
+      <p>Nothing touches the sound unless you ask it to. When you do, the tools are the ones serious listeners reach for.</p>
+    </div>
+
+    <div class="grid">
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h4l2-6 4 12 2-6h8"/></svg></div>
+        <h3>Bit-perfect</h3>
+        <p>The output opens at each song’s own sample rate, and on macOS the device itself switches to it, then switches back when you quit. Now Playing tells you when the sound reaches your DAC unconverted.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12c3 0 3-6 6-6s3 12 6 12 3-6 6-6"/></svg></div>
+        <h3>Gapless</h3>
+        <p>Songs at the same sample rate run straight into each other, so live albums, classical works and DJ mixes play as recorded. The silence MP3 encoders add is trimmed off.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h3>Exclusive access <span class="tag">macOS</span></h3>
+        <p>While a song plays, Mugig has your DAC to itself: no system alerts or other apps mixed in, and nothing changing its sample rate behind your back.</p>
+        <span class="where">Controls → Exclusive Access</span>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div>
+        <h3>Ten-band parametric EQ</h3>
+        <p>Every band has its own frequency, gain and width, with shelves at the ends, presets and a live response curve. Boosts turn the whole down to match, so loud music never clips.</p>
+        <span class="where">Controls → Equalizer… &nbsp;<kbd>⌥⌘E</kbd></span>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/></svg></div>
+        <h3>Crossfeed for headphones</h3>
+        <p>Each ear hears a little of the other channel, as it would from speakers, so hard-panned music doesn’t sit inside one ear. Light, Medium and Strong, after the bs2b design.</p>
+        <span class="where">Controls → Crossfeed</span>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></div>
+        <h3>Speed, with the pitch kept</h3>
+        <p>Anywhere from 0.5× to 2× without the chipmunk effect, for practising along or catching every word. At 1× the audio passes through untouched.</p>
+        <span class="where"><kbd>⌘]</kbd> faster &nbsp;<kbd>⌘[</kbd> slower</span>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg></div>
+        <h3>Gentle on the ears</h3>
+        <p>Playing and resuming fade in over a second, and turning the volume up glides there instead of jumping. Turning it down is instant. At full volume the sound is untouched.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+        <h3>Smooth on slow disks</h3>
+        <p>Decoding runs up to three seconds ahead, so a USB disk waking up or retrying a bad spot doesn’t break up the sound.</p>
+      </article>
+      <article class="card">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4 2.5-2.5Z"/></svg></div>
+        <h3>Damaged files play on</h3>
+        <p>A corrupt FLAC frame becomes a moment of silence instead of the end of the song, so you can still hear the rest while you find a better copy.</p>
+      </article>
+    </div>
+
+    <div class="duo">
+      <figure>
+        <div class="frame plain">
+          <img src="images/eq-dark.png" width="780" height="600" loading="lazy" alt="The Equalizer window: ten vertical sliders set to the Loudness preset, a purple response curve above them, frequency and Q fields below, and a note that the output is turned down 4.7 dB so the boost can't clip">
+        </div>
+        <figcaption>The equalizer, with the Loudness preset.</figcaption>
+      </figure>
+      <div class="panel" style="align-self:center">
+        <h3>Also on the player bar</h3>
+        <ul class="list-cols" style="columns:1;margin-top:10px">
+          <li><strong>Up Next</strong><span>Right-click a song for Play Next or Play Later. Those play first, then the list carries on where it was.</span></li>
+          <li><strong>Picks up where you left off</strong><span>Reopen Mugig and the last song is waiting, paused at the same spot, with Up Next as you left it.</span></li>
+          <li><strong>Visualizer</strong><span>A spectrum or a waveform on the Now Playing page.</span></li>
+          <li><strong>Media keys and Now Playing</strong><span>On macOS, the keyboard’s media keys and the system’s Now Playing controls work, album art included.</span></li>
+          <li><strong>Choice of output device</strong><span>Pick your DAC, speakers or headphones from inside the app.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Library -->
+<section id="library">
+  <div class="wrap">
+    <div class="split flip">
+      <div class="split-text">
+        <p class="kicker">Library</p>
+        <h2>Big libraries, many disks, no fuss</h2>
+        <p style="color:var(--text-soft);font-size:18px;margin-top:16px">Point Mugig at your music folders, internal, USB or network, and it keeps up with them on its own.</p>
+        <ul class="checks">
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></div>
+            <div><strong>Several music folders</strong><span>Unplug a disk and its folder waits as “Not connected”; plug it back in and it is scanned again. Folders are watched for changes, and rescans are quick.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m16 15 3 3 3-3M19 18V9"/></svg></div>
+            <div><strong>Playlists and smart playlists</strong><span>Add songs by hand, or write rules such as “Format is FLAC and Quality is Hi-Res” and let the list keep itself up to date.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg></div>
+            <div><strong>CUE sheets</strong><span>An album ripped to one big file is listed song by song and plays back gapless, as on the CD. Sheets in Chinese, Japanese, Korean and Western Windows encodings are read too.</span></div>
+          </li>
+          <li>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 17.5h7M17.5 14v7"/></svg></div>
+            <div><strong>Leaves out what isn’t music</strong><span>Sounds inside apps and plug-ins, <code>node_modules</code>, hidden folders and the Trash stay out of your library.</span></div>
+          </li>
+        </ul>
+      </div>
+      <figure>
+        <div class="frame plain">
+          <img src="images/smart-dark.png" width="620" height="291" loading="lazy" alt="The Edit Smart Playlist dialog: a playlist named Genuine Hi-Res matching all of two rules, Format is FLAC and Quality is Hi-Res; 2 songs match">
+        </div>
+        <figcaption>A smart playlist of hi-res files that passed the quality check.</figcaption>
+      </figure>
+    </div>
+
+    <ul class="list-cols" style="margin-top:64px">
+      <li><strong>Search and sort</strong><span>By title, artist, album, time, year, format, size, quality or path. The line under the title totals what’s shown: tracks, artists, albums, listening time and size.</span></li>
+      <li><strong>Select many songs at once</strong><span><kbd>⌘</kbd>-click, <kbd>⇧</kbd>-click or <kbd>⌘A</kbd>, then play, queue, check or copy them together.</span></li>
+      <li><strong>Show or hide columns</strong><span>Right-click a column header, or use View → Columns.</span></li>
+      <li><strong>Get Info, Show in Finder, Copy Path</strong><span>Right-click any song. Explorer on Windows, your file manager on Linux.</span></li>
+      <li><strong>Move to Trash</strong><span>Asks first, and the file can always be put back. On a USB disk it goes to that disk’s own Trash.</span></li>
+      <li><strong>Drag and drop</strong><span>Drop a folder on the window to add it, or audio files to play them.</span></li>
+      <li><strong>Reads the file, not its name</strong><span>The format comes from the file’s own bytes, so misnamed files still play.</span></li>
+      <li><strong>Light and dark</strong><span>Follows the system, or choose in View → Appearance.</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- Shortcuts -->
+<section id="shortcuts" class="alt">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">Keyboard</p>
+      <h2>Made for the keyboard</h2>
+      <p><kbd>⌘</kbd> is <kbd>Ctrl</kbd> on Windows and Linux.</p>
+    </div>
+    <div class="keys">
+      <div><span>Play / pause</span><span><kbd>Space</kbd></span></div>
+      <div><span>Next / previous song</span><span><kbd>⌘→</kbd><kbd>⌘←</kbd></span></div>
+      <div><span>Skip forward / back 10 seconds</span><span><kbd>⌥⌘→</kbd><kbd>⌥⌘←</kbd></span></div>
+      <div><span>Volume up / down</span><span><kbd>⌘↑</kbd><kbd>⌘↓</kbd></span></div>
+      <div><span>Mute</span><span><kbd>⌥⌘↓</kbd></span></div>
+      <div><span>Faster / slower</span><span><kbd>⌘]</kbd><kbd>⌘[</kbd></span></div>
+      <div><span>Equalizer</span><span><kbd>⌥⌘E</kbd></span></div>
+      <div><span>Stop</span><span><kbd>⌘.</kbd></span></div>
+      <div><span>Find</span><span><kbd>⌘F</kbd></span></div>
+      <div><span>Visualizer</span><span><kbd>⌘L</kbd></span></div>
+      <div><span>Check the playing song’s quality</span><span><kbd>⌘I</kbd></span></div>
+      <div><span>Check all songs</span><span><kbd>⇧⌘I</kbd></span></div>
+      <div><span>Open files / add a music folder</span><span><kbd>⌘O</kbd><kbd>⇧⌘O</kbd></span></div>
+      <div><span>Rescan the folders</span><span><kbd>⌘R</kbd></span></div>
+      <div><span>Show the playing song in Finder</span><span><kbd>⇧⌘R</kbd></span></div>
+      <div><span>Select every song / clear the selection</span><span><kbd>⌘A</kbd><kbd>Esc</kbd></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Get it -->
+<section id="get">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="kicker">Get Mugig</p>
+      <h2>Build it in three steps</h2>
+      <p>Mugig is built from source with Go, on macOS, Windows or Linux.</p>
+    </div>
+
+    <ol class="steps">
+      <li class="step">
+        <div>
+          <h3>Install Go and a C compiler</h3>
+          <p><a href="https://go.dev/dl/">Go</a> 1.24 or later, and a C compiler, as the window and the audio output use C.</p>
+        </div>
+        <dl class="reqs">
+          <dt>macOS</dt><dd><code>xcode-select --install</code></dd>
+          <dt>Linux <span>(Debian, Ubuntu)</span></dt><dd><code>sudo apt install gcc libgl1-mesa-dev xorg-dev</code></dd>
+          <dt>Windows</dt><dd>A MinGW-w64 GCC, for example from <a href="https://www.msys2.org">MSYS2</a></dd>
+        </dl>
+      </li>
+      <li class="step">
+        <div>
+          <h3>Get the source</h3>
+          <p>Clone the repository from GitHub.</p>
+        </div>
+<pre>git clone https://github.com/yeungon/mugig.git
+cd mugig</pre>
+      </li>
+      <li class="step">
+        <div>
+          <h3>Build and run</h3>
+          <p>Run it straight away, or package it as an app. The first build takes a few minutes.</p>
+        </div>
+<pre>make run        <span class="c"># build and run</span>
+make package    <span class="c"># build the app (Mugig.app on macOS)</span>
+make install    <span class="c"># macOS: package and copy into /Applications</span></pre>
+      </li>
+    </ol>
+
+    <div class="install-extra">
+      <div class="panel">
+        <h3>Builds for other systems</h3>
+        <p>These collect their results in <code>dist/</code>. Windows and Linux builds use fyne-cross, which needs Docker running.</p>
+<pre>make mac            <span class="c"># Apple silicon and Intel</span>
+make windows        <span class="c"># also windows-arm64</span>
+make linux          <span class="c"># also linux-arm64</span>
+make all-platforms  <span class="c"># all three</span></pre>
+      </div>
+      <div class="panel">
+        <h3>Platform notes</h3>
+        <p>Mugig is made and tested on macOS. On Windows and Linux it builds and should work, but has had far less use.</p>
+        <p style="margin-top:12px">These are macOS only: switching the device’s sample rate, exclusive access, the system’s Now Playing controls, the native Open panel that lists all disks, and the macOS decoder used as a second opinion on damaged files.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="closing">
+  <div class="wrap">
+    <div class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <h2>Hear your music. <span class="gradient-text">Know your files.</span></h2>
+    <p>A player that respects the recording, and tells you the truth about it.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/yeungon/mugig">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+        View on GitHub
+      </a>
+      <a class="btn btn-ghost" href="#get">Build instructions</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#top"><img src="images/icon.png" alt="" width="30" height="30">Mugig</a>
+      <p>A music player and audio quality checker, written in Go with <a href="https://fyne.io">Fyne</a>.</p>
+      <p><a href="https://github.com/yeungon/mugig">github.com/yeungon/mugig</a></p>
+    </div>
+    <div>
+      <h4>Credits</h4>
+      <p>The interface font is <a href="https://rsms.me/inter/">Inter</a>, under the SIL Open Font License. Crossfeed follows Boris Mikhaylov’s <a href="https://bs2b.sourceforge.net/">bs2b</a> design, with presets by Chu Moy and Jan Meier. The idea of measuring loudness and peaks alongside the quality check comes from <a href="https://github.com/Angel2mp3/AudioAuditor">AudioAuditor</a>; the code follows the published standards.</p>
+      <p>Built on <a href="https://fyne.io">Fyne</a>, <a href="https://github.com/gopxl/beep">beep</a>, <a href="https://github.com/gen2brain/malgo">malgo</a> (miniaudio), <a href="https://github.com/mewkiz/flac">mewkiz/flac</a> and <a href="https://github.com/dhowden/tag">dhowden/tag</a>. Screenshots show made-up songs.</p>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
