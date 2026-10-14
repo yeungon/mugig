@@ -296,6 +296,8 @@ type ui struct {
 	speedBtn        *widget.Button   // in the player bar
 	speedItems      []*fyne.MenuItem // one per speed, in the Controls menu
 	crossfeed       crossfeedLevel
+	eq              eqSettings
+	eqView          *eqView          // the Equalizer window, while open
 	crossfeedItems  []*fyne.MenuItem // one per level, in the Controls menu
 	appearanceItems []*fyne.MenuItem // View > Appearance (see appearance.go)
 	repeatAllItem   *fyne.MenuItem
@@ -388,6 +390,7 @@ func main() {
 	a.SetIcon(appIcon)
 	setDockIcon(iconPNG)
 	w := a.NewWindow("Mugig")
+	w.SetMaster() // closing it quits, even with the Equalizer window open
 
 	media := newSystemMedia()
 	audio := newPlayer()

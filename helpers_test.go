@@ -20,6 +20,7 @@ type fakePlayer struct {
 	level  float64
 	speed  float64
 	feed   crossfeedLevel
+	eq     eqSettings
 	bad    map[string]bool // paths that fail to play
 	next   string          // the path readied to follow, by Prepare
 
@@ -48,6 +49,7 @@ func (f *fakePlayer) Seek(d time.Duration) error    { f.pos = d; return nil }
 func (f *fakePlayer) SetVolume(level float64)       { f.level = level }
 func (f *fakePlayer) SetSpeed(speed float64)        { f.speed = speed }
 func (f *fakePlayer) SetCrossfeed(l crossfeedLevel) { f.feed = l }
+func (f *fakePlayer) SetEQ(s eqSettings)            { f.eq = s }
 
 // testRate is the sample rate of the fake player's audio.
 const testRate = 44100

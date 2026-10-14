@@ -36,6 +36,7 @@ type audioPlayer interface {
 	SetVolume(level float64)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
 	SetCrossfeed(level crossfeedLevel)
+	SetEQ(s eqSettings)
 	// Samples fills dst with the most recent audio, mono and oldest first,
 	// and returns its sample rate, or 0 if nothing is playing.
 	Samples(dst []float64) int
@@ -64,6 +65,7 @@ type player struct {
 	out output
 
 	decks *decks // the song playing and the one readied to follow; nil if stopped
+	eq    *equalizer
 	cross *crossfeed
 	tap   *tap
 	vol   *effects.Volume
@@ -72,6 +74,7 @@ type player struct {
 	level float64 // volume from 0 (silent) to 1 (full), kept across tracks
 	speed float64 // playback speed, kept across tracks
 	feed  crossfeedLevel
+	eqSet eqSettings
 
 	onEnd     func(error) // the current song's end-of-track callback
 	nextPath  string      // the song asked to follow, "" for none
@@ -117,7 +120,9 @@ func (p *player) Play(path string, onEnd func(error)) error {
 	ds := &decks{cur: d}
 	ds.switched = func(old *deck) { p.notify(func() { p.switched(gen, old) }) }
 	p.decks = ds
-	p.cross = &crossfeed{s: ds}
+	p.eq = &equalizer{s: ds}
+	p.eq.set(p.eqSet, int(d.format.SampleRate))
+	p.cross = &crossfeed{s: p.eq}
 	p.cross.set(p.feed, int(d.format.SampleRate))
 	// The tap sits before the volume so the visualizer still moves when
 	// the sound is turned down.
@@ -385,6 +390,19 @@ func (p *player) SetCrossfeed(level crossfeedLevel) {
 	p.cross.set(level, int(p.decks.cur.format.SampleRate))
 }
 
+// SetEQ sets the equalizer, for this track and the ones after.
+func (p *player) SetEQ(s eqSettings) {
+	p.eqSet = s
+	cur := p.current()
+	if cur == nil {
+		return
+	}
+	f := designEQ(s, int(cur.format.SampleRate)) // outside the lock: it takes a moment
+	p.out.mu.Lock()
+	defer p.out.mu.Unlock()
+	p.eq.use(s, f)
+}
+
 // SetVolume sets the volume from 0 (silent) to 1 (full).
 func (p *player) SetVolume(level float64) {
 	p.level = level
@@ -509,7 +527,7 @@ func (p *player) release() {
 	if p.decks.next != nil {
 		p.decks.next.stream.Close()
 	}
-	p.decks, p.cross, p.tap, p.vol, p.ctrl = nil, nil, nil, nil, nil
+	p.decks, p.eq, p.cross, p.tap, p.vol, p.ctrl = nil, nil, nil, nil, nil, nil
 	p.nextPath, p.handedOff = "", false
 }
 

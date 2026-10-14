@@ -72,6 +72,24 @@ silicon).
 - **`widget.List` puts a padding's height between rows**, not a separator's.
   To make a list exactly as tall as its rows, use
   `n·rowHeight + (n−1)·theme.Padding()`.
+- **`slider.SetValue` also fires `OnChangeEnded`**, as if a drag had
+  ended. Work done only when a slider is let go (saving a preference)
+  then runs on every programmatic change too; guard the callbacks while
+  filling widgets in.
+- **`select.SetSelected("")` does nothing** (it only accepts one of the
+  options). Use `ClearSelected()` to show the placeholder again.
+- **Never create a shape with a nil colour** (`canvas.NewRectangle(nil)`)
+  even as an invisible spacer: the software painter used by
+  `Canvas().Capture()` dereferences it and panics. Use
+  `color.Transparent`.
+- **Draw a smooth curve as a `canvas.Raster`**, not as many
+  `canvas.Line` segments, which render with gaps between them. For a
+  curve that is a function of x, fill each pixel column between where the
+  curve enters and leaves it, with partial cover at the ends for
+  smoothness (the equalizer's graph).
+- **A vertical `widget.Slider` takes its height from its container**:
+  inside `container.NewCenter` it collapses to its minimum. Stack it on
+  a transparent rectangle with the height wanted.
 - **Custom colour names** in the app theme (`colorNameAccent`,
   `colorNameSurface`) keep colours consistent and switchable with the
   light/dark variant.
@@ -146,6 +164,9 @@ silicon).
   race detector makes it ~90 s) the test window started drawing without
   its cached objects, and a pixel test failed only in the full run. Set
   `FYNE_CACHE=1h` for tests (`make test` does).
+- **Closing a test window twice hangs the test.** The test driver's
+  `removeWindow` panics with its lock held on a window it no longer
+  has, and the next test waits forever. Close each window once.
 - **Theme changes apply in the background** in the test driver; don't
   assume the next capture shows them.
 - **Inline `fyne.Do` plus an inline `async` makes background work finish
@@ -187,6 +208,13 @@ silicon).
   measurement: a hard-panned 60 Hz tone reaches the far ear exactly the
   preset's dB down (4.5, 6, 9.5), 10 kHz at least 20 dB down. Centred
   treble drops by up to 2 dB; that is bs2b's design, not a bug.
+- **Equalizer: RBJ Audio EQ Cookbook biquads** (low shelf, peaks, high
+  shelf) in transposed direct form II. Test by measurement: a sine
+  through the filters changes by exactly the computed response (within
+  0.1 dB). Turn the whole down by the response's largest boost so a
+  full-scale tone can't clip. When a band moves, copy the filters' state
+  to the new coefficients rather than starting from zero, or it clicks.
+  Ten bands on two channels at 192 kHz cost 0.3% of a core.
 - **Speed with pitch kept**: WSOLA (`stretch.go`) — overlapping pieces of
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at
