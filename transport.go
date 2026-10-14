@@ -117,7 +117,8 @@ func (u *ui) buildTransport() fyne.CanvasObject {
 			container.NewStack(u.timeSlots[1], u.total),
 			u.seek),
 	)
-	volume := container.NewHBox(layout.NewSpacer(), container.NewCenter(u.buildSpeedButton()), u.visBtn, u.muteBtn,
+	u.queueBtn = iconButton(queueIcon, u.showQueue)
+	volume := container.NewHBox(layout.NewSpacer(), container.NewCenter(u.buildSpeedButton()), u.queueBtn, u.visBtn, u.muteBtn,
 		container.NewCenter(container.NewGridWrap(fyne.NewSize(110, u.volume.MinSize().Height), u.volume)),
 		mini)
 
@@ -131,17 +132,30 @@ func (u *ui) buildTransport() fyne.CanvasObject {
 // jump plays t as a step forward, remembering the current track so
 // "previous" can return to it in shuffle mode.
 func (u *ui) jump(t Track) {
+	u.remember()
+	u.play(t)
+}
+
+// remember adds the playing track to the history "previous" walks back
+// through in shuffle mode.
+func (u *ui) remember() {
 	if u.playing.Path != "" {
 		u.history = append(u.history, u.playing.Path)
 		if len(u.history) > maxHistory {
 			u.history = u.history[1:]
 		}
 	}
-	u.play(t)
 }
 
-// play starts t, replacing whatever was playing. Called on the UI thread.
+// play starts t, from the list or a file opened, replacing whatever was
+// playing. Called on the UI thread.
 func (u *ui) play(t Track) {
+	u.start(t, false)
+}
+
+// start plays t. queued says it comes from Up Next, so the list carries on
+// afterwards from where it was rather than from t.
+func (u *ui) start(t Track, queued bool) {
 	if err := u.player.Play(t.Path, u.trackEnded); err != nil {
 		u.setStopped()
 		dialog.ShowError(err, u.win)
@@ -149,6 +163,10 @@ func (u *ui) play(t Track) {
 	}
 	u.playing = t
 	u.paused = false
+	u.fromQueue = queued
+	if !queued {
+		u.listPath = t.Path
+	}
 	if u.queueValid {
 		u.queue = slices.DeleteFunc(u.queue, func(p string) bool { return p == t.Path })
 	}
@@ -196,12 +214,11 @@ func (u *ui) showArt(data []byte) {
 	u.bigArt.set(data)
 }
 
-// togglePlay pauses or resumes, or starts the list if nothing is playing.
+// togglePlay pauses or resumes, or if nothing is playing starts Up Next or
+// the list.
 func (u *ui) togglePlay() {
 	if u.playing.Path == "" {
-		if t, ok := u.upNext(); ok {
-			u.jump(t)
-		}
+		u.advance()
 		return
 	}
 	u.paused = u.player.TogglePause()
@@ -230,7 +247,7 @@ func (u *ui) trackEnded(err error) {
 		return
 	}
 	if u.repeat == repeatOne {
-		u.play(u.playing)
+		u.start(u.playing, u.fromQueue)
 		return
 	}
 	u.next()
@@ -239,15 +256,28 @@ func (u *ui) trackEnded(err error) {
 // next plays the following track, or stops at the end of the list. Unlike a
 // track ending, pressing next moves on even in repeat-one mode.
 func (u *ui) next() {
-	if t, ok := u.upNext(); ok {
-		u.jump(t)
-	} else {
+	if !u.advance() {
 		u.stop()
 	}
 }
 
-// upNext picks the track after the current one, following shuffle and
-// repeat. ok is false when playback should stop.
+// advance plays the first song in Up Next, or else the list's next track.
+// It reports false if there is neither.
+func (u *ui) advance() bool {
+	if t, ok := u.takeQueued(); ok {
+		u.remember()
+		u.start(t, true)
+		return true
+	}
+	if t, ok := u.upNext(); ok {
+		u.jump(t)
+		return true
+	}
+	return false
+}
+
+// upNext picks the list's track after the current one, following shuffle
+// and repeat. ok is false when playback should stop.
 func (u *ui) upNext() (t Track, ok bool) {
 	if len(u.tracks) == 0 {
 		return Track{}, false
@@ -255,7 +285,7 @@ func (u *ui) upNext() (t Track, ok bool) {
 	if u.shuffle {
 		return u.nextShuffled()
 	}
-	i := u.playingIndex() // -1 if nothing is playing, so this starts at the top
+	i := u.listIndex() // -1 if nothing is playing, so this starts at the top
 	switch {
 	case i+1 < len(u.tracks):
 		return u.tracks[i+1], true
@@ -330,6 +360,12 @@ func (u *ui) prev() {
 		}
 		u.restart()
 		return
+	}
+	if u.fromQueue { // back to the list, where it was before Up Next
+		if i := u.indexOf(u.listPath); i >= 0 {
+			u.play(u.tracks[i])
+			return
+		}
 	}
 	i := u.playingIndex()
 	switch {
@@ -432,6 +468,7 @@ func (u *ui) toggleMute() {
 func (u *ui) setStopped() {
 	u.playing = Track{}
 	u.paused = false
+	u.fromQueue = false
 	u.queueValid = false // the next play starts a fresh shuffle round
 	u.history = nil
 	u.playBtn.SetIcon(theme.MediaPlayIcon())
@@ -486,6 +523,16 @@ func (u *ui) playingIndex() int {
 		return -1
 	}
 	return u.indexOf(u.playing.Path)
+}
+
+// listIndex is where the list carries on from: the playing track, or while
+// a song from Up Next plays, the last track played from the list. It is -1
+// if neither is listed.
+func (u *ui) listIndex() int {
+	if u.fromQueue {
+		return u.indexOf(u.listPath)
+	}
+	return u.playingIndex()
 }
 
 // indexOf finds a track in the list by path, since rows move when the list

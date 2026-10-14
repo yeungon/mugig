@@ -159,12 +159,13 @@ func TestTrackCellStyles(t *testing.T) {
 		color   fyne.ThemeColorName
 		icon    bool
 	}{
-		{0, false, theme.ColorNameForeground, false},
-		{0, true, colorNameAccent, true},
-		{1, true, colorNameAccent, false},
-		{2, true, theme.ColorNameForeground, false},
-		{3, false, theme.ColorNameDisabled, false},
-		{6, true, theme.ColorNameDisabled, false}, // path
+		{titleCol, false, theme.ColorNameForeground, false},
+		{titleCol, true, colorNameAccent, true},
+		{artistCol, true, colorNameAccent, false},
+		{albumCol, true, theme.ColorNameForeground, false},
+		{timeCol, false, theme.ColorNameDisabled, false},
+		{yearCol, false, theme.ColorNameDisabled, false},
+		{pathCol, true, theme.ColorNameDisabled, false},
 	} {
 		c.set("x", tc.col, tc.playing)
 		if c.seg.Style.ColorName != tc.color || c.icon.Visible() != tc.icon {

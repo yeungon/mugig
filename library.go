@@ -157,6 +157,8 @@ func (u *ui) updateHeader(id widget.TableCellID, o fyne.CanvasObject) {
 
 func (u *ui) compareColumn(a, b Track, col int) int {
 	switch col {
+	case timeCol:
+		return cmp.Compare(a.Length, b.Length)
 	case yearCol:
 		return cmp.Compare(a.Year, b.Year)
 	case sizeCol:

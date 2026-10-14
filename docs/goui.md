@@ -51,6 +51,13 @@ silicon).
   button (`ShowAtPosition(pos.SubtractXY(0, menu.MinSize().Height))`).
 - **Tighter spacing for one part of the UI**: `container.NewThemeOverride`
   with a small theme that changes only padding sizes (`compactTheme`).
+- **Name table columns with constants** (`titleCol = iota`, …), never
+  bare numbers. When Size was added, a map of "muted" columns written as
+  `{3, 4, 6}` quietly went stale and greyed out Quality's slot instead of
+  Path's.
+- **`widget.List` puts a padding's height between rows**, not a separator's.
+  To make a list exactly as tall as its rows, use
+  `n·rowHeight + (n−1)·theme.Padding()`.
 - **Custom colour names** in the app theme (`colorNameAccent`,
   `colorNameSurface`) keep colours consistent and switchable with the
   light/dark variant.
@@ -147,6 +154,15 @@ silicon).
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at
   192 kHz). Bypass it entirely at 1×.
+- **Get song lengths from the headers, not a decoder.** go-mp3 works out an
+  MP3's length by reading every frame, far too slow for a library scan.
+  Read it instead from FLAC's STREAMINFO, WAV's data size, the last Ogg
+  page's granule position, or the MP3's Xing/VBRI frame count (otherwise
+  constant bitrate: audio bytes × 8 ÷ bitrate) (`length.go`). Checked
+  against the decoders on 150 real songs: none was off by more than a
+  second. The 4,167 songs on two USB disks took 40 s, once.
+- **Don't cache "unknown" as an answer** if it might be a passing read
+  error. A song cached without a length is measured again on the next scan.
 - **malgo's `BackendNull` constant is off by one**; tests use
   `malgo.BackendNull + 1` for miniaudio's silent device.
 

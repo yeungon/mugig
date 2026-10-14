@@ -63,7 +63,7 @@ func TestLibraryStatsWording(t *testing.T) {
 func TestSortCyclesAscDescOff(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	setLibrary(u, fiveTracks()...)
-	const year = 3
+	const year = yearCol
 
 	u.sortBy(year)
 	if got := titles(u.tracks); !slices.Equal(got, []string{"Zebra", "Help", "Hey Jude", "Come Together", "Bohemian Rhapsody"}) {
@@ -146,7 +146,7 @@ func TestLibraryOrder(t *testing.T) {
 func TestScanBatchesRespectSearchAndSort(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	u.search.SetText("beatles")
-	u.sortBy(3) // year
+	u.sortBy(yearCol)
 
 	lib := fiveTracks()
 	u.flush("/music", lib[:3])

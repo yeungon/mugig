@@ -11,8 +11,18 @@ import (
 	"time"
 )
 
+// fileLength opens path and returns how long its audio lasts, or 0.
+func fileLength(path string) time.Duration {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	return trackLength(f)
+}
+
 // trackLength returns how long the audio in f lasts, or 0 if its headers
-// don't say.
+// don't say. It reads with ReadAt, so it leaves f's offset where it was.
 func trackLength(f *os.File) time.Duration {
 	st, err := f.Stat()
 	if err != nil {
@@ -22,8 +32,13 @@ func trackLength(f *os.File) time.Duration {
 	kind, start := sniffFile(f)
 	switch kind {
 	case flacFile:
+		// A damaged metadata block further on doesn't matter here: the
+		// length is in the first.
 		info, _ := probeFLAC(f, start, size)
-		return info.Duration
+		if info.SampleRate == 0 {
+			return 0
+		}
+		return time.Duration(info.samples) * time.Second / time.Duration(info.SampleRate)
 	case wavFile:
 		return wavLength(f, size)
 	case oggFile:

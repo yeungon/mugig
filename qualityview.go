@@ -553,6 +553,8 @@ func fileStamp(path string) string {
 func (u *ui) trackMenu(t Track) *fyne.Menu {
 	return fyne.NewMenu("",
 		fyne.NewMenuItem("Play", func() { u.jump(t) }),
+		fyne.NewMenuItem("Play Next", func() { u.playNext(t) }),
+		fyne.NewMenuItem("Play Later", func() { u.playLater(t) }),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Get Info…", func() { u.showInfo(t) }),
 		fyne.NewMenuItem("Check Audio Quality…", func() { u.checkTrack(t) }),

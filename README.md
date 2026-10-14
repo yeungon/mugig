@@ -26,6 +26,9 @@ Written in Go with [Fyne](https://fyne.io).
   a USB disk waking up or retrying a bad spot doesn't break up the sound.
 - **Damaged FLAC files play to the end**: a corrupt frame is skipped (a short
   silence) instead of stopping the song.
+- **Up Next**: right-click a song and choose **Play Next** or **Play Later**.
+  Those songs play first, then the list carries on where it was. The queue
+  button in the player bar lights up while songs are waiting and lists them.
 - Shuffle, repeat, seeking, keyboard shortcuts, a spectrum or waveform
   **visualizer**, and on macOS the system's Now Playing controls and media keys.
 - **Light and dark** appearance, following the system or chosen in
@@ -43,9 +46,10 @@ Written in Go with [Fyne](https://fyne.io).
   the disk is back.
 - Add folders with the **+** beside Folders, the Open panel, or by dropping
   them on the window. Audio files opened or dropped are played.
-- Search, and sort by any column: title, artist, album, year, format, **size**,
-  **quality** or path.
-- Right-click a song to **Get Info**, **Check Audio Quality**, **Show in
+- Search, and sort by any column: title, artist, album, **time**, year,
+  format, **size**, **quality** or path. The line under the title totals the
+  songs shown: tracks, artists, albums, listening time and size.
+- Right-click a song to **Play Next**, **Play Later**, **Get Info**, **Check Audio Quality**, **Show in
   Finder** (Explorer on Windows, the file manager on Linux) or **Copy File
   Path**.
 
@@ -149,7 +153,8 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | Files | What they do |
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
-| `library.go`, `folders.go`, `folderview.go`, `cache.go`, `watch*.go`, `drive*.go` | Scanning, the music folders, the saved library, folder watching |
+| `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, the music folders, the saved library, folder watching |
+| `transport.go`, `upnext.go` | The player bar, play order, shuffle, repeat and Up Next |
 | `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
 | `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |

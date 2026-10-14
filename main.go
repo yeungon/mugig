@@ -37,9 +37,10 @@ type Track struct {
 	Album  string
 	Year   int
 	Format string
-	Size   int64  // bytes
-	NoTags bool   // true if tags were missing or unreadable
-	search string // lower-cased title, artist and album for the search box
+	Size   int64         // bytes
+	Length time.Duration // 0 if unknown
+	NoTags bool          // true if tags were missing or unreadable
+	search string        // lower-cased title, artist and album for the search box
 }
 
 // audioExts maps lower-case extensions to a display format name.
@@ -50,14 +51,19 @@ var audioExts = map[string]string{
 	".wav":  "WAV", // usually has no tags, so the file name is the title
 }
 
-var columns = []string{"Title", "Artist", "Album", "Year", "Format", "Size", "Quality", "Path"}
+var columns = []string{"Title", "Artist", "Album", "Time", "Year", "Format", "Size", "Quality", "Path"}
 
-// Columns whose index the code needs (see columns).
+// Each column's index in columns.
 const (
-	yearCol    = 3
-	sizeCol    = 5
-	qualityCol = 6
-	pathCol    = 7
+	titleCol = iota
+	artistCol
+	albumCol
+	timeCol
+	yearCol
+	formatCol
+	sizeCol
+	qualityCol
+	pathCol
 )
 
 // appID identifies the app to the OS; preferences are stored under it, so
@@ -142,6 +148,9 @@ func scanFile(cache *libraryCache, path string) scanResult {
 	}
 	if !r.cached {
 		r.track = readTrack(path)
+	} else if r.track.Length == 0 {
+		// Cached before lengths were read, or the disk didn't answer then.
+		r.track.Length = fileLength(path)
 	}
 	r.track.Size = r.size // also for tracks cached before sizes were shown
 	r.track.search = searchKey(r.track)
@@ -186,6 +195,7 @@ func readTrack(path string) Track {
 		return t
 	}
 	defer f.Close()
+	t.Length = trackLength(f)
 
 	m, err := tag.ReadFrom(f) // reads only the tag section, not the audio
 	if err != nil {
@@ -289,6 +299,12 @@ type ui struct {
 	queue           []string // shuffle: paths still to play this round
 	queueValid      bool     // false means queue must be rebuilt before use
 	history         []string // paths played before the current one, for "previous"
+	queued          []Track  // Up Next: chosen to play before the list carries on (see upnext.go)
+	fromQueue       bool     // the playing track came from Up Next
+	listPath        string   // the last track played from the list, where it carries on from
+	queueBtn        *widget.Button
+	queuePop        *widget.PopUp
+	clearQueueItem  *fyne.MenuItem
 
 	// The fields below are only read or modified on the UI thread (inside
 	// fyne.Do or widget callbacks), so they need no mutex.
@@ -483,7 +499,7 @@ func (u *ui) build() {
 	u.table.ShowHeaderRow = true
 	u.table.CreateHeader = newHeader
 	u.table.UpdateHeader = u.updateHeader
-	for i, width := range []float32{250, 170, 190, 70, 80, 85, 100, 400} {
+	for i, width := range []float32{250, 170, 190, 70, 70, 80, 85, 100, 400} {
 		u.table.SetColumnWidth(i, width)
 	}
 
@@ -517,18 +533,23 @@ func (u *ui) tapTable(at fyne.Position) {
 
 func cellText(t Track, col int) string {
 	switch col {
-	case 0:
+	case titleCol:
 		return t.Title
-	case 1:
+	case artistCol:
 		return t.Artist
-	case 2:
+	case albumCol:
 		return t.Album
+	case timeCol:
+		if t.Length > 0 {
+			return formatTime(t.Length)
+		}
+		return ""
 	case yearCol:
 		if t.Year > 0 {
 			return strconv.Itoa(t.Year)
 		}
 		return ""
-	case 4:
+	case formatCol:
 		return t.Format
 	case sizeCol:
 		return fileSize(t.Size)

@@ -64,6 +64,8 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		}
 	}
 
+	u.clearQueueItem = item("Clear Up Next", "", 0, u.clearQueue)
+	u.clearQueueItem.Disabled = len(u.queued) == 0
 	u.shuffleItem = item("Shuffle", "", 0, u.toggleShuffle)
 	u.repeatAllItem = item("Repeat All", "", 0, func() { u.setRepeat(repeatAll) })
 	u.repeatOneItem = item("Repeat One", "", 0, func() { u.setRepeat(repeatOne) })
@@ -96,6 +98,7 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		item("Stop", fyne.KeyPeriod, cmd, u.stop),
 		item("Next", fyne.KeyRight, cmd, whilePlaying(u.next)),
 		item("Previous", fyne.KeyLeft, cmd, whilePlaying(u.prev)),
+		u.clearQueueItem,
 		fyne.NewMenuItemSeparator(),
 		item("Skip Forward", fyne.KeyRight, cmd|alt, func() { u.skip(skipStep) }),
 		item("Skip Back", fyne.KeyLeft, cmd|alt, func() { u.skip(-skipStep) }),

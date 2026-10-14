@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -104,8 +105,10 @@ func libraryStats(tracks []Track) string {
 	}
 	artists, albums := map[string]bool{}, map[string]bool{}
 	var size int64
+	var length time.Duration
 	for _, t := range tracks {
 		size += t.Size
+		length += t.Length
 		if t.Artist != "" {
 			artists[strings.ToLower(t.Artist)] = true
 		}
@@ -115,10 +118,25 @@ func libraryStats(tracks []Track) string {
 	}
 	s := fmt.Sprintf("%s · %s · %s",
 		plural(len(tracks), "track"), plural(len(artists), "artist"), plural(len(albums), "album"))
+	if length > 0 {
+		s += " · " + totalTime(length)
+	}
 	if size > 0 {
 		s += " · " + fileSize(size)
 	}
 	return s
+}
+
+// totalTime formats how long a list of songs plays for: "48 min",
+// "9 h 12 min", "7.4 days".
+func totalTime(d time.Duration) string {
+	switch {
+	case d >= 24*time.Hour:
+		return fmt.Sprintf("%.1f days", d.Hours()/24)
+	case d >= time.Hour:
+		return fmt.Sprintf("%d h %d min", int(d.Hours()), int(d.Minutes())%60)
+	}
+	return fmt.Sprintf("%d min", int(d.Round(time.Minute).Minutes()))
 }
 
 // fileSize formats a size in bytes as Finder does, in powers of 1000:
@@ -205,13 +223,13 @@ func (c *trackCell) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(container.NewBorder(nil, nil, c.icon, nil, c.text))
 }
 
-// secondaryColumns are shown in muted text: year, format and path.
-var secondaryColumns = map[int]bool{3: true, 4: true, 6: true}
+// secondaryColumns are shown in muted text.
+var secondaryColumns = map[int]bool{timeCol: true, yearCol: true, formatCol: true, pathCol: true}
 
 func (c *trackCell) set(text string, col int, playing bool) {
-	c.icon.Hidden = !(playing && col == 0)
+	c.icon.Hidden = !(playing && col == titleCol)
 	switch {
-	case playing && col <= 1:
+	case playing && (col == titleCol || col == artistCol):
 		c.seg.Style.ColorName = colorNameAccent
 	case secondaryColumns[col]:
 		c.seg.Style.ColorName = theme.ColorNameDisabled
