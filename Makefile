@@ -2,7 +2,7 @@
 FYNE := go run fyne.io/tools/cmd/fyne@v1.7.3
 APP  := Mugig.app
 
-.PHONY: run test fuzz build package install clean
+.PHONY: run test fuzz build package icon install clean
 
 # Builds every .go file in the package (main.go alone misses the rest).
 run:
@@ -21,9 +21,21 @@ fuzz:
 build:
 	go build -o mugig .
 
-# Makes "Mugig.app" with the icon and details from FyneApp.toml.
+# Packages the app for this computer: "Mugig.app" on macOS. macOS gets the
+# square Icon.png, which fyne rounds to Apple's shape itself; Windows and
+# Linux show the icon as it is, so they get the rounded one.
+ifeq ($(shell uname -s),Darwin)
+ICON := Icon.png
+else
+ICON := IconRounded.png
+endif
+
 package:
-	$(FYNE) package --release
+	$(FYNE) package --release --icon $(ICON)
+
+# Redraws Icon.png and IconRounded.png after a change to tools/mkicon.
+icon:
+	go run ./tools/mkicon
 
 # Copies the app into /Applications so it shows in Launchpad and Spotlight.
 install: package

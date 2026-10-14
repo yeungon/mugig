@@ -140,7 +140,7 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 	flush := func() {
 		got := pending
 		pending = nil
-		fyne.Do(func() { u.batchProgressed(b, got) })
+		onUI(func() { u.batchProgressed(b, got) })
 	}
 	for r := range results {
 		pending = append(pending, r)
@@ -157,7 +157,7 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 	}
 	u.qualityStore.save()
 	flush()
-	fyne.Do(func() { u.batchFinished(b, ctx.Err() != nil) })
+	onUI(func() { u.batchFinished(b, ctx.Err() != nil) })
 }
 
 // checkOne checks one song, or reuses its saved result. ok is false if the

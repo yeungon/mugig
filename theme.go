@@ -15,11 +15,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-//go:embed Icon.png
+//go:embed IconRounded.png
 var iconPNG []byte
 
-// appIcon is the window and Dock icon, also shown in the sidebar.
-var appIcon = fyne.NewStaticResource("Icon.png", iconPNG)
+// appIcon is the rounded icon: the window and taskbar icon on Windows and
+// Linux, and the sidebar's logo. (macOS takes the Dock icon from the app
+// bundle, made from Icon.png; see tools/mkicon and dock_darwin.go.)
+var appIcon = fyne.NewStaticResource("IconRounded.png", iconPNG)
 
 // colorNameSurface is for panels that sit on the background: the sidebar
 // and the player bar.

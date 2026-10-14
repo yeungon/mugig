@@ -11,10 +11,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -297,11 +299,40 @@ type ui struct {
 	reconnectEvery time.Duration // 0 turns off noticing a disconnected disk
 }
 
+// uiGoroutine is the goroutine that runs the UI: main's. It is 0 in tests,
+// whose driver runs everything on the test's goroutine.
+var uiGoroutine atomic.Uint64
+
+// onUI runs f on the UI thread, as fyne.Do does, except while the app shuts
+// down: Fyne then runs what it is handed at once, on the goroutine handing
+// it over (a timer's, say), and the closing window must not be touched from
+// there.
+func onUI(f func()) {
+	fyne.Do(func() {
+		if id := uiGoroutine.Load(); id != 0 && goroutineID() != id {
+			return
+		}
+		f()
+	})
+}
+
+// goroutineID reads the current goroutine's number from its stack trace,
+// which starts "goroutine 1 [running]:". Fyne tells the UI goroutine apart
+// the same way.
+func goroutineID() uint64 {
+	var buf [32]byte
+	s := strings.TrimPrefix(string(buf[:runtime.Stack(buf[:], false)]), "goroutine ")
+	id, _ := strconv.ParseUint(s[:max(strings.IndexByte(s, ' '), 0)], 10, 64)
+	return id
+}
+
 func main() {
+	uiGoroutine.Store(goroutineID())
 	quietFLACNotes()
 	a := app.NewWithID(appID)
 	a.Settings().SetTheme(appTheme{})
 	a.SetIcon(appIcon)
+	setDockIcon(iconPNG)
 	w := a.NewWindow("Mugig")
 
 	media := newSystemMedia()
@@ -593,7 +624,7 @@ func (u *ui) flush(batch []Track) {
 	if len(batch) == 0 {
 		return
 	}
-	fyne.Do(func() {
+	onUI(func() {
 		u.all = append(u.all, batch...)
 		// Append matching tracks unsorted; the view is sorted once at the end.
 		words := u.searchWords()
@@ -609,7 +640,7 @@ func (u *ui) flush(batch []Track) {
 }
 
 func (u *ui) finish(cancelled bool, elapsed time.Duration, fromCache int) {
-	fyne.Do(func() {
+	onUI(func() {
 		// Sort once at the end rather than on every batch.
 		sort.SliceStable(u.all, func(i, j int) bool {
 			return libraryLess(u.all[i], u.all[j])

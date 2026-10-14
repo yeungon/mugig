@@ -16,8 +16,6 @@ import "C"
 import (
 	"time"
 	"unsafe"
-
-	"fyne.io/fyne/v2"
 )
 
 // systemMedia connects playback to the macOS media keys, Control Center and
@@ -53,6 +51,6 @@ func (*systemMedia) Update(info nowPlayingInfo) {
 //export goRemoteCommand
 func goRemoteCommand(cmd C.int, pos C.double) {
 	if h := remoteHandler; h != nil {
-		fyne.Do(func() { h(remoteCommand(cmd), seconds(float64(pos))) })
+		onUI(func() { h(remoteCommand(cmd), seconds(float64(pos))) })
 	}
 }

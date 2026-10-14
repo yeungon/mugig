@@ -15,8 +15,6 @@ import "C"
 
 import (
 	"unsafe"
-
-	"fyne.io/fyne/v2"
 )
 
 // The output device's own sample rate ("nominal" rate, as shown in Audio
@@ -51,6 +49,6 @@ func watchDevices(f func()) {
 //export goAudioDevicesChanged
 func goAudioDevicesChanged() {
 	if f := devicesChanged; f != nil {
-		fyne.Do(f)
+		onUI(f)
 	}
 }

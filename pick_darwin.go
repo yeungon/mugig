@@ -66,7 +66,7 @@ func goPickDone(id C.int, paths *C.char) {
 		chosen = strings.Split(C.GoString(paths), "\n")
 	}
 	if done != nil {
-		fyne.Do(func() { done(chosen) })
+		onUI(func() { done(chosen) })
 	}
 }
 

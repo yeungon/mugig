@@ -12,7 +12,6 @@ import (
 	"math/cmplx"
 	"time"
 
-	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 )
 
@@ -104,7 +103,7 @@ func (v *visualizer) start() {
 			case <-stop:
 				return
 			case <-t.C:
-				fyne.Do(v.frame)
+				onUI(v.frame)
 			}
 		}
 	}(v.stop)

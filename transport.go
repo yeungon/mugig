@@ -179,7 +179,7 @@ func (u *ui) play(t Track) {
 	u.showArt(nil)
 	u.async(func() { // reading art can be slow on a spinning disk
 		data := coverArt(t.Path)
-		fyne.Do(func() {
+		onUI(func() {
 			if u.playing.Path == t.Path { // still the same track
 				u.showArt(data)
 				u.publishNowPlaying()
@@ -457,7 +457,7 @@ func (u *ui) setStopped() {
 // life of the app.
 func (u *ui) trackProgress() {
 	for range time.Tick(250 * time.Millisecond) {
-		fyne.Do(func() {
+		onUI(func() {
 			if u.playing.Path != "" && !u.seeking {
 				u.setSeek(u.player.Position())
 			}

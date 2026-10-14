@@ -95,7 +95,7 @@ func (p *player) Play(path string, onEnd func(error)) error {
 	p.ctrl = &beep.Ctrl{Streamer: beep.Seq(p.vol, beep.Callback(func() {
 		// Runs on the audio thread with the output locked, so hand off to
 		// the UI thread from a goroutine that doesn't hold the lock.
-		go fyne.Do(func() {
+		go onUI(func() {
 			if p.gen == gen {
 				err := s.Err()
 				p.release()

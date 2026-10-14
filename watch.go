@@ -87,7 +87,7 @@ func (u *ui) folderChanged(w *folderWatch, paths []string) {
 		w.timer.Stop()
 	}
 	if u.settle > 0 {
-		w.timer = time.AfterFunc(u.settle, func() { fyne.Do(func() { u.applyPending(w) }) })
+		w.timer = time.AfterFunc(u.settle, func() { onUI(func() { u.applyPending(w) }) })
 	}
 	w.mu.Unlock()
 	if u.settle == 0 {
@@ -114,7 +114,7 @@ func (u *ui) applyPending(w *folderWatch) {
 	u.watchBusy = true
 	u.async(func() {
 		ch := readChanges(w.root, paths, u.cache)
-		fyne.Do(func() {
+		onUI(func() {
 			u.watchBusy = false
 			if u.watch == w && u.cancel == nil {
 				u.applyChanges(ch)
@@ -286,13 +286,13 @@ func (u *ui) watchConnection(w *folderWatch) {
 		switch {
 		case err != nil && connected:
 			connected = false
-			fyne.Do(func() {
+			onUI(func() {
 				if u.watch == w {
 					u.applyChanges(folderChanges{rootGone: true})
 				}
 			})
 		case err == nil && !connected:
-			fyne.Do(func() {
+			onUI(func() {
 				if u.watch == w {
 					u.openFolder(w.root, false)
 				}

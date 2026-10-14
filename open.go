@@ -107,7 +107,7 @@ func (u *ui) openFiles(paths []string) {
 		for i, p := range paths {
 			tracks[i] = scanFile(u.cache, p).track
 		}
-		fyne.Do(func() {
+		onUI(func() {
 			for _, t := range tracks {
 				if !slices.ContainsFunc(u.all, func(o Track) bool { return o.Path == t.Path }) {
 					u.all = append(u.all, t)

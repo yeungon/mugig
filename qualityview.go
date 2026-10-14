@@ -70,7 +70,7 @@ func (u *ui) loadQuality(t Track) {
 		info, err := probe(t.Path)
 		var rep qualityReport
 		saved := err == nil && canAnalyse(info) && u.qualityStore.get(t.Path, fileStamp(t.Path), &rep)
-		fyne.Do(func() {
+		onUI(func() {
 			if ctx.Err() != nil {
 				return // the track has changed
 			}
@@ -592,7 +592,7 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 	u.async(func() {
 		// post runs f on the UI thread unless the dialog has been closed.
 		post := func(f func()) {
-			fyne.Do(func() {
+			onUI(func() {
 				if ctx.Err() == nil {
 					f()
 					relayout()
@@ -639,7 +639,7 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 			bar.Hide()
 			show(rep, img)
 		})
-		fyne.Do(func() { u.qualityChecked(t.Path, rep, level) }) // it may be playing by now
+		onUI(func() { u.qualityChecked(t.Path, rep, level) }) // it may be playing by now
 	})
 	return p, spec, d
 }
