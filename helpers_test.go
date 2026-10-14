@@ -120,6 +120,10 @@ func newTestUI(t *testing.T) (*ui, *fakePlayer, fyne.App) {
 		t.Error("unexpected Finder window") // tests that expect one set u.reveal
 		return nil
 	}
+	u.trash = func(string) error {
+		t.Error("unexpected move to Trash") // tests that expect one set u.trash
+		return nil
+	}
 	// No real folder watching: tests that want it use a fakeWatcher.
 	u.watchFolder = func(string, func([]string)) (func(), error) { return func() {}, nil }
 	u.reconnectEvery = 0

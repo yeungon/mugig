@@ -26,7 +26,9 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
 	"github.com/dhowden/tag"
+	"mugig/internal/trash"
 )
 
 // Track holds what we report to the GUI for one audio file.
@@ -226,6 +228,7 @@ type ui struct {
 	pick      picker                  // shows an Open panel (see open.go)
 	reveal    func(path string) error // shows a file in Finder or Explorer; tests replace it
 	modifiers func() fyne.KeyModifier // the modifier keys held down; tests replace it
+	trash     func(path string) error // moves a file to the Trash; tests replace it
 	mainMenu  *fyne.MainMenu
 	table     *trackTable
 	search    *widget.Entry
@@ -448,7 +451,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	}
 	u.levels = u.qualityStore.levels()
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
-	u.reveal, u.modifiers = reveal, keyModifiers
+	u.reveal, u.modifiers, u.trash = reveal, keyModifiers, trash.Move
 	u.selected = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker

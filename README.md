@@ -57,8 +57,9 @@ Written in Go with [Fyne](https://fyne.io).
   play them, queue them, check their quality or copy their paths; the line
   under the title totals them. A plain click still plays a song.
 - Right-click a song to **Play Next**, **Play Later**, **Get Info**, **Check Audio Quality**, **Show in
-  Finder** (Explorer on Windows, the file manager on Linux) or **Copy File
-  Path**.
+  Finder** (Explorer on Windows, the file manager on Linux), **Copy File
+  Path** or **Move to Trash** (asks first; the file can be put back from the
+  Trash, which on a USB disk is that disk's own).
 
 ### Audio quality check
 
@@ -164,6 +165,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
 | `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, the music folders, the saved library, folder watching |
 | `selection.go` | Selecting several songs and acting on them |
+| `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
 | `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |

@@ -122,7 +122,7 @@ func TestMenuForSelectedSongs(t *testing.T) {
 	for _, it := range m.Items {
 		labels = append(labels, it.Label)
 	}
-	if want := "Play|Play Next|Play Later||Check Audio Quality||" + revealLabel + "|Copy File Paths"; strings.Join(labels, "|") != want {
+	if want := "Play|Play Next|Play Later||Check Audio Quality||" + revealLabel + "|Copy File Paths||" + trashLabel; strings.Join(labels, "|") != want {
 		t.Fatalf("menu %q", labels)
 	}
 	action := func(m *fyne.Menu, label string) {

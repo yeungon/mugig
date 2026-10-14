@@ -145,5 +145,7 @@ func (u *ui) songsMenu(ts []Track) *fyne.Menu {
 			}
 			fyne.CurrentApp().Clipboard().SetContent(strings.Join(paths, "\n"))
 		}),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem(trashLabel, func() { u.confirmTrash(ts) }),
 	)
 }

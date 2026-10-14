@@ -561,6 +561,8 @@ func (u *ui) trackMenu(t Track) *fyne.Menu {
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem(revealLabel, func() { u.revealTrack(t) }),
 		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(t.Path) }),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem(trashLabel, func() { u.confirmTrash([]Track{t}) }),
 	)
 }
 

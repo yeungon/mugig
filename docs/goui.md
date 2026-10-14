@@ -247,6 +247,14 @@ silicon).
   folder with `xdg-open`.
 - Check the file still exists first, and explain an unplugged disk.
 
+- **Move to Trash, per system**: macOS `NSFileManager trashItemAtURL:`
+  (as Finder; a file on a USB disk goes to that disk's `.Trashes`),
+  Windows `SHFileOperationW` with `FOF_ALLOWUNDO` (the Recycle Bin), Linux
+  `gio trash` or `trash-put` (the freedesktop.org spec). Kept in its own
+  package without Fyne, so `GOOS=windows go vet ./internal/trash` checks
+  the Windows code from a Mac, which the app as a whole can't (Fyne needs a
+  C compiler for each system).
+
 ## 10. cgo and Objective-C
 
 - Put Objective-C in `*_darwin.m` beside a `*_darwin.go` with
