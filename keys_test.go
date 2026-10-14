@@ -42,7 +42,7 @@ func TestMenuShortcuts(t *testing.T) {
 		mod   fyne.KeyModifier
 	}{
 		{"Open…", fyne.KeyO, cmd},
-		{"Choose Music Folder…", fyne.KeyO, cmd | fyne.KeyModifierShift},
+		{"Add Music Folder…", fyne.KeyO, cmd | fyne.KeyModifierShift},
 		{"Find", fyne.KeyF, cmd},
 		{"Next", fyne.KeyRight, cmd},
 		{"Previous", fyne.KeyLeft, cmd},

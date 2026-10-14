@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -21,8 +22,8 @@ func (f *fakePicker) pick(_ fyne.Window, opts pickOptions, done func([]string)) 
 	done(f.paths)
 }
 
-// musicFolder copies the sample files into a fresh folder.
-func musicFolder(t *testing.T) string {
+// sampleFolder copies the sample files into a fresh folder.
+func sampleFolder(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	for _, name := range []string{"sample.mp3", "sample.flac", "sample.wav"} {
@@ -35,24 +36,31 @@ func musicFolder(t *testing.T) string {
 	return dir
 }
 
-func TestChooseFolderScansIt(t *testing.T) {
+func TestAddFolderScansIt(t *testing.T) {
 	u, _, _ := newTestUI(t)
-	dir := musicFolder(t)
+	dir := sampleFolder(t)
 	fp := &fakePicker{paths: []string{dir}}
 	u.pick = fp.pick
 
-	u.chooseFolder()
+	u.chooseFolderToAdd()
 	if len(fp.asked) != 1 || !fp.asked[0].folders || fp.asked[0].files {
 		t.Fatalf("asked %+v", fp.asked)
 	}
-	if len(u.all) != 3 || u.lastFolder() != dir || u.folderName.Text != filepath.Base(dir) {
-		t.Errorf("scanned %d tracks, folder %q", len(u.all), u.lastFolder())
+	if len(u.all) != 3 || !slices.Equal(folderPaths(u), []string{dir}) {
+		t.Errorf("scanned %d tracks, folders %q", len(u.all), folderPaths(u))
+	}
+	if got := u.prefs.StringList(prefFolders); !slices.Equal(got, []string{dir}) {
+		t.Errorf("saved folders %q", got)
 	}
 
-	// Cancelling the panel changes nothing.
+	// The next panel starts beside it, where more music likely is.
 	fp.paths = nil
-	u.chooseFolder()
-	if len(u.all) != 3 {
+	u.chooseFolderToAdd()
+	if fp.asked[1].start != filepath.Dir(dir) {
+		t.Errorf("second panel starts in %q", fp.asked[1].start)
+	}
+	// Cancelling the panel changes nothing.
+	if len(u.all) != 3 || len(u.folders) != 1 {
 		t.Error("cancelling the panel changed the library")
 	}
 }
@@ -61,7 +69,7 @@ func TestChooseFolderScansIt(t *testing.T) {
 // scanned.
 func TestOpenFilesOrFolder(t *testing.T) {
 	u, player, _ := newTestUI(t)
-	dir := musicFolder(t)
+	dir := sampleFolder(t)
 	setLibrary(u, fiveTracks()...)
 	flac, wav := filepath.Join(dir, "sample.flac"), filepath.Join(dir, "sample.wav")
 	notes := filepath.Join(t.TempDir(), "notes.txt") // not audio: ignored
@@ -83,23 +91,25 @@ func TestOpenFilesOrFolder(t *testing.T) {
 		t.Errorf("library %d tracks after opening again", len(u.all))
 	}
 
+	// A folder is added to what is there, its songs listed once.
 	fp.paths = []string{dir}
 	u.openItems()
-	if len(u.all) != 3 || u.lastFolder() != dir {
-		t.Errorf("opening a folder: %d tracks, folder %q", len(u.all), u.lastFolder())
+	if len(u.all) != 8 || !slices.Equal(folderPaths(u), []string{dir}) {
+		t.Errorf("opening a folder: %d tracks, folders %q", len(u.all), folderPaths(u))
 	}
 }
 
 func TestDroppingFilesAndFolders(t *testing.T) {
 	u, _, _ := newTestUI(t)
-	dir := musicFolder(t)
+	dir := sampleFolder(t)
 	u.dropped(fyne.Position{}, []fyne.URI{storage.NewFileURI(filepath.Join(dir, "sample.mp3"))})
 	if u.playing.Path != filepath.Join(dir, "sample.mp3") {
 		t.Errorf("dropped file not played: %q", u.playing.Path)
 	}
-	u.dropped(fyne.Position{}, []fyne.URI{storage.NewFileURI(dir)})
-	if len(u.all) != 3 || u.lastFolder() != dir {
-		t.Errorf("dropped folder: %d tracks", len(u.all))
+	other := sampleFolder(t)
+	u.dropped(fyne.Position{}, []fyne.URI{storage.NewFileURI(dir), storage.NewFileURI(other)})
+	if len(u.all) != 6 || !slices.Equal(folderPaths(u), []string{dir, other}) {
+		t.Errorf("dropped folders: %d tracks, folders %q", len(u.all), folderPaths(u))
 	}
 }
 
@@ -107,19 +117,23 @@ func TestDroppingFilesAndFolders(t *testing.T) {
 // to, is explained rather than scanned as empty.
 func TestUnreadableFolderExplained(t *testing.T) {
 	u, _, _ := newTestUI(t)
-	dir := musicFolder(t)
+	dir := sampleFolder(t)
 	setLibrary(u, fiveTracks()...)
 	os.Chmod(dir, 0)
 	defer os.Chmod(dir, 0o755)
 
-	u.openFolder(dir, false)
-	if len(u.all) != 5 || !strings.Contains(u.status.Text, "Privacy & Security") {
-		t.Errorf("library %d tracks, status %q", len(u.all), u.status.Text)
+	u.addFolder(dir)
+	if top := u.win.Canvas().Overlays().Top(); top == nil || !strings.Contains(allText(top), "Privacy & Security") {
+		t.Error("no explanation shown")
 	}
+	if len(u.all) != 5 || len(u.folders) != 0 {
+		t.Errorf("library %d tracks, %d folders", len(u.all), len(u.folders))
+	}
+	u.win.Canvas().Overlays().Top().Hide()
 
 	gone := filepath.Join(t.TempDir(), "unplugged")
-	u.openFolder(gone, false)
-	if !strings.Contains(u.status.Text, "connect the disk") {
-		t.Errorf("status %q", u.status.Text)
+	u.addFolder(gone)
+	if top := u.win.Canvas().Overlays().Top(); top == nil || !strings.Contains(allText(top), "connect the disk") {
+		t.Error("no explanation shown for a missing folder")
 	}
 }

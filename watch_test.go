@@ -27,8 +27,8 @@ func watchedLibrary(t *testing.T) (*ui, *fakeWatcher, string) {
 	u, _, _ := newTestUI(t)
 	fw := &fakeWatcher{}
 	u.watchFolder, u.settle = fw.watch, 0
-	dir := musicFolder(t)
-	u.openFolder(dir, false)
+	dir := sampleFolder(t)
+	u.addFolder(dir)
 	if fw.root != dir || len(u.all) != 3 {
 		t.Fatalf("watching %q, %d tracks", fw.root, len(u.all))
 	}
@@ -125,15 +125,24 @@ func TestWatchFolders(t *testing.T) {
 	}
 }
 
-// When the disk is disconnected the list is kept, not emptied.
-func TestWatchKeepsListWhenDiskGoes(t *testing.T) {
+// When the disk is disconnected, its songs are hidden but not forgotten:
+// they are back, from the cache, when it is connected again.
+func TestWatchHidesSongsWhenDiskGoes(t *testing.T) {
 	u, fw, dir := watchedLibrary(t)
 	gone := dir + "-away"
 	os.Rename(dir, gone)
-	defer os.Rename(gone, dir)
 	fw.changed([]string{dir})
-	if len(u.all) != 3 || !strings.Contains(u.status.Text, "disconnected") {
+	if len(u.all) != 0 || !strings.Contains(u.status.Text, "disconnected") || u.folders[0].connected {
 		t.Errorf("%d tracks, status %q", len(u.all), u.status.Text)
+	}
+	if fw.stopped != true {
+		t.Error("still watching a disconnected folder")
+	}
+
+	os.Rename(gone, dir)
+	u.setConnected(dir, true) // as watchConnections does
+	if len(u.all) != 3 || !strings.Contains(u.status.Text, "3 unchanged") {
+		t.Errorf("after reconnecting: %d tracks, status %q", len(u.all), u.status.Text)
 	}
 }
 
@@ -147,26 +156,39 @@ func TestWatchWaitsForScan(t *testing.T) {
 	if len(u.all) != 3 {
 		t.Fatal("applied during a scan")
 	}
-	u.finish(false, 0, 0)
+	u.finish(dir, scanTally{cancelled: true})
 	if len(u.all) != 4 {
 		t.Errorf("%d tracks after the scan finished", len(u.all))
 	}
 }
 
-func TestWatchFollowsNewFolder(t *testing.T) {
-	u, fw, _ := watchedLibrary(t)
-	other := musicFolder(t)
-	first := fw
-	fw2 := &fakeWatcher{}
-	u.watchFolder = fw2.watch
-	u.openFolder(other, false)
-	if !first.stopped || fw2.root != other {
-		t.Errorf("old watch stopped %v, new one on %q", first.stopped, fw2.root)
+// Each folder has its own watch; a removed folder's is stopped, and late
+// news from it ignored.
+func TestWatchEachFolder(t *testing.T) {
+	u, first, dir := watchedLibrary(t)
+	other := sampleFolder(t)
+	second := &fakeWatcher{}
+	u.watchFolder = second.watch
+	u.addFolder(other)
+	if first.stopped || second.root != other || len(u.all) != 6 {
+		t.Fatalf("first watch stopped %v, second on %q, %d tracks", first.stopped, second.root, len(u.all))
 	}
-	// Late news from the old folder is ignored.
-	first.changed([]string{filepath.Join(other, "x.mp3")})
-	if len(u.all) != 3 {
-		t.Errorf("%d tracks", len(u.all))
+
+	added := filepath.Join(other, "new.mp3")
+	copyFile(t, "testdata/sample.mp3", added)
+	second.changed([]string{added})
+	if len(u.all) != 7 {
+		t.Errorf("%d tracks after adding to the second folder", len(u.all))
+	}
+
+	u.removeFolder(dir)
+	if !first.stopped || len(u.all) != 4 {
+		t.Errorf("first watch stopped %v, %d tracks", first.stopped, len(u.all))
+	}
+	copyFile(t, "testdata/sample.mp3", filepath.Join(dir, "late.mp3"))
+	first.changed([]string{filepath.Join(dir, "late.mp3")})
+	if len(u.all) != 4 {
+		t.Errorf("%d tracks after news from a removed folder", len(u.all))
 	}
 }
 
@@ -210,10 +232,10 @@ func newTestUIWithHidden(t *testing.T) (*ui, *fakeWatcher, string) {
 	u, _, _ := newTestUI(t)
 	fw := &fakeWatcher{}
 	u.watchFolder, u.settle = fw.watch, 0
-	dir := musicFolder(t)
+	dir := sampleFolder(t)
 	os.WriteFile(filepath.Join(dir, "._sample.mp3"), []byte("Mac metadata"), 0o644)
 	copyFile(t, "testdata/sample.flac", filepath.Join(dir, ".Trashes", "501", "deleted.flac"))
-	u.openFolder(dir, false)
+	u.addFolder(dir)
 	return u, fw, dir
 }
 

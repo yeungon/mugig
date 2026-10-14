@@ -58,10 +58,20 @@ func (u *ui) buildBatchBar() (button, bar fyne.CanvasObject) {
 	return container.NewVBox(layout.NewSpacer(), u.checkAllBtn, layout.NewSpacer()), u.batchBar
 }
 
-// batchWorkers is how many songs to check at once: as many as the disk
-// can feed, keeping a processor free for playback and the window.
-func batchWorkers(root string) int {
-	return max(1, min(scanWorkers(root), runtime.NumCPU()-1))
+// batchWorkers is how many songs to check at once: as many as the
+// slowest disk can feed, keeping a processor free for playback and the
+// window.
+func (u *ui) batchWorkers() int {
+	n, known := max(1, runtime.NumCPU()-1), false
+	for _, f := range u.folders {
+		if f.connected {
+			n, known = min(n, scanWorkers(f.path)), true
+		}
+	}
+	if !known {
+		n = min(n, gentleWorkers) // songs opened on their own: the disk is unknown
+	}
+	return max(1, n)
 }
 
 // checkAllSongs starts checking every lossless song.
@@ -91,7 +101,7 @@ func (u *ui) checkAllSongs() {
 	u.batchStop.Show()
 	u.batchBar.Show()
 	u.showBatch()
-	workers := batchWorkers(u.lastFolder())
+	workers := u.batchWorkers()
 	u.async(func() { u.runBatch(ctx, b, todo, workers) })
 }
 

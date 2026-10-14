@@ -1,12 +1,11 @@
 package main
 
-// Keeping the library in step with the music folder: when files are added,
+// Keeping the library in step with its folders: when files are added,
 // changed or deleted, only those are read again, so the list updates in
-// place without a rescan. If the folder's disk is disconnected, the list is
-// kept, and the folder is scanned again when the disk comes back.
+// place without a rescan. If a folder's disk is disconnected, its songs are
+// hidden, and the folder is scanned again when the disk comes back.
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -28,38 +27,42 @@ const (
 type watchFunc func(root string, changed func(paths []string)) (stop func(), err error)
 
 // folderWatch follows one music folder. Its fields are guarded by mu, as
-// changes arrive on other goroutines.
+// changes arrive on other goroutines, except busy, which is the UI's.
 type folderWatch struct {
 	root    string
-	stop    func() // stops the watcher; nil while disconnected
+	stop    func() // stops the watcher; nil if it couldn't start
 	mu      sync.Mutex
 	pending map[string]bool // changed paths not yet applied
 	timer   *time.Timer
 	closed  bool
+	busy    bool // changes are being read
 }
 
-// startWatching follows root for changes, replacing any previous watch.
-func (u *ui) startWatching(root string) {
-	u.stopWatching()
-	w := &folderWatch{root: root, pending: map[string]bool{}}
-	u.watch = w
-	stop, err := u.watchFolder(root, func(paths []string) { u.folderChanged(w, paths) })
+// startWatching follows f for changes, replacing any previous watch.
+func (u *ui) startWatching(f *musicFolder) {
+	u.stopWatching(f)
+	w := &folderWatch{root: f.path, pending: map[string]bool{}}
+	f.watch = w
+	stop, err := u.watchFolder(f.path, func(paths []string) { u.folderChanged(w, paths) })
 	if err != nil {
-		fyne.LogError("watching "+root, err)
+		fyne.LogError("watching "+f.path, err)
 		return
 	}
 	w.stop = stop
-	if u.reconnectEvery > 0 {
-		go u.watchConnection(w)
+}
+
+func (u *ui) stopAllWatching() {
+	for _, f := range u.folders {
+		u.stopWatching(f)
 	}
 }
 
-func (u *ui) stopWatching() {
-	w := u.watch
+func (u *ui) stopWatching(f *musicFolder) {
+	w := f.watch
 	if w == nil {
 		return
 	}
-	u.watch = nil
+	f.watch = nil
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.closed = true
@@ -98,7 +101,7 @@ func (u *ui) folderChanged(w *folderWatch, paths []string) {
 // applyPending reads the changed files in the background, then updates the
 // list. While a scan runs it waits: the scan's end calls it again.
 func (u *ui) applyPending(w *folderWatch) {
-	if u.watch != w || u.cancel != nil || u.watchBusy {
+	if !u.watching(w) || u.cancel != nil || w.busy {
 		return
 	}
 	w.mu.Lock()
@@ -111,17 +114,23 @@ func (u *ui) applyPending(w *folderWatch) {
 	if len(paths) == 0 {
 		return
 	}
-	u.watchBusy = true
+	w.busy = true
 	u.async(func() {
 		ch := readChanges(w.root, paths, u.cache)
 		onUI(func() {
-			u.watchBusy = false
-			if u.watch == w && u.cancel == nil {
-				u.applyChanges(ch)
+			w.busy = false
+			if u.watching(w) && u.cancel == nil {
+				u.applyChanges(w.root, ch)
 			}
 			u.applyPending(w) // anything that arrived meanwhile
 		})
 	})
+}
+
+// watching reports whether w is still a library folder's watch.
+func (u *ui) watching(w *folderWatch) bool {
+	f := u.folderAt(w.root)
+	return f != nil && f.watch == w
 }
 
 // folderChanges is what changed in the music folder.
@@ -192,10 +201,9 @@ func within(path, dir string) bool {
 }
 
 // applyChanges updates the list, the cache and the status line.
-func (u *ui) applyChanges(ch folderChanges) {
+func (u *ui) applyChanges(root string, ch folderChanges) {
 	if ch.rootGone {
-		u.status.SetText(fmt.Sprintf("%s is disconnected. Its songs will be back when it is connected again.",
-			filepath.Base(u.watch.root)))
+		u.setConnected(root, false)
 		return
 	}
 	had := make(map[string]bool, len(u.all))
@@ -255,7 +263,7 @@ func (u *ui) applyChanges(ch folderChanges) {
 	for _, p := range stale {
 		delete(u.levels, p)
 	}
-	root, cache, store := u.watch.root, u.cache, u.qualityStore
+	cache, store := u.cache, u.qualityStore
 	u.async(func() {
 		cache.update(root, seen, false)
 		cache.forget(removed)
@@ -269,35 +277,28 @@ func (u *ui) applyChanges(ch folderChanges) {
 	})
 }
 
-// watchConnection notices when the folder's disk is disconnected or comes
+// watchConnections notices when a folder's disk is disconnected or comes
 // back, which FSEvents doesn't report. When it is back, the folder is
-// scanned again, as anything may have changed meanwhile.
-func (u *ui) watchConnection(w *folderWatch) {
-	connected := true
-	for {
+// scanned again, as anything may have changed meanwhile. It runs for as
+// long as the app does.
+func (u *ui) watchConnections() {
+	for u.reconnectEvery > 0 {
 		time.Sleep(u.reconnectEvery)
-		w.mu.Lock()
-		closed := w.closed
-		w.mu.Unlock()
-		if closed {
-			return
-		}
-		_, err := os.Stat(w.root)
-		switch {
-		case err != nil && connected:
-			connected = false
-			onUI(func() {
-				if u.watch == w {
-					u.applyChanges(folderChanges{rootGone: true})
-				}
-			})
-		case err == nil && !connected:
-			onUI(func() {
-				if u.watch == w {
-					u.openFolder(w.root, false)
-				}
-			})
-			return // the scan starts a new watch
+		u.checkConnections()
+	}
+}
+
+// checkConnections looks for each folder, off the UI thread, and tells the
+// UI of any that came or went.
+func (u *ui) checkConnections() {
+	states := u.folderStates.Load()
+	if states == nil {
+		return
+	}
+	for _, f := range *states {
+		_, err := os.Stat(f.path)
+		if there := err == nil; there != f.connected {
+			onUI(func() { u.setConnected(f.path, there) })
 		}
 	}
 }

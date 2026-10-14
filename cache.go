@@ -85,6 +85,18 @@ func (c *libraryCache) forget(paths []string) {
 	}
 }
 
+// forgetUnder drops the entries for files in dir, a folder taken out of
+// the library.
+func (c *libraryCache) forgetUnder(dir string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for p := range c.entries {
+		if within(p, dir) {
+			delete(c.entries, p)
+		}
+	}
+}
+
 // save writes the cache to disk.
 func (c *libraryCache) save() error {
 	if c.path == "" {

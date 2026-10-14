@@ -74,8 +74,8 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 
 	file := fyne.NewMenu("File",
 		item("Open…", fyne.KeyO, cmd, u.openItems),
-		item("Choose Music Folder…", fyne.KeyO, cmd|fyne.KeyModifierShift, u.chooseFolder),
-		item("Rescan Folder", fyne.KeyR, cmd, u.rescan),
+		item("Add Music Folder…", fyne.KeyO, cmd|fyne.KeyModifierShift, u.chooseFolderToAdd),
+		item("Rescan Folders", fyne.KeyR, cmd, u.scanLibrary),
 		item(revealLabel, fyne.KeyR, cmd|fyne.KeyModifierShift, whilePlaying(func() { u.revealTrack(u.playing) })),
 		fyne.NewMenuItemSeparator(),
 		item("Find", fyne.KeyF, cmd, func() {

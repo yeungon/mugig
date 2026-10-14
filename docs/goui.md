@@ -118,6 +118,11 @@ silicon).
   `FYNE_CACHE=1h` for tests (`make test` does).
 - **Theme changes apply in the background** in the test driver; don't
   assume the next capture shows them.
+- **Inline `fyne.Do` plus an inline `async` makes background work finish
+  before the call that started it returns.** A queue of folder scans then
+  ran one scan to the end before the next was queued, unlike in the app.
+  Queue all the work first, then start it. To test a moment mid-way, make
+  `async` collect the functions and run them one at a time.
 
 ## 6. Audio
 
@@ -180,6 +185,16 @@ silicon).
 - **Watch folders with FSEvents on macOS** (`fsnotify/fsevents`) and
   fsnotify elsewhere; poll to notice a disk being unplugged and plugged back
   in.
+- **An unplugged disk looks like an empty folder** to a walk that skips
+  errors. Check the folder still exists before treating files the scan
+  didn't see as deleted. Otherwise the saved tags of a whole disk are
+  forgotten.
+- **Tell "disk unplugged" from "folder deleted"** by the nearest folder
+  above that still exists: `/Volumes` (or `/media/<user>`, `/mnt`) means the
+  disk is gone.
+- **Listing folders is rarely the slow part of a scan.** Reading tags is.
+  A parallel walker (fastwalk) saved milliseconds on real music folders,
+  and nothing on a spinning USB disk, where the heads are the limit.
 - **Scan with more workers on SSDs than on spinning or USB disks**
   (`diskutil info` tells which on macOS).
 - **Fyne's own file dialog doesn't list mounted volumes**; the native macOS

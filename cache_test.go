@@ -104,23 +104,9 @@ func TestRescanUsesCache(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "notes.txt"), nil)
 
 	for _, want := range []string{"0 unchanged", "2 unchanged"} {
-		u.all, u.tracks = nil, nil // as startScan does
-		u.runScan(context.Background(), dir, 2)
+		u.runScan(context.Background(), dir, 2) // the second time, the tracks are updated, not added again
 		if got := titles(u.tracks); !slices.Equal(got, []string{"A", "B"}) || !strings.Contains(u.status.Text, want) {
 			t.Errorf("after scan: tracks %v, status %q (want %q)", got, u.status.Text, want)
 		}
-	}
-}
-
-func TestLastFolder(t *testing.T) {
-	u, _, _ := newTestUI(t)
-	dir := t.TempDir()
-	u.prefs.SetString(prefFolder, dir)
-	if got := u.lastFolder(); got != dir {
-		t.Errorf("lastFolder = %q, want %q", got, dir)
-	}
-	u.prefs.SetString(prefFolder, filepath.Join(dir, "unplugged"))
-	if got := u.lastFolder(); got != "" {
-		t.Errorf("missing folder should give \"\", got %q", got)
 	}
 }

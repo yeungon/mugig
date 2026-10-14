@@ -33,10 +33,16 @@ Written in Go with [Fyne](https://fyne.io).
 
 ### Library
 
-- Scans a folder, including removable and network disks, and remembers what
-  it read, so rescans are quick. Watches the folder for changes and notices a
-  disk being unplugged and plugged back in.
-- Open files or folders with the Open panel, or drag and drop them.
+- A library made of **several music folders**, on any mix of internal,
+  removable and network disks. Click a folder in the sidebar to see just its
+  songs; right-click it to rescan it, show it in Finder or remove it (the
+  files are never touched).
+- Remembers what it read, so rescans are quick. Watches each folder for
+  changes. When a disk is unplugged, its folder stays listed as
+  "Not connected" with its songs hidden, and it is scanned again as soon as
+  the disk is back.
+- Add folders with the **+** beside Folders, the Open panel, or by dropping
+  them on the window. Audio files opened or dropped are played.
 - Search, and sort by any column: title, artist, album, year, format, **size**,
   **quality** or path.
 - Right-click a song to **Get Info**, **Check Audio Quality**, **Show in
@@ -134,8 +140,8 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | ⌘L | Visualizer |
 | ⌘I | Check the playing song's audio quality |
 | ⇧⌘I | Check all songs |
-| ⌘O / ⇧⌘O | Open files / choose a music folder |
-| ⌘R | Rescan the folder |
+| ⌘O / ⇧⌘O | Open files / add a music folder |
+| ⌘R | Rescan the folders |
 | ⇧⌘R | Show the playing song in Finder |
 
 ## Project layout
@@ -143,7 +149,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | Files | What they do |
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
-| `library.go`, `cache.go`, `watch*.go`, `drive*.go` | Scanning, the saved library, folder watching |
+| `library.go`, `folders.go`, `folderview.go`, `cache.go`, `watch*.go`, `drive*.go` | Scanning, the music folders, the saved library, folder watching |
 | `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
 | `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |

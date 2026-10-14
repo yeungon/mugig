@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -127,23 +128,25 @@ func TestSidebarNavigation(t *testing.T) {
 	}
 }
 
-func TestShowFolder(t *testing.T) {
-	u, _, _ := newTestUI(t)
+// Under a folder's name, the sidebar says where it is.
+func TestFolderPlace(t *testing.T) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("no home folder")
 	}
-	u.showFolder(filepath.Join(home, "Music", "Jazz"))
-	if u.folderName.Text != "Jazz" || u.folderPath.Text != filepath.Join("~", "Music", "Jazz") {
-		t.Errorf("home folder: %q / %q", u.folderName.Text, u.folderPath.Text)
+	want := map[string]string{
+		filepath.Join(home, "Music", "Jazz"): filepath.Join("~", "Music"),
+		"/Volumes/OneTouch":                  "Disk",
+		"/Volumes/OneTouch/2.Music B/Nhạc":   "OneTouch/2.Music B",
+		"/Users/shared/Music":                "/Users/shared",
 	}
-	u.showFolder("/Volumes/Backup/Music")
-	if u.folderName.Text != "Music" || u.folderPath.Text != "/Volumes/Backup/Music" {
-		t.Errorf("other folder: %q / %q", u.folderName.Text, u.folderPath.Text)
+	if runtime.GOOS != "darwin" {
+		want["/Volumes/OneTouch/2.Music B/Nhạc"] = "/Volumes/OneTouch/2.Music B"
 	}
-	u.showFolder("")
-	if u.folderName.Text != "No folder chosen" {
-		t.Errorf("no folder: %q", u.folderName.Text)
+	for path, place := range want {
+		if got := folderPlace(path); got != place {
+			t.Errorf("%s: %q, want %q", path, got, place)
+		}
 	}
 }
 

@@ -63,7 +63,7 @@ func TestEmptyAndMacOSXFilesSkipped(t *testing.T) {
 	dir := fw.root
 	os.WriteFile(filepath.Join(dir, "14 Track 14.mp3"), nil, 0o644)
 	copyFile(t, "testdata/sample.mp3", filepath.Join(dir, "__MACOSX", "Album", "01.mp3"))
-	u.openFolder(dir, false)
+	u.queueScan(dir)
 	if got := paths(u.all); len(got) != 3 {
 		t.Fatalf("scan listed %q", got)
 	}

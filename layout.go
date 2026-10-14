@@ -12,8 +12,6 @@ package main
 import (
 	"fmt"
 	"image/color"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -26,8 +24,8 @@ import (
 
 const sidebarWidth = 220
 
-// buildSidebar creates the left column: app name, page navigation, and the
-// music folder with its scan controls.
+// buildSidebar creates the left column: app name, page navigation, the
+// library's folders, and the scan's progress.
 func (u *ui) buildSidebar() fyne.CanvasObject {
 	logo := canvas.NewImageFromResource(appIcon)
 	logo.FillMode = canvas.ImageFillContain
@@ -35,17 +33,9 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 	brand := container.NewHBox(logo,
 		widget.NewLabelWithStyle("Mugig", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}))
 
-	u.navSongs = navButton("Songs", theme.ListIcon(), func() { u.showVisualizer(false) })
+	u.navSongs = navButton("Songs", theme.ListIcon(), func() { u.setFilter("") })
 	u.navNowPlaying = navButton("Now Playing", graphicEqIcon, func() { u.showVisualizer(true) })
-
-	u.folderName = widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	u.folderName.Truncation = fyne.TextTruncateEllipsis
-	u.folderPath = secondaryLabel("")
-	u.folderPath.SizeName = theme.SizeNameCaptionText
-	u.showFolder(u.lastFolder())
-
-	u.rescanBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), u.rescan)
-	scanRow := container.NewBorder(nil, nil, nil, u.rescanBtn, u.chooseBtn)
+	foldersHeader, folders := u.buildFolderSection()
 
 	top := container.NewVBox(
 		brand,
@@ -53,12 +43,9 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 		sectionLabel("LIBRARY"),
 		u.navSongs,
 		u.navNowPlaying,
+		foldersHeader,
 	)
 	bottom := container.NewVBox(
-		sectionLabel("SOURCE"),
-		u.folderName,
-		u.folderPath,
-		scanRow,
 		u.cancelBtn,
 		u.progress,
 		u.status,
@@ -68,7 +55,7 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 	return container.NewStack(
 		newSurface(colorNameSurface),
 		width,
-		container.NewPadded(container.NewBorder(top, bottom, nil, nil)),
+		container.NewPadded(container.NewBorder(top, bottom, nil, nil, folders)),
 	)
 }
 
@@ -80,9 +67,11 @@ func navButton(label string, icon fyne.Resource, onTap func()) *widget.Button {
 	return b
 }
 
-// updateNav marks which page is showing.
+// updateNav marks which page is showing: all songs, a folder's or Now
+// Playing.
 func (u *ui) updateNav(nowPlaying bool) {
-	for b, on := range map[*widget.Button]bool{u.navSongs: !nowPlaying, u.navNowPlaying: nowPlaying} {
+	defer u.refreshFolders()
+	for b, on := range map[*widget.Button]bool{u.navSongs: !nowPlaying && u.filter == "", u.navNowPlaying: nowPlaying} {
 		if on {
 			b.Importance = widget.MediumImportance
 		} else {
@@ -92,25 +81,12 @@ func (u *ui) updateNav(nowPlaying bool) {
 	}
 }
 
-// showFolder shows the music folder in the sidebar, with the home folder
-// abbreviated to ~.
-func (u *ui) showFolder(dir string) {
-	if dir == "" {
-		u.folderName.SetText("No folder chosen")
-		u.folderPath.SetText("Choose where your music is")
-		return
-	}
-	u.folderName.SetText(filepath.Base(dir))
-	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(dir, home+string(filepath.Separator)) {
-		dir = "~" + dir[len(home):]
-	}
-	u.folderPath.SetText(dir)
-}
-
 // buildSongsPage creates the Songs page: a header with title, library
 // stats and search, above the track list.
 func (u *ui) buildSongsPage() fyne.CanvasObject {
-	title := widget.NewRichText(&widget.TextSegment{Style: widget.RichTextStyleHeading, Text: "Songs"})
+	u.pageTitle = &widget.TextSegment{Style: widget.RichTextStyleHeading, Text: "Songs"}
+	title := widget.NewRichText(u.pageTitle)
+	title.Truncation = fyne.TextTruncateEllipsis
 	search := container.NewVBox(layout.NewSpacer(),
 		container.NewGridWrap(fyne.NewSize(320, u.search.MinSize().Height), u.search),
 		layout.NewSpacer())
@@ -124,7 +100,7 @@ func (u *ui) buildSongsPage() fyne.CanvasObject {
 // 87 albums".
 func libraryStats(tracks []Track) string {
 	if len(tracks) == 0 {
-		return "No music yet. Choose a folder to scan."
+		return "No music yet. Add a folder with the + beside Folders."
 	}
 	artists, albums := map[string]bool{}, map[string]bool{}
 	var size int64

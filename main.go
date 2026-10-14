@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ const appID = "org.kiwipanel.musicscan"
 
 // Preference keys for settings kept between launches.
 const (
-	prefFolder   = "lastFolder"
+	prefFolder   = "lastFolder" // the one music folder of earlier versions (see prefFolders)
 	prefVolume   = "volume"
 	prefShuffle  = "shuffle"
 	prefRepeat   = "repeat"
@@ -220,16 +221,16 @@ type ui struct {
 	count     *widget.Label
 	status    *widget.Label
 	progress  *widget.ProgressBarInfinite
-	chooseBtn *widget.Button
+	addBtn    *widget.Button
 	rescanBtn *widget.Button
 	cancelBtn *widget.Button
 
 	// Layout (see layout.go).
 	songsPage     *fyne.Container
+	pageTitle     *widget.TextSegment // "Songs", or the folder shown
 	navSongs      *widget.Button
 	navNowPlaying *widget.Button
-	folderName    *widget.Label
-	folderPath    *widget.Label
+	folderList    *fyne.Container // the library's folders, in the sidebar
 
 	// Playback (see transport.go).
 	player          audioPlayer
@@ -295,9 +296,18 @@ type ui struct {
 	tracks   []Track // what the table shows: all, filtered and sorted
 	sortCol  int     // column the list is sorted by, or -1 for library order
 	stats    string  // library summary shown under the title
-	statsFor int     // library size stats was worked out for
+	statsFor string  // the folder and number of tracks stats was worked out for
 	sortDesc bool
-	cancel   context.CancelFunc
+	cancel   context.CancelFunc // stops the running scan; nil if none
+
+	// The library's folders (see folders.go).
+	folders      []*musicFolder
+	folderStates atomic.Pointer[[]folderState] // for watchConnections
+	filter       string                        // the folder the list is narrowed to, or "" for all
+	scanning     string                        // the folder being scanned
+	scanQueue    []string                      // folders waiting to be scanned
+	discardScan  bool                          // the folder being scanned was removed or unplugged
+	run          scanRun
 
 	levels         map[string]qualityLevel // saved verdicts, for the Quality column
 	batch          *batchCheck             // the latest Check All Songs run (see batch.go)
@@ -307,9 +317,7 @@ type ui struct {
 	batchProgress  *widget.ProgressBar
 	batchLabel     *widget.Label
 	batchStop      *widget.Button
-	watch          *folderWatch // follows the music folder (see watch.go)
-	watchBusy      bool         // changes are being read
-	watchFolder    watchFunc    // starts a watcher; tests use a fake
+	watchFolder    watchFunc // starts a watcher; tests use a fake
 	settle         time.Duration
 	reconnectEvery time.Duration // 0 turns off noticing a disconnected disk
 }
@@ -360,19 +368,18 @@ func main() {
 	})
 	media.Start(u.remote)
 	watchDevices(u.devicesChanged)
+	go u.watchConnections()
 
 	// Pick up where the user left off.
 	a.Lifecycle().SetOnStarted(func() {
-		if dir := u.lastFolder(); dir != "" {
-			u.openFolder(dir, false)
-		} else if missing := u.prefs.String(prefFolder); missing != "" {
-			u.status.SetText(fmt.Sprintf("Can't find %s. If it's on a removable disk, connect it and choose Rescan.", missing))
+		if len(u.folders) > 0 {
+			u.scanLibrary()
 		}
 	})
 	w.SetOnDropped(u.dropped)
 
 	w.SetOnClosed(func() {
-		u.stopWatching()
+		u.stopAllWatching()
 		if u.batch != nil && !u.batch.finished {
 			u.batch.cancel()
 			u.qualityStore.save() // keep what was checked so far
@@ -430,7 +437,6 @@ func (u *ui) build() {
 	u.progress.Stop()
 	u.progress.Hide()
 
-	u.chooseBtn = widget.NewButtonWithIcon("Choose Folder…", theme.FolderOpenIcon(), u.chooseFolder)
 	u.cancelBtn = widget.NewButtonWithIcon("Cancel Scan", theme.CancelIcon(), func() {
 		if u.cancel != nil {
 			u.cancel()
@@ -491,9 +497,12 @@ func (u *ui) build() {
 
 	pages := container.NewStack(u.buildSongsPage(), u.buildVisualizer()) // one shown at a time
 	bar := u.buildTransport()
+	u.loadFolders()
 	sidebar := u.buildSidebar()
 	u.updateCount()
-	u.status.SetText("Choose a folder to scan.")
+	if len(u.folders) == 0 {
+		u.status.SetText("Add a folder with your music to begin.")
+	}
 	u.showVisualizer(false)
 	u.applyOutputPrefs()
 	u.win.SetContent(container.NewBorder(nil, bar, sidebar, nil, pages))
@@ -529,53 +538,52 @@ func cellText(t Track, col int) string {
 	return "" // Quality: see levelOf
 }
 
-// lastFolder returns the previously scanned folder, or "" if there is none
-// or it no longer exists (say, an unplugged drive).
-func (u *ui) lastFolder() string {
-	dir := u.prefs.String(prefFolder)
-	if dir == "" {
-		return ""
+// queueScan scans library folders after any scans already running or
+// waiting; at once if there are none.
+func (u *ui) queueScan(roots ...string) {
+	for _, root := range roots {
+		if u.scanning != root && !slices.Contains(u.scanQueue, root) {
+			u.scanQueue = append(u.scanQueue, root)
+		}
 	}
-	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-		return ""
+	if u.cancel == nil && len(u.scanQueue) > 0 {
+		u.run = scanRun{started: time.Now()}
+		u.nextScan()
 	}
-	return dir
 }
 
-// rescan scans the last folder again, or asks for one if there is none.
-func (u *ui) rescan() {
-	if u.cancel != nil {
-		return // already scanning
+// nextScan starts the first waiting scan, if any.
+func (u *ui) nextScan() {
+	if len(u.scanQueue) == 0 {
+		return
 	}
-	if dir := u.lastFolder(); dir != "" {
-		u.openFolder(dir, true)
-	} else {
-		u.chooseFolder()
-	}
+	root := u.scanQueue[0]
+	u.scanQueue = u.scanQueue[1:]
+	u.startScan(root)
+}
+
+// scanRun totals the scans started together, for the status line.
+type scanRun struct {
+	started                            time.Time
+	folders, tracks, fromCache, noTags int
 }
 
 // startScan is called on the UI thread. It sets up the UI for a scan, then
-// hands the work to runScan in the background.
+// hands the work to runScan in the background. The folder's songs stay
+// listed while it is scanned again.
 func (u *ui) startScan(root string) {
-	u.prefs.SetString(prefFolder, root)
-	u.showFolder(root)
-	u.table.UnselectAll() // row indexes are about to change
-	u.all, u.tracks = nil, nil
-	u.queueValid = false
-	u.table.Refresh()
-	u.table.ScrollToTop()
-	u.updateCount()
-
-	u.chooseBtn.Disable()
 	u.rescanBtn.Disable()
 	u.cancelBtn.Show()
 	u.progress.Show()
 	u.progress.Start()
-	u.status.SetText("Scanning…")
+	u.status.SetText(fmt.Sprintf("Scanning %s…", filepath.Base(root)))
 
 	ctx, cancel := context.WithCancel(context.Background())
-	u.cancel = cancel
-	u.startWatching(root) // changes during the scan are applied when it ends
+	u.cancel, u.scanning = cancel, root
+	if f := u.folderAt(root); f != nil {
+		u.startWatching(f) // changes during the scan are applied when it ends
+	}
+	u.refreshFolders()
 	u.async(func() { u.runScan(ctx, root, scanWorkers(root)) })
 }
 
@@ -597,98 +605,178 @@ func (u *ui) runScan(ctx context.Context, root string, workers int) {
 		close(results)
 	}()
 
-	u.collect(ctx, root, results, time.Now())
+	u.collect(ctx, root, results)
+}
+
+// scanTally is what one scan found.
+type scanTally struct {
+	found     map[string]bool // every track's path
+	fromCache int
+	noTags    int
+	cancelled bool
+	complete  bool // not cancelled, and the folder was there throughout
 }
 
 // collect gathers results off the UI thread and pushes them to the GUI in
 // batches, so the interface stays responsive even with many files. At the
 // end it updates and saves the cache; the workers have stopped by then, so
 // nothing else is using it.
-func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult, started time.Time) {
+func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult) {
 	ticker := time.NewTicker(150 * time.Millisecond)
 	defer ticker.Stop()
 
 	seen := map[string]cacheEntry{}
-	fromCache := 0
+	tally := scanTally{found: map[string]bool{}}
 	var batch []Track
 	for {
 		select {
 		case r, ok := <-results:
 			if !ok {
-				u.flush(batch)
-				u.cache.update(root, seen, ctx.Err() == nil)
+				u.flush(root, batch)
+				// A disk unplugged mid-scan reads as empty folders, which
+				// mustn't be taken for deleted songs.
+				_, err := os.Stat(root)
+				tally.cancelled = ctx.Err() != nil
+				tally.complete = !tally.cancelled && err == nil
+				u.cache.update(root, seen, tally.complete)
 				if err := u.cache.save(); err != nil {
 					fyne.LogError("saving library cache", err)
 				}
-				u.finish(ctx.Err() != nil, time.Since(started), fromCache)
+				u.finish(root, tally)
 				return
 			}
 			if r.modTime != 0 {
 				seen[r.track.Path] = cacheEntry{Size: r.size, ModTime: r.modTime, Track: r.track}
 			}
 			if r.cached {
-				fromCache++
+				tally.fromCache++
 			}
+			if r.track.NoTags {
+				tally.noTags++
+			}
+			tally.found[r.track.Path] = true
 			batch = append(batch, r.track)
 		case <-ticker.C:
 			if len(batch) > 0 {
-				u.flush(batch)
+				u.flush(root, batch)
 				batch = nil // hand ownership of the old slice to the UI
 			}
 		}
 	}
 }
 
-func (u *ui) flush(batch []Track) {
+// flush adds a batch of scanned tracks to the list, or updates them if
+// listed already.
+func (u *ui) flush(root string, batch []Track) {
 	if len(batch) == 0 {
 		return
 	}
 	onUI(func() {
-		u.all = append(u.all, batch...)
-		// Append matching tracks unsorted; the view is sorted once at the end.
+		if u.discardScan && u.scanning == root {
+			return // the folder was removed or unplugged
+		}
+		index := make(map[string]int, len(u.all))
+		for i, t := range u.all {
+			index[t.Path] = i
+		}
+		// Append new tracks unsorted; the view is sorted once at the end.
 		words := u.searchWords()
 		for _, t := range batch {
-			if matches(t, words) {
+			if i, ok := index[t.Path]; ok {
+				u.all[i] = t
+				continue
+			}
+			u.all = append(u.all, t)
+			if u.inFilter(t) && matches(t, words) {
 				u.tracks = append(u.tracks, t)
 			}
 		}
 		u.table.Refresh()
 		u.updateCount()
-		u.status.SetText(fmt.Sprintf("Scanning… %s found", plural(len(u.all), "track")))
+		u.status.SetText(fmt.Sprintf("Scanning %s… %s found", filepath.Base(root), plural(u.countIn(root), "track")))
 	})
 }
 
-func (u *ui) finish(cancelled bool, elapsed time.Duration, fromCache int) {
+func (u *ui) finish(root string, tally scanTally) {
 	onUI(func() {
+		// A folder removed or unplugged during its scan: what was found
+		// is dropped, and other folders' scans go on.
+		discard := u.discardScan && u.scanning == root
+		cancelled := tally.cancelled && !discard // by the user: the rest is cancelled too
+		u.cancel, u.scanning, u.discardScan = nil, "", false
+		switch {
+		case discard:
+			u.dropTracksIn(root)
+			if u.folderAt(root) == nil { // removed: what the scan cached is unwanted
+				cache := u.cache
+				u.async(func() {
+					cache.forgetUnder(root)
+					if err := cache.save(); err != nil {
+						fyne.LogError("saving library cache", err)
+					}
+				})
+			}
+		case tally.complete:
+			// Songs no longer there are taken off the list.
+			u.all = slices.DeleteFunc(u.all, func(t Track) bool { return within(t.Path, root) && !tally.found[t.Path] })
+		}
 		// Sort once at the end rather than on every batch.
 		sort.SliceStable(u.all, func(i, j int) bool {
 			return libraryLess(u.all[i], u.all[j])
 		})
 		u.applyView() // also redraws the playing marker, which may have moved
 
-		noTags := 0
-		for _, t := range u.all {
-			if t.NoTags {
-				noTags++
-			}
+		if !discard {
+			u.run.folders++
+			u.run.tracks += len(tally.found)
+			u.run.fromCache += tally.fromCache
+			u.run.noTags += tally.noTags
+		}
+		if cancelled {
+			u.scanQueue = nil
+		}
+		if len(u.scanQueue) > 0 {
+			u.nextScan()
+			return
 		}
 
 		u.progress.Stop()
 		u.progress.Hide()
 		u.cancelBtn.Hide()
-		u.chooseBtn.Enable()
 		u.rescanBtn.Enable()
-		u.cancel = nil
-		if u.watch != nil {
-			defer u.applyPending(u.watch) // changes that came during the scan
+		u.refreshFolders()
+		for _, f := range u.folders {
+			if f.watch != nil {
+				defer u.applyPending(f.watch) // changes that came during the scan
+			}
 		}
 
 		verb := "Scanned"
 		if cancelled {
 			verb = "Scan cancelled:"
 		}
-		u.status.SetText(fmt.Sprintf("%s %s in %s\n%s unchanged · %s without tags",
-			verb, plural(len(u.all), "track"), elapsed.Round(10*time.Millisecond),
-			thousands(fromCache), thousands(noTags)))
+		in := ""
+		if u.run.folders > 1 {
+			in = " in " + plural(u.run.folders, "folder")
+		}
+		elapsed := time.Duration(0)
+		if !u.run.started.IsZero() {
+			elapsed = time.Since(u.run.started)
+		}
+		u.status.SetText(fmt.Sprintf("%s %s%s in %s\n%s unchanged · %s without tags",
+			verb, plural(u.run.tracks, "track"), in, elapsed.Round(10*time.Millisecond),
+			thousands(u.run.fromCache), thousands(u.run.noTags)))
+		u.run = scanRun{}
 	})
+}
+
+// countIn counts the listed tracks in dir.
+func (u *ui) countIn(dir string) int {
+	n := 0
+	for _, t := range u.all {
+		if within(t.Path, dir) {
+			n++
+		}
+	}
+	return n
 }

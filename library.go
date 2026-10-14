@@ -1,12 +1,14 @@
 package main
 
 // The library (u.all) is everything scanned, kept in artist/album/title order
-// once a scan finishes. The table shows a view of it (u.tracks), narrowed by
-// the search box and ordered by the column header the user clicked.
+// once a scan finishes. The table shows a view of it (u.tracks), narrowed to
+// the folder chosen in the sidebar and by the search box, and ordered by the
+// column header the user clicked.
 
 import (
 	"cmp"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -36,12 +38,12 @@ func matches(t Track, words []string) bool {
 }
 
 // applyView rebuilds the visible list from the library using the current
-// search and sort. Called on the UI thread.
+// folder, search and sort. Called on the UI thread.
 func (u *ui) applyView() {
 	words := u.searchWords()
 	view := make([]Track, 0, len(u.all))
 	for _, t := range u.all {
-		if matches(t, words) {
+		if u.inFilter(t) && matches(t, words) {
 			view = append(view, t)
 		}
 	}
@@ -61,17 +63,48 @@ func (u *ui) applyView() {
 	u.updateCount()
 }
 
-// updateCount shows library stats under the page title, or how many
-// tracks the search matched.
+// updateCount shows the page title, and under it the library's or the
+// folder's stats, or how many tracks the search matched. It also updates
+// the sidebar's counts.
 func (u *ui) updateCount() {
-	if len(u.searchWords()) == 0 {
-		if u.statsFor != len(u.all) || u.stats == "" { // only recount when the library changed
-			u.stats, u.statsFor = libraryStats(u.all), len(u.all)
-		}
-		u.count.SetText(u.stats)
+	defer u.refreshFolders()
+	title := "Songs"
+	if u.filter != "" {
+		title = filepath.Base(u.filter)
+	}
+	if u.pageTitle != nil && u.pageTitle.Text != title {
+		u.pageTitle.Text = title
+		u.songsPage.Refresh()
+	}
+	shown := u.all
+	if u.filter != "" {
+		shown = slices.DeleteFunc(slices.Clone(u.all), func(t Track) bool { return !u.inFilter(t) })
+	}
+	if len(u.searchWords()) > 0 {
+		u.count.SetText(fmt.Sprintf("%s of %s match", thousands(len(u.tracks)), plural(len(shown), "track")))
 		return
 	}
-	u.count.SetText(fmt.Sprintf("%s of %s match", thousands(len(u.tracks)), plural(len(u.all), "track")))
+	key := fmt.Sprint(u.filter, "\x00", len(shown))
+	if len(shown) == 0 || u.statsFor != key { // only recount when the list changed
+		u.stats, u.statsFor = u.folderStats(shown), key
+	}
+	u.count.SetText(u.stats)
+}
+
+// folderStats summarises the songs shown, or says why there are none.
+func (u *ui) folderStats(shown []Track) string {
+	f := u.folderAt(u.filter)
+	switch {
+	case len(shown) > 0 || u.filter == "" && len(u.folders) == 0:
+		return libraryStats(shown)
+	case f != nil && !f.connected:
+		return f.missing + ". Its songs will be back when it is connected again."
+	case u.scanning != "" && (u.filter == "" || u.scanning == u.filter):
+		return "Scanning…"
+	case f != nil:
+		return "No songs in this folder."
+	}
+	return "No songs. Connect the disks with your music, or add a folder."
 }
 
 // sortBy cycles a column through ascending, descending, then back to library

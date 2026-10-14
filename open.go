@@ -1,6 +1,6 @@
 package main
 
-// Opening music: a folder becomes the library and is scanned; audio files
+// Opening music: a folder is added to the library and scanned; audio files
 // are added to the list and the first one plays. Both can be chosen with
 // the system's Open panel (see pick_darwin.go) or dropped on the window.
 
@@ -29,37 +29,25 @@ type pickOptions struct {
 // chosen paths, or none if cancelled.
 type picker func(w fyne.Window, opts pickOptions, done func(paths []string))
 
-// chooseFolder asks for the music folder and scans it.
-func (u *ui) chooseFolder() {
-	if u.cancel != nil {
-		return // already scanning
-	}
-	u.pick(u.win, pickOptions{
-		title:   "Choose the folder or disk with your music",
-		folders: true,
-		start:   u.lastFolder(),
-	}, func(paths []string) {
-		if len(paths) > 0 {
-			u.openFolder(paths[0], true)
-		}
-	})
-}
-
 // openItems asks for audio files or a folder, and opens them.
 func (u *ui) openItems() {
+	start := ""
+	if n := len(u.folders); n > 0 && u.folders[n-1].connected {
+		start = u.folders[n-1].path
+	}
 	u.pick(u.win, pickOptions{
-		title:    "Choose audio files to play, or a folder to scan",
+		title:    "Choose audio files to play, or a folder to add",
 		files:    true,
 		folders:  true,
 		multiple: true,
-		start:    u.lastFolder(),
+		start:    start,
 	}, u.openPaths)
 }
 
-// openPaths opens what was chosen or dropped: the first folder, if any,
-// becomes the library; otherwise the audio files are played.
+// openPaths opens what was chosen or dropped: folders are added to the
+// library, and audio files are played.
 func (u *ui) openPaths(paths []string) {
-	var files []string
+	var files, folders []string
 	for _, p := range paths {
 		fi, err := os.Stat(p)
 		switch {
@@ -67,40 +55,25 @@ func (u *ui) openPaths(paths []string) {
 			u.showOpenError(p, err)
 			return
 		case fi.IsDir():
-			u.openFolder(p, true)
-			return
+			folders = append(folders, p)
 		case isAudioFile(p) && fi.Size() > 0:
 			files = append(files, p)
 		}
 	}
-	if len(files) == 0 {
-		if len(paths) > 0 {
-			dialog.ShowInformation("Not audio", "Mugig plays MP3, FLAC, WAV and Ogg Vorbis files.", u.win)
-		}
-		return
+	for _, dir := range folders {
+		u.addFolder(dir)
 	}
-	u.openFiles(files)
-}
-
-// openFolder makes dir the music folder and scans it, after checking it
-// can be read. Problems are shown in a dialog if ask is set (the user just
-// chose it), otherwise only in the status line.
-func (u *ui) openFolder(dir string, ask bool) {
-	if u.cancel != nil {
-		return // already scanning
+	switch {
+	case len(files) > 0:
+		u.openFiles(files)
+	case len(folders) == 0 && len(paths) > 0:
+		dialog.ShowInformation("Not audio", "Mugig plays MP3, FLAC, WAV and Ogg Vorbis files.", u.win)
 	}
-	if _, err := os.ReadDir(dir); err != nil {
-		u.status.SetText(fmt.Sprintf("Can't open %s: %s", filepath.Base(dir), friendlyError(err)))
-		if ask {
-			u.showOpenError(dir, err)
-		}
-		return
-	}
-	u.startScan(dir)
 }
 
 // openFiles adds audio files to the list, if not there already, and plays
-// the first. They stay until the next scan.
+// the first. Those outside the library's folders stay listed until Mugig
+// quits.
 func (u *ui) openFiles(paths []string) {
 	u.async(func() {
 		tracks := make([]Track, len(paths))

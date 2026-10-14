@@ -46,7 +46,7 @@ func TestSearchCount(t *testing.T) {
 }
 
 func TestLibraryStatsWording(t *testing.T) {
-	if got := libraryStats(nil); got != "No music yet. Choose a folder to scan." {
+	if got := libraryStats(nil); got != "No music yet. Add a folder with the + beside Folders." {
 		t.Errorf("empty library: %q", got)
 	}
 	one := []Track{track("A", "Solo", "Only", 0)}
@@ -149,12 +149,12 @@ func TestScanBatchesRespectSearchAndSort(t *testing.T) {
 	u.sortBy(3) // year
 
 	lib := fiveTracks()
-	u.flush(lib[:3])
-	u.flush(lib[3:])
+	u.flush("/music", lib[:3])
+	u.flush("/music", lib[3:])
 	if len(u.all) != 5 || len(u.tracks) != 3 {
 		t.Fatalf("during scan: %d in library, %d shown; want 5 and 3", len(u.all), len(u.tracks))
 	}
-	u.finish(false, 0, 0)
+	u.finish("/music", scanTally{complete: true, found: map[string]bool{lib[0].Path: true, lib[1].Path: true, lib[2].Path: true, lib[3].Path: true, lib[4].Path: true}})
 	if got := titles(u.tracks); !slices.Equal(got, []string{"Help", "Hey Jude", "Come Together"}) {
 		t.Errorf("after scan = %v", got)
 	}
