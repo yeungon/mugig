@@ -18,6 +18,7 @@ type fakePlayer struct {
 	paused bool
 	pos    time.Duration
 	level  float64
+	speed  float64
 	bad    map[string]bool // paths that fail to play
 
 	device    string
@@ -39,6 +40,7 @@ func (f *fakePlayer) Position() time.Duration    { return f.pos }
 func (f *fakePlayer) Duration() time.Duration    { return 3 * time.Minute }
 func (f *fakePlayer) Seek(d time.Duration) error { f.pos = d; return nil }
 func (f *fakePlayer) SetVolume(level float64)    { f.level = level }
+func (f *fakePlayer) SetSpeed(speed float64)     { f.speed = speed }
 
 // testRate is the sample rate of the fake player's audio.
 const testRate = 44100

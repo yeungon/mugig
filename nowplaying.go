@@ -31,6 +31,7 @@ const (
 type nowPlayingInfo struct {
 	Title, Artist, Album string
 	Duration, Elapsed    time.Duration
+	Rate                 float64 // playback speed: 1 is normal
 	State                playState
 	Art                  []byte // encoded image, or nil
 }
@@ -60,6 +61,7 @@ func (u *ui) publishNowPlaying() {
 		Album:    u.playing.Album,
 		Duration: u.player.Duration(),
 		Elapsed:  u.player.Position(),
+		Rate:     u.speed,
 		State:    state,
 		Art:      u.artData,
 	})

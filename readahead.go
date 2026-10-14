@@ -29,7 +29,8 @@ type readAhead struct {
 	rate  beep.SampleRate
 
 	mu       sync.Mutex
-	more     *sync.Cond // signalled when there is room, or on closing
+	more     *sync.Cond // broadcast when there is room, or audio, or on closing
+	wait     bool       // wait for decoding rather than play silence: for tests
 	ring     [][2]float32
 	head     int  // next frame to play
 	size     int  // frames decoded and not yet played
@@ -115,14 +116,38 @@ func (r *readAhead) decodeChunk(gen int) {
 	if !ok || (n == 0 && room > 0) {
 		r.done, r.err = true, err
 	}
+	r.more.Broadcast()
 }
 
 // Stream plays decoded frames. If decoding has fallen behind, it plays
 // silence until it catches up, rather than ending the song.
 func (r *readAhead) Stream(samples [][2]float64) (int, bool) {
+	n, ok, _ := r.streamGen(samples)
+	return n, ok
+}
+
+// streamGen is Stream, also giving the number of seeks so far, so a caller
+// keeping sound of its own can tell when to drop it.
+func (r *readAhead) streamGen(samples [][2]float64) (int, bool, int) {
 	r.mu.Lock()
-	defer r.more.Signal()
+	defer r.more.Broadcast()
 	defer r.mu.Unlock()
+	for r.wait && r.size < len(samples) && !r.done && !r.closed {
+		r.more.Wait()
+	}
+	n, ok := r.stream(samples)
+	return n, ok, r.gen
+}
+
+// seeks returns the number of seeks so far.
+func (r *readAhead) seeks() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.gen
+}
+
+// stream does Stream's work, with mu held.
+func (r *readAhead) stream(samples [][2]float64) (int, bool) {
 	n := min(len(samples), r.size)
 	for i := range n {
 		s := r.ring[(r.head+i)%len(r.ring)]
@@ -177,7 +202,7 @@ func (r *readAhead) Seek(p int) error {
 		return err
 	}
 	r.prefill()
-	r.more.Signal()
+	r.more.Broadcast()
 	return nil
 }
 

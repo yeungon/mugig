@@ -30,6 +30,7 @@ type audioPlayer interface {
 	Duration() time.Duration
 	Seek(d time.Duration) error
 	SetVolume(level float64)
+	SetSpeed(speed float64) // 1 is normal; the pitch is kept
 	// Samples fills dst with the most recent audio, mono and oldest first,
 	// and returns its sample rate, or 0 if nothing is playing.
 	Samples(dst []float64) int
@@ -60,6 +61,9 @@ type player struct {
 	ctrl   *beep.Ctrl
 	gen    int     // bumped on every Stop so stale end-of-track callbacks are ignored
 	level  float64 // volume from 0 (silent) to 1 (full), kept across tracks
+	speed  float64 // playback speed, kept across tracks
+
+	stretch *stretcher // between the stream and the tap: changes the speed
 
 	device    string             // chosen output device's ID, "" for the system default
 	matchRate bool               // switch the device to each track's rate
@@ -67,7 +71,7 @@ type player struct {
 }
 
 func newPlayer() *player {
-	return &player{level: 1, matchRate: true, original: map[string]float64{}}
+	return &player{level: 1, speed: 1, matchRate: true, original: map[string]float64{}}
 }
 
 // Play stops any current track and starts the one at path. onEnd is called
@@ -83,13 +87,15 @@ func (p *player) Play(path string, onEnd func(error)) error {
 		s.Close()
 		return fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
 	}
-	s = newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate)
+	ra := newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate)
+	s = ra
+	p.stretch = newStretcher(ra, int(format.SampleRate), p.speed)
 
 	gen := p.gen
 	p.stream, p.format = s, format
 	// The tap sits before the volume so the visualizer still moves when
 	// the sound is turned down.
-	p.tap = newTap(s, 8192)
+	p.tap = newTap(p.stretch, 8192)
 	p.vol = &effects.Volume{Streamer: p.tap, Base: 2}
 	p.applyLevel()
 	p.ctrl = &beep.Ctrl{Streamer: beep.Seq(p.vol, beep.Callback(func() {
@@ -232,6 +238,18 @@ func (p *player) Seek(d time.Duration) error {
 	return p.stream.Seek(n)
 }
 
+// SetSpeed sets the playback speed, keeping the pitch, for this track and
+// the ones after.
+func (p *player) SetSpeed(speed float64) {
+	p.speed = speed
+	if p.stretch == nil {
+		return
+	}
+	p.out.mu.Lock()
+	defer p.out.mu.Unlock()
+	p.stretch.setTempo(speed)
+}
+
 // SetVolume sets the volume from 0 (silent) to 1 (full).
 func (p *player) SetVolume(level float64) {
 	p.level = level
@@ -331,7 +349,7 @@ func (p *player) Stop() {
 
 func (p *player) release() {
 	p.stream.Close()
-	p.stream, p.tap, p.vol, p.ctrl = nil, nil, nil, nil
+	p.stream, p.stretch, p.tap, p.vol, p.ctrl = nil, nil, nil, nil, nil
 }
 
 // Close stops playback, closes the device and puts back the device rates

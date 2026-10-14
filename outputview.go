@@ -93,11 +93,19 @@ func (u *ui) updateOutputInfo() {
 			name = d.Name
 		}
 	}
-	if device == track {
-		u.npOutput.SetText(fmt.Sprintf("Playing on %s at %s, unconverted", name, kHz(float64(track))))
-	} else {
-		u.npOutput.SetText(fmt.Sprintf("Playing on %s, converted from %s to %s", name,
-			kHz(float64(track)), kHz(float64(device))))
+	var text string
+	switch {
+	case device == track && u.speed == 1:
+		text = fmt.Sprintf("Playing on %s at %s, unconverted", name, kHz(float64(track)))
+	case device == track:
+		text = fmt.Sprintf("Playing on %s at %s", name, kHz(float64(track)))
+	default:
+		text = fmt.Sprintf("Playing on %s, converted from %s to %s", name,
+			kHz(float64(track)), kHz(float64(device)))
 	}
+	if u.speed != 1 {
+		text += fmt.Sprintf(", at %s speed with the pitch kept", speedLabel(u.speed))
+	}
+	u.npOutput.SetText(text)
 	u.npOutput.Show()
 }

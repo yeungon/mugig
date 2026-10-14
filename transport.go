@@ -117,7 +117,7 @@ func (u *ui) buildTransport() fyne.CanvasObject {
 			container.NewStack(u.timeSlots[1], u.total),
 			u.seek),
 	)
-	volume := container.NewHBox(layout.NewSpacer(), u.visBtn, u.muteBtn,
+	volume := container.NewHBox(layout.NewSpacer(), container.NewCenter(u.buildSpeedButton()), u.visBtn, u.muteBtn,
 		container.NewCenter(container.NewGridWrap(fyne.NewSize(110, u.volume.MinSize().Height), u.volume)),
 		mini)
 

@@ -32,7 +32,7 @@ void npStart(void) {
 
 // state matches playState in nowplaying.go: 0 stopped, 1 playing, 2 paused.
 void npUpdate(const char *title, const char *artist, const char *album,
-	double duration, double elapsed, int state, const void *art, int artLen) {
+	double duration, double elapsed, double rate, int state, const void *art, int artLen) {
 	@autoreleasepool {
 		MPNowPlayingInfoCenter *center = [MPNowPlayingInfoCenter defaultCenter];
 		if (state == 0) {
@@ -47,7 +47,8 @@ void npUpdate(const char *title, const char *artist, const char *album,
 		info[MPMediaItemPropertyAlbumTitle] = [NSString stringWithUTF8String:album];
 		info[MPMediaItemPropertyPlaybackDuration] = @(duration);
 		info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(elapsed);
-		info[MPNowPlayingInfoPropertyPlaybackRate] = @(state == 1 ? 1.0 : 0.0);
+		// The rate lets the system move the position along at the playing speed.
+		info[MPNowPlayingInfoPropertyPlaybackRate] = @(state == 1 ? rate : 0.0);
 		if (art != NULL && artLen > 0) {
 			NSImage *image = [[NSImage alloc] initWithData:[NSData dataWithBytes:art length:artLen]];
 			if (image != nil) {

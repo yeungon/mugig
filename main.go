@@ -264,6 +264,9 @@ type ui struct {
 	miniView      *fyne.Container
 	miniItem      *fyne.MenuItem
 	shuffleItem   *fyne.MenuItem
+	speed         float64          // playback speed, 1 being normal (see speed.go)
+	speedBtn      *widget.Button   // in the player bar
+	speedItems    []*fyne.MenuItem // one per speed, in the Controls menu
 	repeatAllItem *fyne.MenuItem
 	repeatOneItem *fyne.MenuItem
 	seeking       bool // user is dragging the seek bar

@@ -145,3 +145,22 @@ func TestPlayerDevices(t *testing.T) {
 		t.Errorf("unplugged device: %v", err)
 	}
 }
+
+// At double speed a song plays in half the time, through the real output.
+func TestPlayerSpeed(t *testing.T) {
+	p := testPlayer(t)
+	p.SetSpeed(2)
+	ended := make(chan struct{}, 1)
+	start := time.Now()
+	if err := p.Play(longFLAC(t, 44100, 16, 3), func(error) { ended <- struct{}{} }); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the track never ended")
+	}
+	if took := time.Since(start); took < 1200*time.Millisecond || took > 2200*time.Millisecond {
+		t.Errorf("3 s at 2× took %v, want about 1.5 s", took)
+	}
+}
