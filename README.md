@@ -4,7 +4,10 @@ A desktop music player that also tells you the truth about your files: whether
 a "lossless" FLAC really is lossless, whether it is intact, and how loud it is.
 Written in Go with [Fyne](https://fyne.io).
 
-![The song list, with each file's format, size and quality verdict](docs/screenshot-songs.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-songs-dark.png">
+  <img src="docs/screenshot-songs-light.png" alt="The song list, with each file's format, size and quality verdict">
+</picture>
 
 ## Features
 
@@ -25,6 +28,8 @@ Written in Go with [Fyne](https://fyne.io).
   silence) instead of stopping the song.
 - Shuffle, repeat, seeking, keyboard shortcuts, a spectrum or waveform
   **visualizer**, and on macOS the system's Now Playing controls and media keys.
+- **Light and dark** appearance, following the system or chosen in
+  View → Appearance.
 
 ### Library
 
@@ -40,7 +45,10 @@ Written in Go with [Fyne](https://fyne.io).
 
 ### Audio quality check
 
-![The Audio Quality window, showing a FLAC made from an MP3](docs/screenshot-quality.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-quality-dark.png">
+  <img src="docs/screenshot-quality-light.png" alt="The Audio Quality window, showing a FLAC made from an MP3">
+</picture>
 
 Right-click a song and choose **Check Audio Quality…** (⌘I for the playing
 song), or **Check All Songs** to check the whole library in the background.

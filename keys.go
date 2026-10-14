@@ -90,6 +90,7 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 	}
 	u.miniItem = item("Mini Visualizer", "", 0, func() { u.showMiniVisualizer(!u.miniView.Visible()) })
 	view := fyne.NewMenu("View", append([]*fyne.MenuItem{u.visItem, u.miniItem, fyne.NewMenuItemSeparator()}, u.visModeItems...)...)
+	view.Items = append(view.Items, fyne.NewMenuItemSeparator(), u.buildAppearanceMenu())
 	controls := fyne.NewMenu("Controls",
 		item("Play / Pause (Space)", "", 0, u.togglePlay),
 		item("Stop", fyne.KeyPeriod, cmd, u.stop),

@@ -232,61 +232,62 @@ type ui struct {
 	folderPath    *widget.Label
 
 	// Playback (see transport.go).
-	player        audioPlayer
-	playing       Track // zero when stopped
-	prevBtn       *widget.Button
-	playBtn       *roundButton
-	nextBtn       *widget.Button
-	nowTitle      *widget.Label
-	nowArtist     *widget.Label
-	seek          *widget.Slider
-	elapsed       *widget.Label
-	total         *widget.Label
-	timeSlots     [2]*canvas.Rectangle // keep the time labels a steady width
-	barBadge      *qualityBadge        // lossless or not, in the player bar
-	np            *qualityPanel        // the playing track's quality, on the Now Playing page
-	barArtistRow  *fyne.Container      // barBadge and the artist
-	npQuality     *fyne.Container      // npChecks and checkBtn
-	npOutput      *widget.Label        // where the sound goes, on the Now Playing page
-	outputItem    *fyne.MenuItem       // the Output Device submenu
-	matchRateItem *fyne.MenuItem
-	checkBtn      *widget.Button // Check Audio Quality, on the Now Playing page
-	checkItem     *fyne.MenuItem // the same in the menu
-	quality       trackQuality   // the playing track's (see qualityview.go)
-	qualityStore  *qualityStore
-	volume        *widget.Slider
-	muteBtn       *widget.Button
-	shuffleBtn    *widget.Button
-	repeatBtn     *widget.Button
-	art           *artTile // in the player bar
-	bigArt        *artTile // on the Now Playing page
-	artData       []byte   // cover of the playing track, or nil
-	paused        bool
-	unmuteLevel   float64 // volume to restore when unmuting
-	vis           *visualizer
-	visView       *fyne.Container
-	visTitle      *widget.RichText
-	visDetail     *widget.Label
-	visModes      *widget.RadioGroup
-	visBtn        *widget.Button
-	visItem       *fyne.MenuItem
-	visModeItems  []*fyne.MenuItem
-	miniVis       *visualizer
-	miniView      *fyne.Container
-	miniItem      *fyne.MenuItem
-	shuffleItem   *fyne.MenuItem
-	speed         float64          // playback speed, 1 being normal (see speed.go)
-	speedBtn      *widget.Button   // in the player bar
-	speedItems    []*fyne.MenuItem // one per speed, in the Controls menu
-	repeatAllItem *fyne.MenuItem
-	repeatOneItem *fyne.MenuItem
-	seeking       bool // user is dragging the seek bar
-	settingSeek   bool // the seek bar is being moved by code, not the user
-	shuffle       bool
-	repeat        repeatMode
-	queue         []string // shuffle: paths still to play this round
-	queueValid    bool     // false means queue must be rebuilt before use
-	history       []string // paths played before the current one, for "previous"
+	player          audioPlayer
+	playing         Track // zero when stopped
+	prevBtn         *widget.Button
+	playBtn         *roundButton
+	nextBtn         *widget.Button
+	nowTitle        *widget.Label
+	nowArtist       *widget.Label
+	seek            *widget.Slider
+	elapsed         *widget.Label
+	total           *widget.Label
+	timeSlots       [2]*canvas.Rectangle // keep the time labels a steady width
+	barBadge        *qualityBadge        // lossless or not, in the player bar
+	np              *qualityPanel        // the playing track's quality, on the Now Playing page
+	barArtistRow    *fyne.Container      // barBadge and the artist
+	npQuality       *fyne.Container      // npChecks and checkBtn
+	npOutput        *widget.Label        // where the sound goes, on the Now Playing page
+	outputItem      *fyne.MenuItem       // the Output Device submenu
+	matchRateItem   *fyne.MenuItem
+	checkBtn        *widget.Button // Check Audio Quality, on the Now Playing page
+	checkItem       *fyne.MenuItem // the same in the menu
+	quality         trackQuality   // the playing track's (see qualityview.go)
+	qualityStore    *qualityStore
+	volume          *widget.Slider
+	muteBtn         *widget.Button
+	shuffleBtn      *widget.Button
+	repeatBtn       *widget.Button
+	art             *artTile // in the player bar
+	bigArt          *artTile // on the Now Playing page
+	artData         []byte   // cover of the playing track, or nil
+	paused          bool
+	unmuteLevel     float64 // volume to restore when unmuting
+	vis             *visualizer
+	visView         *fyne.Container
+	visTitle        *widget.RichText
+	visDetail       *widget.Label
+	visModes        *widget.RadioGroup
+	visBtn          *widget.Button
+	visItem         *fyne.MenuItem
+	visModeItems    []*fyne.MenuItem
+	miniVis         *visualizer
+	miniView        *fyne.Container
+	miniItem        *fyne.MenuItem
+	shuffleItem     *fyne.MenuItem
+	speed           float64          // playback speed, 1 being normal (see speed.go)
+	speedBtn        *widget.Button   // in the player bar
+	speedItems      []*fyne.MenuItem // one per speed, in the Controls menu
+	appearanceItems []*fyne.MenuItem // View > Appearance (see appearance.go)
+	repeatAllItem   *fyne.MenuItem
+	repeatOneItem   *fyne.MenuItem
+	seeking         bool // user is dragging the seek bar
+	settingSeek     bool // the seek bar is being moved by code, not the user
+	shuffle         bool
+	repeat          repeatMode
+	queue           []string // shuffle: paths still to play this round
+	queueValid      bool     // false means queue must be rebuilt before use
+	history         []string // paths played before the current one, for "previous"
 
 	// The fields below are only read or modified on the UI thread (inside
 	// fyne.Do or widget callbacks), so they need no mutex.
@@ -417,6 +418,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 
 func (u *ui) build() {
 	u.mainMenu = u.buildMenu()
+	u.applyAppearance()
 	u.win.SetMainMenu(u.mainMenu)
 	u.win.Canvas().SetOnTypedKey(u.onTypedKey)
 
