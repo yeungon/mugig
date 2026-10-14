@@ -12,22 +12,33 @@ import (
 const (
 	prefOutputDevice = "outputDevice"    // chosen device's ID, "" for the system default
 	prefMatchRate    = "matchSampleRate" // switch the device to each track's rate
+	prefExclusive    = "exclusiveOutput" // take the device for Mugig alone while playing
 )
 
-// buildOutputMenu creates the Output Device submenu and the Match Output
-// Sample Rate item, from the saved choices.
-func (u *ui) buildOutputMenu() (devices, match *fyne.MenuItem) {
+// buildOutputMenu creates the Output Device submenu, and the Match Output
+// Sample Rate and Exclusive Access items, from the saved choices.
+// Exclusive access is offered only where the system has it.
+func (u *ui) buildOutputMenu() []*fyne.MenuItem {
 	u.outputItem = fyne.NewMenuItem("Output Device", nil)
 	u.outputItem.ChildMenu = fyne.NewMenu("")
 	u.matchRateItem = fyne.NewMenuItem("Match Output Sample Rate", func() {
 		u.setMatchRate(!u.matchRateItem.Checked)
 	})
 	u.matchRateItem.Checked = u.prefs.BoolWithFallback(prefMatchRate, true)
-	return u.outputItem, u.matchRateItem
+	u.exclusiveItem = fyne.NewMenuItem("Exclusive Access", func() {
+		u.setExclusive(!u.exclusiveItem.Checked)
+	})
+	u.exclusiveItem.Checked = u.prefs.Bool(prefExclusive)
+	items := []*fyne.MenuItem{u.outputItem, u.matchRateItem}
+	if u.canHog {
+		items = append(items, u.exclusiveItem)
+	}
+	return items
 }
 
 // applyOutputPrefs hands the saved choices to the player.
 func (u *ui) applyOutputPrefs() {
+	u.player.SetExclusive(u.canHog && u.exclusiveItem.Checked)
 	u.player.SetMatchRate(u.matchRateItem.Checked)
 	u.player.SetDevice(u.prefs.String(prefOutputDevice))
 	u.refreshDevices()
@@ -70,6 +81,16 @@ func (u *ui) setMatchRate(on bool) {
 	u.updateOutputInfo()
 }
 
+// setExclusive turns exclusive access on or off: while a song plays or is
+// paused, no other app's sound can mix in or change the device's rate.
+func (u *ui) setExclusive(on bool) {
+	u.prefs.SetBool(prefExclusive, on)
+	u.exclusiveItem.Checked = on
+	u.player.SetExclusive(on)
+	u.mainMenu.Refresh()
+	u.updateOutputInfo()
+}
+
 // devicesChanged follows devices being plugged in or out, or the system's
 // default output changing.
 func (u *ui) devicesChanged() {
@@ -105,6 +126,12 @@ func (u *ui) updateOutputInfo() {
 	}
 	if u.speed != 1 {
 		text += fmt.Sprintf(", at %s speed with the pitch kept", speedLabel(u.speed))
+	}
+	switch {
+	case u.player.Exclusive():
+		text += ". Exclusive access: no other sound is mixed in"
+	case u.exclusiveItem.Checked && u.canHog:
+		text += ". Exclusive access isn't available: another app may have the device"
 	}
 	u.npOutput.SetText(text)
 	u.npOutput.Show()

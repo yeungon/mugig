@@ -10,6 +10,9 @@ package main
 double caNominalRate(const char *uid);
 int caSetNominalRate(const char *uid, double rate);
 void caWatchDevices(void);
+unsigned int caHog(const char *uid);
+void caUnhog(unsigned int dev);
+int caHogOwner(unsigned int dev);
 */
 import "C"
 
@@ -36,6 +39,28 @@ func setNominalRate(uid string, rate float64) bool {
 	defer C.free(unsafe.Pointer(c))
 	return C.caSetNominalRate(c, C.double(rate)) == 0
 }
+
+// Exclusive access ("hog mode"): while Mugig has the device to itself, no
+// other app's sound, nor the system's alerts, can mix into the music or
+// change the device's rate. The system gives the device back if Mugig
+// quits or crashes.
+
+const canHogDevice = true
+
+// hogDevice takes the device with uid, or the default output for "", for
+// Mugig alone. It returns the device's ID, or 0 if another app has it or it
+// can't be had.
+func hogDevice(uid string) uint32 {
+	c := C.CString(uid)
+	defer C.free(unsafe.Pointer(c))
+	return uint32(C.caHog(c))
+}
+
+// unhogDevice gives the device back to every app.
+func unhogDevice(dev uint32) { C.caUnhog(C.uint(dev)) }
+
+// hogOwner is the process ID of the app with dev to itself, or -1.
+func hogOwner(dev uint32) int { return int(C.caHogOwner(C.uint(dev))) }
 
 // devicesChanged is called on the UI thread when an output device is added
 // or removed, or the default output changes. Set by watchDevices.

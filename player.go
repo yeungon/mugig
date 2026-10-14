@@ -47,6 +47,10 @@ type audioPlayer interface {
 	Devices() []outputDevice
 	SetDevice(id string)
 	SetMatchRate(on bool)
+	// SetExclusive turns taking the device for Mugig alone on or off, and
+	// Exclusive reports whether Mugig has it now.
+	SetExclusive(on bool)
+	Exclusive() bool
 	// DevicesChanged is called when devices come or go, or the system's
 	// default output changes.
 	DevicesChanged()
@@ -74,6 +78,8 @@ type player struct {
 	device    string             // chosen output device's ID, "" for the system default
 	matchRate bool               // switch the device to each track's rate
 	original  map[string]float64 // device rates before they were switched, to restore
+	exclusive bool               // take the device for Mugig alone while a song plays
+	hogged    uint32             // the device Mugig has to itself, 0 for none
 }
 
 func newPlayer() *player {
@@ -99,6 +105,7 @@ func (p *player) Play(path string, onEnd func(error)) error {
 	}
 	if err := p.openOutput(int(d.format.SampleRate)); err != nil {
 		d.stream.Close()
+		p.letGo()
 		return fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
 	}
 
@@ -118,6 +125,7 @@ func (p *player) Play(path string, onEnd func(error)) error {
 				err := ds.Err()
 				p.release()
 				p.out.idle()
+				p.letGo()
 				p.onEnd(err)
 			}
 		})
@@ -211,6 +219,14 @@ func (p *player) setNext(d *deck) {
 // openOutput readies the device for a track at rate, first switching the
 // device itself to rate if allowed and possible.
 func (p *player) openOutput(rate int) error {
+	if p.exclusive {
+		// Taken first, so no other app can change the rate back.
+		dev := hogDevice(deviceUID(p.device))
+		if dev != p.hogged {
+			unhogDevice(p.hogged) // moving to another device
+		}
+		p.hogged = dev
+	}
 	if p.matchRate {
 		uid := deviceUID(p.device)
 		if _, saved := p.original[uid]; !saved {
@@ -417,6 +433,26 @@ func (p *player) SetMatchRate(on bool) {
 	p.reopen()
 }
 
+func (p *player) SetExclusive(on bool) {
+	if on == p.exclusive {
+		return
+	}
+	p.exclusive = on
+	if !on {
+		p.letGo()
+	} else if p.decks != nil {
+		p.hogged = hogDevice(deviceUID(p.device))
+	}
+}
+
+func (p *player) Exclusive() bool { return p.hogged != 0 }
+
+// letGo gives the device back to every app.
+func (p *player) letGo() {
+	unhogDevice(p.hogged)
+	p.hogged = 0
+}
+
 // DevicesChanged moves the track to the system's new default output, at the
 // track's rate, or off a chosen device that was unplugged.
 func (p *player) DevicesChanged() {
@@ -448,6 +484,7 @@ func (p *player) Stop() {
 	}
 	p.out.idle() // once this returns the audio thread no longer reads the stream
 	p.release()
+	p.letGo()
 }
 
 func (p *player) release() {
@@ -464,6 +501,7 @@ func (p *player) release() {
 func (p *player) Close() {
 	p.Stop()
 	p.out.close()
+	p.letGo()
 	p.restoreRates()
 }
 

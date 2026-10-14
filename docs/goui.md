@@ -173,6 +173,14 @@ silicon).
   sample rate (switching the device's own rate on macOS through CoreAudio,
   and restoring it on quit), and pass audio through untouched at full
   volume and 1× speed.
+- **Exclusive access on macOS is "hog mode"**
+  (`kAudioDevicePropertyHogMode`). Setting it *toggles*, whatever value
+  is passed: taken if no one has it, given back if this process has it.
+  So read the owner first, and never set it blindly. Take it before
+  switching the device's rate, so no other app can change the rate back.
+  coreaudiod gives the device back if the process dies, so a crash
+  can't leave other apps silent. Mugig's own playback through miniaudio
+  carries on while it holds the device (checked on the built-in output).
 - **Speed with pitch kept**: WSOLA (`stretch.go`) — overlapping pieces of
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at

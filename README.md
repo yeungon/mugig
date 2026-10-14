@@ -22,6 +22,10 @@ Written in Go with [Fyne](https://fyne.io).
 - **Gapless**: songs at the same sample rate follow each other without a
   pause, so live albums, classical works and mixes play as recorded. MP3s
   have the silence their encoder added cut off.
+- **Exclusive access** (macOS, Controls → Exclusive Access): while a song
+  plays or is paused, Mugig has the device to itself, so no other app's
+  sound or alert is mixed into the music or changes the device's rate.
+  Stop gives it back. Off unless turned on.
 - Choice of **output device**.
 - **Playback speed** from 0.5× to 2× with the **pitch kept**. At 1× the audio
   passes through untouched.

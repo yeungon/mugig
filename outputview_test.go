@@ -76,3 +76,40 @@ func checkedOf(items []*fyne.MenuItem) string {
 	}
 	return strings.Join(out, ",")
 }
+
+// Exclusive access is off until turned on, is remembered, and the Now
+// Playing page says whether Mugig has the device to itself.
+func TestExclusiveAccess(t *testing.T) {
+	u, fp, a := newTestUI(t)
+	if u.exclusiveItem.Checked || fp.exclusive {
+		t.Fatal("exclusive access should be off by default")
+	}
+	controls := u.mainMenu.Items[2].Items
+	if got := controls[len(controls)-1]; u.canHog != (got == u.exclusiveItem) {
+		t.Errorf("the item should be offered only where the system has it: last item %q", got.Label)
+	}
+	setLibrary(u, fiveTracks()...)
+	u.togglePlay()
+	u.exclusiveItem.Action()
+	if !fp.exclusive || !u.exclusiveItem.Checked {
+		t.Fatal("not turned on")
+	}
+	if !strings.HasSuffix(u.npOutput.Text, "unconverted. Exclusive access: no other sound is mixed in") {
+		t.Errorf("%q", u.npOutput.Text)
+	}
+	fp.hogFails = true
+	u.updateOutputInfo()
+	if !strings.Contains(u.npOutput.Text, "Exclusive access isn't available") {
+		t.Errorf("%q", u.npOutput.Text)
+	}
+
+	fp2 := &fakePlayer{}
+	newUI(u.win, a.Preferences(), uiDeps{player: fp2, cache: u.cache})
+	if fp2.exclusive != u.canHog {
+		t.Error("setting not remembered")
+	}
+	u.exclusiveItem.Action()
+	if fp.exclusive {
+		t.Error("not turned off")
+	}
+}

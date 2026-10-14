@@ -24,6 +24,8 @@ type fakePlayer struct {
 
 	device    string
 	matchRate bool
+	exclusive bool
+	hogFails  bool // another app has the device to itself
 }
 
 func (f *fakePlayer) Play(path string, onEnd func(error)) error {
@@ -72,6 +74,8 @@ func (f *fakePlayer) Devices() []outputDevice {
 func (f *fakePlayer) SetDevice(id string)  { f.device = id }
 func (f *fakePlayer) SetMatchRate(on bool) { f.matchRate = on }
 func (f *fakePlayer) DevicesChanged()      {}
+func (f *fakePlayer) SetExclusive(on bool) { f.exclusive = on }
+func (f *fakePlayer) Exclusive() bool      { return f.exclusive && !f.hogFails && f.onEnd != nil }
 
 // finish simulates the current track playing to its end.
 func (f *fakePlayer) finish(t *testing.T) {

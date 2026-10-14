@@ -82,7 +82,7 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 	u.repeatOneItem = item("Repeat One", "", 0, func() { u.setRepeat(repeatOne) })
 	u.checkItem = item("Check Audio Quality…", fyne.KeyI, cmd, u.checkAudioQuality)
 	u.checkAllItem = item("Check All Songs", fyne.KeyI, cmd|fyne.KeyModifierShift, u.checkAllSongs)
-	outputDevices, matchRate := u.buildOutputMenu()
+	outputItems := u.buildOutputMenu()
 	u.checkItem.Disabled = true // until a track that can be checked plays
 
 	file := fyne.NewMenu("File",
@@ -127,8 +127,8 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		u.checkItem,
 		u.checkAllItem,
 		fyne.NewMenuItemSeparator(),
-		outputDevices, matchRate,
 	)
+	controls.Items = append(controls.Items, outputItems...)
 	return fyne.NewMainMenu(file, view, controls)
 }
 

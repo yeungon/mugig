@@ -265,6 +265,8 @@ type ui struct {
 	npOutput        *widget.Label        // where the sound goes, on the Now Playing page
 	outputItem      *fyne.MenuItem       // the Output Device submenu
 	matchRateItem   *fyne.MenuItem
+	exclusiveItem   *fyne.MenuItem
+	canHog          bool           // the system offers exclusive access to a device
 	checkBtn        *widget.Button // Check Audio Quality, on the Now Playing page
 	checkItem       *fyne.MenuItem // the same in the menu
 	quality         trackQuality   // the playing track's (see qualityview.go)
@@ -454,6 +456,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	u.levels = u.qualityStore.levels()
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
 	u.reveal, u.modifiers, u.trash = reveal, keyModifiers, trash.Move
+	u.canHog = canHogDevice
 	u.selected = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker

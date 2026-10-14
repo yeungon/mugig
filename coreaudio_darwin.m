@@ -1,4 +1,4 @@
-// Core Audio device rates, for coreaudio_darwin.go.
+// Core Audio device rates and exclusive access, for coreaudio_darwin.go.
 
 #import <CoreAudio/CoreAudio.h>
 #import <Foundation/Foundation.h>
@@ -80,4 +80,44 @@ void caWatchDevices(void) {
 				goAudioDevicesChanged();
 			});
 	}
+}
+
+static AudioObjectPropertyAddress hogAddr = {kAudioDevicePropertyHogMode,
+	kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
+
+// hogOwner is the process with the device to itself, or -1 for none.
+static pid_t hogOwner(AudioObjectID dev) {
+	pid_t owner = -1;
+	UInt32 size = sizeof(owner);
+	if (AudioObjectGetPropertyData(dev, &hogAddr, 0, NULL, &size, &owner) != noErr) return -1;
+	return owner;
+}
+
+// caHog takes the device with uid, or the default output for "", for this
+// process alone. It returns the device, or 0 if another process has it or
+// it can't be had. Setting the property toggles it, whatever the value.
+unsigned int caHog(const char *uid) {
+	AudioObjectID dev = deviceFor(uid);
+	if (dev == kAudioObjectUnknown) return 0;
+	pid_t me = getpid();
+	pid_t owner = hogOwner(dev);
+	if (owner == me) return dev;
+	if (owner != -1) return 0;
+	Boolean settable = false;
+	if (AudioObjectIsPropertySettable(dev, &hogAddr, &settable) != noErr || !settable) return 0;
+	pid_t v = me;
+	if (AudioObjectSetPropertyData(dev, &hogAddr, 0, NULL, sizeof(v), &v) != noErr) return 0;
+	return hogOwner(dev) == me ? dev : 0;
+}
+
+// caUnhog gives the device back to every process, if this one has it.
+void caUnhog(unsigned int dev) {
+	if (dev == 0 || hogOwner(dev) != getpid()) return;
+	pid_t v = -1;
+	AudioObjectSetPropertyData(dev, &hogAddr, 0, NULL, sizeof(v), &v);
+}
+
+// caHogOwner is the process that has the device to itself, or -1.
+int caHogOwner(unsigned int dev) {
+	return dev == 0 ? -1 : hogOwner(dev);
 }
