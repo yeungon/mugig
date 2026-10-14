@@ -247,58 +247,65 @@ type ui struct {
 	folderList    *fyne.Container // the library's folders, in the sidebar
 
 	// Playback (see transport.go).
-	player          audioPlayer
-	playing         Track // zero when stopped
-	prevBtn         *widget.Button
-	playBtn         *roundButton
-	nextBtn         *widget.Button
-	nowTitle        *widget.Label
-	nowArtist       *widget.Label
-	seek            *widget.Slider
-	elapsed         *widget.Label
-	total           *widget.Label
-	timeSlots       [2]*canvas.Rectangle // keep the time labels a steady width
-	barBadge        *qualityBadge        // lossless or not, in the player bar
-	np              *qualityPanel        // the playing track's quality, on the Now Playing page
-	barArtistRow    *fyne.Container      // barBadge and the artist
-	npQuality       *fyne.Container      // npChecks and checkBtn
-	npOutput        *widget.Label        // where the sound goes, on the Now Playing page
-	outputItem      *fyne.MenuItem       // the Output Device submenu
-	matchRateItem   *fyne.MenuItem
-	exclusiveItem   *fyne.MenuItem
-	canHog          bool           // the system offers exclusive access to a device
-	checkBtn        *widget.Button // Check Audio Quality, on the Now Playing page
-	checkItem       *fyne.MenuItem // the same in the menu
-	quality         trackQuality   // the playing track's (see qualityview.go)
-	qualityStore    *qualityStore
-	volume          *widget.Slider
-	muteBtn         *widget.Button
-	shuffleBtn      *widget.Button
-	repeatBtn       *widget.Button
-	art             *artTile // in the player bar
-	bigArt          *artTile // on the Now Playing page
-	artData         []byte   // cover of the playing track, or nil
-	paused          bool
-	unmuteLevel     float64 // volume to restore when unmuting
-	vis             *visualizer
-	visView         *fyne.Container
-	visTitle        *widget.RichText
-	visDetail       *widget.Label
-	visModes        *widget.RadioGroup
-	visBtn          *widget.Button
-	visItem         *fyne.MenuItem
-	visModeItems    []*fyne.MenuItem
-	miniVis         *visualizer
-	miniView        *fyne.Container
-	miniItem        *fyne.MenuItem
-	shuffleItem     *fyne.MenuItem
-	speed           float64          // playback speed, 1 being normal (see speed.go)
-	speedBtn        *widget.Button   // in the player bar
-	speedItems      []*fyne.MenuItem // one per speed, in the Controls menu
-	crossfeed       crossfeedLevel
-	eq              eqSettings
-	eqView          *eqView          // the Equalizer window, while open
-	crossfeedItems  []*fyne.MenuItem // one per level, in the Controls menu
+	player         audioPlayer
+	playing        Track // zero when stopped
+	prevBtn        *widget.Button
+	playBtn        *roundButton
+	nextBtn        *widget.Button
+	nowTitle       *widget.Label
+	nowArtist      *widget.Label
+	seek           *widget.Slider
+	elapsed        *widget.Label
+	total          *widget.Label
+	timeSlots      [2]*canvas.Rectangle // keep the time labels a steady width
+	barBadge       *qualityBadge        // lossless or not, in the player bar
+	np             *qualityPanel        // the playing track's quality, on the Now Playing page
+	barArtistRow   *fyne.Container      // barBadge and the artist
+	npQuality      *fyne.Container      // npChecks and checkBtn
+	npOutput       *widget.Label        // where the sound goes, on the Now Playing page
+	outputItem     *fyne.MenuItem       // the Output Device submenu
+	matchRateItem  *fyne.MenuItem
+	exclusiveItem  *fyne.MenuItem
+	canHog         bool           // the system offers exclusive access to a device
+	checkBtn       *widget.Button // Check Audio Quality, on the Now Playing page
+	checkItem      *fyne.MenuItem // the same in the menu
+	quality        trackQuality   // the playing track's (see qualityview.go)
+	qualityStore   *qualityStore
+	volume         *widget.Slider
+	muteBtn        *widget.Button
+	shuffleBtn     *widget.Button
+	repeatBtn      *widget.Button
+	art            *artTile // in the player bar
+	bigArt         *artTile // on the Now Playing page
+	artData        []byte   // cover of the playing track, or nil
+	paused         bool
+	unmuteLevel    float64 // volume to restore when unmuting
+	vis            *visualizer
+	visView        *fyne.Container
+	visTitle       *widget.RichText
+	visDetail      *widget.Label
+	visModes       *widget.RadioGroup
+	visBtn         *widget.Button
+	visItem        *fyne.MenuItem
+	visModeItems   []*fyne.MenuItem
+	miniVis        *visualizer
+	miniView       *fyne.Container
+	miniItem       *fyne.MenuItem
+	shuffleItem    *fyne.MenuItem
+	speed          float64          // playback speed, 1 being normal (see speed.go)
+	speedBtn       *widget.Button   // in the player bar
+	speedItems     []*fyne.MenuItem // one per speed, in the Controls menu
+	crossfeed      crossfeedLevel
+	eq             eqSettings
+	eqView         *eqView          // the Equalizer window, while open
+	crossfeedItems []*fyne.MenuItem // one per level, in the Controls menu
+
+	playlists       []*playlist
+	playlistsPath   string    // where they are saved; "" for nowhere
+	playlist        *playlist // the playlist shown in the song list, or nil
+	playlistList    *fyne.Container
+	newPlaylistBtn  *widget.Button
+	rulesDialog     *rulesEditor     // the smart playlist dialog last opened, for tests
 	appearanceItems []*fyne.MenuItem // View > Appearance (see appearance.go)
 	repeatAllItem   *fyne.MenuItem
 	repeatOneItem   *fyne.MenuItem
@@ -395,10 +402,11 @@ func main() {
 	media := newSystemMedia()
 	audio := newPlayer()
 	u := newUI(w, a.Preferences(), uiDeps{
-		player: audio,
-		cache:  loadCache(filepath.Join(a.Storage().RootURI().Path(), "library.gob")),
-		saved:  loadQualityStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
-		media:  media,
+		player:    audio,
+		cache:     loadCache(filepath.Join(a.Storage().RootURI().Path(), "library.gob")),
+		saved:     loadQualityStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
+		media:     media,
+		playlists: filepath.Join(a.Storage().RootURI().Path(), "playlists.json"),
 	})
 	media.Start(u.remote)
 	watchDevices(u.devicesChanged)
@@ -451,6 +459,8 @@ type uiDeps struct {
 	media  mediaCenter   // optional
 	async  func(func())  // optional; defaults to a new goroutine
 	pick   picker        // optional; defaults to the system's Open panel
+	// playlists is where playlists are saved; "" keeps them in memory.
+	playlists string
 }
 
 func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
@@ -462,6 +472,8 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
 	u.reveal, u.modifiers, u.trash = reveal, keyModifiers, trash.Move
 	u.canHog = canHogDevice
+	u.playlistsPath = d.playlists
+	u.playlists = loadPlaylists(d.playlists)
 	u.selected = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker

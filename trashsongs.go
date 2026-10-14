@@ -95,6 +95,7 @@ func (u *ui) dropSongs(paths []string) {
 	u.all = slices.DeleteFunc(u.all, func(t Track) bool { return gone[t.Path] })
 	u.queued = slices.DeleteFunc(u.queued, func(t Track) bool { return gone[t.Path] })
 	u.queueChanged()
+	u.forgetInPlaylists(paths)
 	u.applyView()
 	u.status.SetText(fmt.Sprintf("Moved %s to %s", plural(len(paths), "song"), trashName()))
 	cache, store := u.cache, u.qualityStore

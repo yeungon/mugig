@@ -684,7 +684,7 @@ func TestRightClickOpensTrackMenu(t *testing.T) {
 	for _, it := range u.trackMenu(u.tracks[2]).Items {
 		labels = append(labels, it.Label)
 	}
-	if want := "Play|Play Next|Play Later||Get Info…|Check Audio Quality…||" + revealLabel + "|Copy File Path||" + trashLabel; strings.Join(labels, "|") != want {
+	if want := "Play|Play Next|Play Later||Add to Playlist||Get Info…|Check Audio Quality…||" + revealLabel + "|Copy File Path||" + trashLabel; strings.Join(labels, "|") != want {
 		t.Errorf("menu %q", labels)
 	}
 

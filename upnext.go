@@ -141,9 +141,15 @@ func (u *ui) fillQueuePopUp() {
 	title := widget.NewLabelWithStyle("Up Next", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	clear := widget.NewButton("Clear", u.clearQueue)
 	clear.Importance = widget.LowImportance
+	save := widget.NewButton("Save as Playlist…", func() {
+		u.queuePop.Hide()
+		u.saveQueueAsPlaylist()
+	})
+	save.Importance = widget.LowImportance
 	var body fyne.CanvasObject
 	if len(u.queued) == 0 {
 		clear.Disable()
+		save.Disable()
 		hint := secondaryLabel("Nothing queued. Right-click a song and choose Play Next or Play Later.")
 		hint.Wrapping = fyne.TextWrapWord
 		body = hint
@@ -168,7 +174,7 @@ func (u *ui) fillQueuePopUp() {
 		height := rows*newQueueRow().MinSize().Height + (rows-1)*theme.Padding()
 		body = container.NewGridWrap(fyne.NewSize(queueWidth, height), list)
 	}
-	content := container.NewBorder(container.NewBorder(nil, nil, title, clear), nil, nil, nil, body)
+	content := container.NewBorder(container.NewBorder(nil, nil, title, container.NewHBox(save, clear)), nil, nil, nil, body)
 	u.queuePop.Content = container.NewGridWrap(fyne.NewSize(queueWidth, content.MinSize().Height), content)
 	u.queuePop.Refresh()
 	u.queuePop.Resize(u.queuePop.MinSize())

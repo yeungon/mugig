@@ -275,7 +275,7 @@ func (u *ui) setConnected(path string, connected bool) {
 
 // setFilter narrows the list to one folder's songs, or "" for all.
 func (u *ui) setFilter(path string) {
-	u.filter = path
+	u.filter, u.playlist = path, nil
 	u.table.UnselectAll()
 	u.table.ScrollToTop()
 	u.applyView()

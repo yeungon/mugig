@@ -42,8 +42,8 @@ func matches(t Track, words []string) bool {
 func (u *ui) applyView() {
 	words := u.searchWords()
 	view := make([]Track, 0, len(u.all))
-	for _, t := range u.all {
-		if u.inFilter(t) && matches(t, words) {
+	for _, t := range u.shownBase() {
+		if matches(t, words) {
 			view = append(view, t)
 		}
 	}
@@ -64,23 +64,35 @@ func (u *ui) applyView() {
 	u.updateCount()
 }
 
+// shownBase is what the song list shows before a search: a playlist's
+// songs, a folder's, or the whole library.
+func (u *ui) shownBase() []Track {
+	switch {
+	case u.playlist != nil:
+		return u.playlist.tracks(u.all, nil, u.songFacts())
+	case u.filter != "":
+		return slices.DeleteFunc(slices.Clone(u.all), func(t Track) bool { return !u.inFilter(t) })
+	}
+	return u.all
+}
+
 // updateCount shows the page title, and under it the library's or the
 // folder's stats, or how many tracks the search matched. It also updates
 // the sidebar's counts.
 func (u *ui) updateCount() {
 	defer u.refreshFolders()
 	title := "Songs"
-	if u.filter != "" {
+	switch {
+	case u.playlist != nil:
+		title = u.playlist.Name
+	case u.filter != "":
 		title = filepath.Base(u.filter)
 	}
 	if u.pageTitle != nil && u.pageTitle.Text != title {
 		u.pageTitle.Text = title
 		u.songsPage.Refresh()
 	}
-	shown := u.all
-	if u.filter != "" {
-		shown = slices.DeleteFunc(slices.Clone(u.all), func(t Track) bool { return !u.inFilter(t) })
-	}
+	shown := u.shownBase()
 	if len(u.selected) > 0 {
 		u.count.SetText(selectionStats(u.selectedTracks()))
 		return
@@ -89,7 +101,7 @@ func (u *ui) updateCount() {
 		u.count.SetText(fmt.Sprintf("%s of %s match", thousands(len(u.tracks)), plural(len(shown), "track")))
 		return
 	}
-	key := fmt.Sprint(u.filter, "\x00", len(shown))
+	key := fmt.Sprintf("%s\x00%p\x00%d", u.filter, u.playlist, len(shown))
 	if len(shown) == 0 || u.statsFor != key { // only recount when the list changed
 		u.stats, u.statsFor = u.folderStats(shown), key
 	}
@@ -100,7 +112,13 @@ func (u *ui) updateCount() {
 func (u *ui) folderStats(shown []Track) string {
 	f := u.folderAt(u.filter)
 	switch {
-	case len(shown) > 0 || u.filter == "" && len(u.folders) == 0:
+	case len(shown) > 0:
+		return libraryStats(shown)
+	case u.playlist != nil && u.playlist.Smart != nil:
+		return "No songs match its rules."
+	case u.playlist != nil:
+		return "No songs yet. Right-click songs and choose Add to Playlist."
+	case u.filter == "" && len(u.folders) == 0:
 		return libraryStats(shown)
 	case f != nil && !f.connected:
 		return f.missing + ". Its songs will be back when it is connected again."

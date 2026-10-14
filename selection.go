@@ -127,13 +127,18 @@ func (u *ui) rowMenu(t Track) *fyne.Menu {
 
 // songsMenu is the right-click menu for several songs.
 func (u *ui) songsMenu(ts []Track) *fyne.Menu {
-	return fyne.NewMenu("",
+	items := []*fyne.MenuItem{
 		fyne.NewMenuItem("Play", func() {
 			u.playNext(ts[1:]...)
 			u.jump(ts[0])
 		}),
 		fyne.NewMenuItem("Play Next", func() { u.playNext(ts...) }),
 		fyne.NewMenuItem("Play Later", func() { u.playLater(ts...) }),
+		fyne.NewMenuItemSeparator(),
+		u.addToPlaylistItem(ts),
+	}
+	items = append(items, u.playlistSongItems(ts)...)
+	return fyne.NewMenu("", append(items,
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Check Audio Quality", func() { u.checkSongs(ts) }),
 		fyne.NewMenuItemSeparator(),
@@ -147,5 +152,5 @@ func (u *ui) songsMenu(ts []Track) *fyne.Menu {
 		}),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem(trashLabel, func() { u.confirmTrash(ts) }),
-	)
+	)...)
 }

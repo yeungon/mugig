@@ -25,7 +25,7 @@ func (u *ui) buildFolderSection() (header, list fyne.CanvasObject) {
 	header = container.NewBorder(nil, nil, sectionLabel("FOLDERS"), container.NewHBox(u.rescanBtn, u.addBtn))
 	u.folderList = container.NewVBox()
 	u.rebuildFolderList()
-	return header, container.NewVScroll(u.folderList)
+	return header, u.folderList
 }
 
 // rebuildFolderList makes a row for each folder, after one is added or
@@ -59,6 +59,7 @@ func (u *ui) refreshFolders() {
 			counts[f]++
 		}
 	}
+	defer u.refreshPlaylists()
 	page := u.visView == nil || !u.visView.Visible() // the song list is showing
 	for _, f := range u.folders {
 		if f.row == nil {
@@ -71,7 +72,7 @@ func (u *ui) refreshFolders() {
 		case u.scanning == f.path:
 			detail = "Scanning…"
 		}
-		f.row.set(f, counts[f], detail, page && u.filter == f.path)
+		f.row.set(f, counts[f], detail, page && u.playlist == nil && u.filter == f.path)
 	}
 }
 
@@ -155,19 +156,23 @@ func (r *folderRow) set(f *musicFolder, count int, detail string, chosen bool) {
 	if onRemovableDisk(f.path) {
 		icon = theme.StorageIcon()
 	}
-	nameColour := theme.ColorNameForeground
+	countText := thousands(count)
 	if !f.connected {
-		icon = theme.NewDisabledResource(icon)
+		icon, countText = theme.NewDisabledResource(icon), ""
+	}
+	r.show(icon, filepath.Base(f.path), detail, countText, f.connected, chosen)
+}
+
+// show fills in the row: also used for playlists.
+func (r *folderRow) show(icon fyne.Resource, name, detail, countText string, enabled, chosen bool) {
+	nameColour := theme.ColorNameForeground
+	if !enabled {
 		nameColour = theme.ColorNameDisabled
 	}
 	r.icon.SetResource(icon)
-	r.name.Text, r.name.Style.ColorName = filepath.Base(f.path), nameColour
+	r.name.Text, r.name.Style.ColorName = name, nameColour
 	r.detail.Text = detail
 	r.text.Refresh()
-	countText := ""
-	if f.connected {
-		countText = thousands(count)
-	}
 	if r.count.Text != countText {
 		r.count.SetText(countText)
 		r.content.Refresh() // lay out again: the name makes way for a wider count

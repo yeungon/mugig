@@ -551,10 +551,15 @@ func fileStamp(path string) string {
 
 // trackMenu is the right-click menu for a track in the list.
 func (u *ui) trackMenu(t Track) *fyne.Menu {
-	return fyne.NewMenu("",
+	items := []*fyne.MenuItem{
 		fyne.NewMenuItem("Play", func() { u.jump(t) }),
 		fyne.NewMenuItem("Play Next", func() { u.playNext(t) }),
 		fyne.NewMenuItem("Play Later", func() { u.playLater(t) }),
+		fyne.NewMenuItemSeparator(),
+		u.addToPlaylistItem([]Track{t}),
+	}
+	items = append(items, u.playlistSongItems([]Track{t})...)
+	return fyne.NewMenu("", append(items,
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Get Info…", func() { u.showInfo(t) }),
 		fyne.NewMenuItem("Check Audio Quality…", func() { u.checkTrack(t) }),
@@ -563,7 +568,7 @@ func (u *ui) trackMenu(t Track) *fyne.Menu {
 		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(t.Path) }),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem(trashLabel, func() { u.confirmTrash([]Track{t}) }),
-	)
+	)...)
 }
 
 // checkTrack opens the Audio Quality dialog for t: its findings and its

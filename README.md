@@ -67,6 +67,14 @@ Written in Go with [Fyne](https://fyne.io).
   changes. When a disk is unplugged, its folder stays listed as
   "Not connected" with its songs hidden, and it is scanned again as soon as
   the disk is back.
+- **Playlists**: right-click songs and choose **Add to Playlist**, or save
+  Up Next as one. A playlist plays in its own order; right-click a song in
+  it to take it out or move it up or down. **Smart playlists** are rules
+  instead, such as "Format is FLAC and Quality is Lossless?" or "File Date
+  is in the last 30 days", by title, artist, album, year, format, quality,
+  time, size, folder or file date, and keep themselves up to date. The +
+  beside Playlists makes either kind; right-click one to play, edit, rename,
+  duplicate or delete it. Songs moved to the Trash leave the playlists.
 - Add folders with the **+** beside Folders, the Open panel, or by dropping
   them on the window. Audio files opened or dropped are played.
 - Search, and sort by any column: title, artist, album, **time**, year,
@@ -187,6 +195,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
 | `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `skip.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, folders left out, the music folders, the saved library, folder watching |
+| `playlists.go`, `playlistview.go` | Playlists and smart playlists |
 | `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |

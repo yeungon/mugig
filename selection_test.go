@@ -122,7 +122,7 @@ func TestMenuForSelectedSongs(t *testing.T) {
 	for _, it := range m.Items {
 		labels = append(labels, it.Label)
 	}
-	if want := "Play|Play Next|Play Later||Check Audio Quality||" + revealLabel + "|Copy File Paths||" + trashLabel; strings.Join(labels, "|") != want {
+	if want := "Play|Play Next|Play Later||Add to Playlist||Check Audio Quality||" + revealLabel + "|Copy File Paths||" + trashLabel; strings.Join(labels, "|") != want {
 		t.Fatalf("menu %q", labels)
 	}
 	action := func(m *fyne.Menu, label string) {
@@ -188,7 +188,8 @@ func TestCheckSelectedSongs(t *testing.T) {
 	songs[0].Format, songs[3].Format = "FLAC", "WAV"
 	setLibrary(u, songs...)
 	u.selectAll()
-	u.songsMenu(u.selectedTracks()).Items[4].Action()
+	m := u.songsMenu(u.selectedTracks())
+	m.Items[slices.IndexFunc(m.Items, func(it *fyne.MenuItem) bool { return it.Label == "Check Audio Quality" })].Action()
 	if u.batch == nil || u.batch.total != 2 {
 		t.Fatalf("batch %+v, want 2 lossless songs", u.batch)
 	}

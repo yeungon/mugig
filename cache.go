@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // libraryCache remembers each file's tags along with its size and
@@ -55,6 +56,17 @@ func (c *libraryCache) lookup(path string, size, modTime int64) (Track, bool) {
 		return Track{}, false
 	}
 	return e.Track, true
+}
+
+// modTime is when the file at path was last changed, as the cache has it,
+// or the zero time if it isn't cached.
+func (c *libraryCache) modTime(path string) time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if e, ok := c.entries[path]; ok {
+		return time.Unix(0, e.ModTime)
+	}
+	return time.Time{}
 }
 
 // update records a scan of root. After a complete scan, entries under root

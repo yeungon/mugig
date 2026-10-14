@@ -26,7 +26,7 @@ import (
 const sidebarWidth = 220
 
 // buildSidebar creates the left column: app name, page navigation, the
-// library's folders, and the scan's progress.
+// library's folders, the playlists, and the scan's progress.
 func (u *ui) buildSidebar() fyne.CanvasObject {
 	logo := canvas.NewImageFromResource(appIcon)
 	logo.FillMode = canvas.ImageFillContain
@@ -37,6 +37,7 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 	u.navSongs = navButton("Songs", theme.ListIcon(), func() { u.setFilter("") })
 	u.navNowPlaying = navButton("Now Playing", graphicEqIcon, func() { u.showVisualizer(true) })
 	foldersHeader, folders := u.buildFolderSection()
+	playlistsHeader, playlists := u.buildPlaylistSection()
 
 	top := container.NewVBox(
 		brand,
@@ -56,7 +57,8 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 	return container.NewStack(
 		newSurface(colorNameSurface),
 		width,
-		container.NewPadded(container.NewBorder(top, bottom, nil, nil, folders)),
+		container.NewPadded(container.NewBorder(top, bottom, nil, nil,
+			container.NewVScroll(container.NewVBox(folders, playlistsHeader, playlists)))),
 	)
 }
 
@@ -72,7 +74,7 @@ func navButton(label string, icon fyne.Resource, onTap func()) *widget.Button {
 // Playing.
 func (u *ui) updateNav(nowPlaying bool) {
 	defer u.refreshFolders()
-	for b, on := range map[*widget.Button]bool{u.navSongs: !nowPlaying && u.filter == "", u.navNowPlaying: nowPlaying} {
+	for b, on := range map[*widget.Button]bool{u.navSongs: !nowPlaying && u.filter == "" && u.playlist == nil, u.navNowPlaying: nowPlaying} {
 		if on {
 			b.Importance = widget.MediumImportance
 		} else {

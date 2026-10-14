@@ -90,6 +90,10 @@ silicon).
 - **A vertical `widget.Slider` takes its height from its container**:
   inside `container.NewCenter` it collapses to its minimum. Stack it on
   a transparent rectangle with the height wanted.
+- **A label that truncates shrinks to "…" in an `HBox`**: an HBox gives
+  each object its minimum width, and a truncating label's minimum is just
+  the ellipsis. Turn truncation off for short labels there (the smart
+  playlist dialog's "3 songs match").
 - **Custom colour names** in the app theme (`colorNameAccent`,
   `colorNameSurface`) keep colours consistent and switchable with the
   light/dark variant.
