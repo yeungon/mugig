@@ -69,7 +69,7 @@ func TestWatchAddsAndRemovesFiles(t *testing.T) {
 	if !strings.Contains(u.status.Text, "1 track added") {
 		t.Errorf("status %q", u.status.Text)
 	}
-	if _, ok := u.cache.lookup(added, fileSize(t, added), fileModTime(t, added)); !ok {
+	if _, ok := u.cache.lookup(added, sizeOnDisk(t, added), fileModTime(t, added)); !ok {
 		t.Error("added file not cached")
 	}
 
@@ -170,7 +170,7 @@ func TestWatchFollowsNewFolder(t *testing.T) {
 	}
 }
 
-func fileSize(t *testing.T, p string) int64 {
+func sizeOnDisk(t *testing.T, p string) int64 {
 	fi, err := os.Stat(p)
 	if err != nil {
 		t.Fatal(err)

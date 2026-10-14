@@ -553,7 +553,12 @@ func fileStamp(path string) string {
 func (u *ui) trackMenu(t Track) *fyne.Menu {
 	return fyne.NewMenu("",
 		fyne.NewMenuItem("Play", func() { u.jump(t) }),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("Get Info…", func() { u.showInfo(t) }),
 		fyne.NewMenuItem("Check Audio Quality…", func() { u.checkTrack(t) }),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem(revealLabel, func() { u.revealTrack(t) }),
+		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(t.Path) }),
 	)
 }
 

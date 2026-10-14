@@ -116,6 +116,10 @@ func newTestUI(t *testing.T) (*ui, *fakePlayer, fyne.App) {
 		},
 	})
 	u.vis.tick, u.miniVis.tick = 0, 0 // tests draw frames by calling frame, not on a timer
+	u.reveal = func(string) error {
+		t.Error("unexpected Finder window") // tests that expect one set u.reveal
+		return nil
+	}
 	// No real folder watching: tests that want it use a fakeWatcher.
 	u.watchFolder = func(string, func([]string)) (func(), error) { return func() {}, nil }
 	u.reconnectEvery = 0

@@ -7,6 +7,7 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -84,7 +85,11 @@ func (u *ui) sortBy(col int) {
 	default:
 		u.sortCol, u.sortDesc = -1, false
 	}
-	u.prefs.SetInt(prefSortCol, u.sortCol)
+	name := "none"
+	if u.sortCol >= 0 {
+		name = columns[u.sortCol]
+	}
+	u.prefs.SetString(prefSortCol, name)
 	u.prefs.SetBool(prefSortDesc, u.sortDesc)
 	u.applyView()
 }
@@ -119,8 +124,10 @@ func (u *ui) updateHeader(id widget.TableCellID, o fyne.CanvasObject) {
 
 func (u *ui) compareColumn(a, b Track, col int) int {
 	switch col {
-	case 3:
+	case yearCol:
 		return cmp.Compare(a.Year, b.Year)
+	case sizeCol:
+		return cmp.Compare(a.Size, b.Size)
 	case qualityCol:
 		return cmp.Compare(levelRank[u.levelOf(a)], levelRank[u.levelOf(b)])
 	}
@@ -140,4 +147,21 @@ func libraryLess(a, b Track) bool {
 
 func compareFold(a, b string) int {
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
+// oldColumns is the column order before Size was added, when the sorting
+// column was saved by its index.
+var oldColumns = []string{"Title", "Artist", "Album", "Year", "Format", "Quality", "Path"}
+
+// savedSortColumn returns the column the list was last sorted by, or -1.
+// It is saved by name, so adding columns doesn't change it; an index saved
+// by an earlier version is read by the old order.
+func savedSortColumn(prefs fyne.Preferences) int {
+	name := prefs.String(prefSortCol)
+	if name == "" {
+		if i := prefs.IntWithFallback("sortColumn", -1); i >= 0 && i < len(oldColumns) {
+			name = oldColumns[i]
+		}
+	}
+	return slices.Index(columns, name)
 }

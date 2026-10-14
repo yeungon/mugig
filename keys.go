@@ -76,6 +76,7 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		item("Open…", fyne.KeyO, cmd, u.openItems),
 		item("Choose Music Folder…", fyne.KeyO, cmd|fyne.KeyModifierShift, u.chooseFolder),
 		item("Rescan Folder", fyne.KeyR, cmd, u.rescan),
+		item(revealLabel, fyne.KeyR, cmd|fyne.KeyModifierShift, whilePlaying(func() { u.revealTrack(u.playing) })),
 		fyne.NewMenuItemSeparator(),
 		item("Find", fyne.KeyF, cmd, func() {
 			u.showVisualizer(false) // the results are in the track list

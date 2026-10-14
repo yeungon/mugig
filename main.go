@@ -36,6 +36,7 @@ type Track struct {
 	Album  string
 	Year   int
 	Format string
+	Size   int64  // bytes
 	NoTags bool   // true if tags were missing or unreadable
 	search string // lower-cased title, artist and album for the search box
 }
@@ -48,7 +49,15 @@ var audioExts = map[string]string{
 	".wav":  "WAV", // usually has no tags, so the file name is the title
 }
 
-var columns = []string{"Title", "Artist", "Album", "Year", "Format", "Quality", "Path"}
+var columns = []string{"Title", "Artist", "Album", "Year", "Format", "Size", "Quality", "Path"}
+
+// Columns whose index the code needs (see columns).
+const (
+	yearCol    = 3
+	sizeCol    = 5
+	qualityCol = 6
+	pathCol    = 7
+)
 
 // appID identifies the app to the OS; preferences are stored under it, so
 // changing it forgets saved settings. It keeps the app's original name,
@@ -61,7 +70,7 @@ const (
 	prefVolume   = "volume"
 	prefShuffle  = "shuffle"
 	prefRepeat   = "repeat"
-	prefSortCol  = "sortColumn"
+	prefSortCol  = "sortColumnName" // the column's name, or "none"
 	prefSortDesc = "sortDescending"
 	prefVisMode  = "visualizerMode"
 	prefMiniVis  = "miniVisualizer"
@@ -133,6 +142,7 @@ func scanFile(cache *libraryCache, path string) scanResult {
 	if !r.cached {
 		r.track = readTrack(path)
 	}
+	r.track.Size = r.size // also for tracks cached before sizes were shown
 	r.track.search = searchKey(r.track)
 	return r
 }
@@ -201,8 +211,9 @@ type ui struct {
 	prefs     fyne.Preferences
 	cache     *libraryCache
 	media     mediaCenter
-	async     func(func()) // runs slow work off the UI thread
-	pick      picker       // shows an Open panel (see open.go)
+	async     func(func())            // runs slow work off the UI thread
+	pick      picker                  // shows an Open panel (see open.go)
+	reveal    func(path string) error // shows a file in Finder or Explorer; tests replace it
 	mainMenu  *fyne.MainMenu
 	table     *trackTable
 	search    *widget.Entry
@@ -393,6 +404,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	}
 	u.levels = u.qualityStore.levels()
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
+	u.reveal = reveal
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker
 	}
@@ -458,12 +470,12 @@ func (u *ui) build() {
 		// also lets the same row be clicked again after a stop.
 		u.table.UnselectAll()
 	}
-	u.sortCol = u.prefs.IntWithFallback(prefSortCol, -1)
+	u.sortCol = savedSortColumn(u.prefs)
 	u.sortDesc = u.prefs.Bool(prefSortDesc)
 	u.table.ShowHeaderRow = true
 	u.table.CreateHeader = newHeader
 	u.table.UpdateHeader = u.updateHeader
-	for i, width := range []float32{280, 200, 220, 70, 80, 100, 400} {
+	for i, width := range []float32{250, 170, 190, 70, 80, 85, 100, 400} {
 		u.table.SetColumnWidth(i, width)
 	}
 
@@ -500,14 +512,16 @@ func cellText(t Track, col int) string {
 		return t.Artist
 	case 2:
 		return t.Album
-	case 3:
+	case yearCol:
 		if t.Year > 0 {
 			return strconv.Itoa(t.Year)
 		}
 		return ""
 	case 4:
 		return t.Format
-	case 6:
+	case sizeCol:
+		return fileSize(t.Size)
+	case pathCol:
 		return t.Path
 	}
 	return "" // Quality: see levelOf

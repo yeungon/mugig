@@ -7,9 +7,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
-// qualityCol is the Quality column's index (see columns).
-const qualityCol = 5
-
 // lossyFormats need no check to be called lossy: the format says it.
 var lossyFormats = map[string]bool{"MP3": true, "OGG": true}
 

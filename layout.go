@@ -127,7 +127,9 @@ func libraryStats(tracks []Track) string {
 		return "No music yet. Choose a folder to scan."
 	}
 	artists, albums := map[string]bool{}, map[string]bool{}
+	var size int64
 	for _, t := range tracks {
+		size += t.Size
 		if t.Artist != "" {
 			artists[strings.ToLower(t.Artist)] = true
 		}
@@ -135,8 +137,32 @@ func libraryStats(tracks []Track) string {
 			albums[strings.ToLower(t.Artist+"\x00"+t.Album)] = true
 		}
 	}
-	return fmt.Sprintf("%s · %s · %s",
+	s := fmt.Sprintf("%s · %s · %s",
 		plural(len(tracks), "track"), plural(len(artists), "artist"), plural(len(albums), "album"))
+	if size > 0 {
+		s += " · " + fileSize(size)
+	}
+	return s
+}
+
+// fileSize formats a size in bytes as Finder does, in powers of 1000:
+// "912 KB", "38.2 MB", "1.24 GB".
+func fileSize(n int64) string {
+	units := []string{"bytes", "KB", "MB", "GB", "TB"}
+	v, u := float64(n), 0
+	for v >= 999.5 && u < len(units)-1 {
+		v /= 1000
+		u++
+	}
+	switch {
+	case u == 0:
+		return fmt.Sprintf("%d bytes", n)
+	case u == 1 || v >= 100:
+		return fmt.Sprintf("%.0f %s", v, units[u])
+	case v >= 10:
+		return fmt.Sprintf("%.1f %s", v, units[u])
+	}
+	return fmt.Sprintf("%.2f %s", v, units[u])
 }
 
 func plural(n int, noun string) string {
