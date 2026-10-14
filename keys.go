@@ -117,6 +117,7 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		item("Volume Up", fyne.KeyUp, cmd, func() { u.volume.SetValue(min(u.volume.Value+volumeStep, 1)) }),
 		item("Volume Down", fyne.KeyDown, cmd, func() { u.volume.SetValue(max(u.volume.Value-volumeStep, 0)) }),
 		item("Mute", fyne.KeyDown, cmd|alt, u.toggleMute),
+		u.buildFadeInItem(),
 		fyne.NewMenuItemSeparator(),
 	)
 	controls.Items = append(controls.Items, u.buildSpeedMenu(item)...)

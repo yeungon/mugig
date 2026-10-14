@@ -9,7 +9,6 @@ import (
 
 	"github.com/gen2brain/malgo"
 	"github.com/gopxl/beep/v2"
-	"github.com/gopxl/beep/v2/effects"
 )
 
 // nullBackend is miniaudio's null device. malgo's own BackendNull is off by
@@ -118,8 +117,10 @@ func TestFullVolumeIsBitExact(t *testing.T) {
 	}
 	src := beep.StreamerFunc(func(s [][2]float64) (int, bool) { return copy(s, in), true })
 	p := newPlayer() // the volume stage as Play builds it, at full volume
-	p.vol = &effects.Volume{Streamer: newTap(src, 1024), Base: 2}
+	p.vol = &fader{s: newTap(src, 1024)}
+	p.vol.setRate(44100)
 	p.SetVolume(1)
+	p.vol.settle()
 
 	var o output
 	o.play(p.vol)

@@ -219,6 +219,13 @@ silicon).
   full-scale tone can't clip. When a band moves, copy the filters' state
   to the new coefficients rather than starting from zero, or it clicks.
   Ten bands on two channels at 192 kHz cost 0.3% of a core.
+- **Make volume increases glide, decreases immediate.** A jump up is
+  what hurts ears and tweeters; down is always safe. Rise at an even
+  pace in decibels (40 dB/s: a fade in from -40 dB takes a second, 50% to
+  full volume 0.45 s), landing exactly on the target, then skip the
+  multiply at a gain of exactly 1 so full volume stays bit-perfect. A
+  fresh song's fader must start *at* its gain, not rise to it, unless it
+  is meant to fade in: otherwise every song fades in.
 - **Speed with pitch kept**: WSOLA (`stretch.go`) — overlapping pieces of
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at

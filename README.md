@@ -22,6 +22,11 @@ Written in Go with [Fyne](https://fyne.io).
 - **Gapless**: songs at the same sample rate follow each other without a
   pause, so live albums, classical works and mixes play as recorded. MP3s
   have the silence their encoder added cut off.
+- **Gentle on the ears**: playing or resuming fades in over a second
+  (Controls → Fade In When Playing, on unless turned off), and turning the
+  volume up glides there rather than jumping, so a slip of the slider
+  can't blast the music. Turning it down is immediate. At full volume the
+  sound still passes through untouched.
 - **Exclusive access** (macOS, Controls → Exclusive Access): while a song
   plays or is paused, Mugig has the device to itself, so no other app's
   sound or alert is mixed into the music or changes the device's rate.
@@ -206,7 +211,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 | `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
-| `player.go`, `gapless.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go`, `eq*.go`, `crossfeed.go` | Decoding, gapless playback, read-ahead, damage-tolerant FLAC, speed, equalizer, crossfeed, audio output |
+| `player.go`, `gapless.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go`, `eq*.go`, `crossfeed.go`, `fader.go` | Decoding, gapless playback, read-ahead, damage-tolerant FLAC, speed, equalizer, crossfeed, volume, audio output |
 | `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
 | `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |
 | `tools/mkicon` | Draws the app icon (`make icon`) |

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"math"
 	"fmt"
 	"io"
 	"os"
@@ -13,7 +14,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"github.com/gopxl/beep/v2"
-	"github.com/gopxl/beep/v2/effects"
 	"github.com/gopxl/beep/v2/mp3"
 	"github.com/gopxl/beep/v2/vorbis"
 	"github.com/gopxl/beep/v2/wav"
@@ -34,6 +34,9 @@ type audioPlayer interface {
 	// carries on with it rather than starting it again.
 	Prepare(path string)
 	SetVolume(level float64)
+	// SetFadeIn turns fading in from near silence, when playing starts or
+	// resumes, on or off.
+	SetFadeIn(on bool)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
 	SetCrossfeed(level crossfeedLevel)
 	SetEQ(s eqSettings)
@@ -68,12 +71,13 @@ type player struct {
 	eq    *equalizer
 	cross *crossfeed
 	tap   *tap
-	vol   *effects.Volume
+	vol   *fader
 	ctrl  *beep.Ctrl
 	gen   int     // bumped on every Stop so stale end-of-track callbacks are ignored
 	level float64 // volume from 0 (silent) to 1 (full), kept across tracks
 	speed float64 // playback speed, kept across tracks
 	feed  crossfeedLevel
+	fade  bool // fade in when playing starts or resumes
 	eqSet eqSettings
 
 	onEnd     func(error) // the current song's end-of-track callback
@@ -104,6 +108,7 @@ func (p *player) Play(path string, onEnd func(error)) error {
 		p.onEnd = onEnd
 		return nil
 	}
+	wasPlaying := p.ctrl != nil && !p.ctrl.Paused // moving from one song to another
 	p.Stop()
 	d, err := openDeck(path, p.speed)
 	if err != nil {
@@ -127,8 +132,14 @@ func (p *player) Play(path string, onEnd func(error)) error {
 	// The tap sits before the volume so the visualizer still moves when
 	// the sound is turned down.
 	p.tap = newTap(p.cross, 8192)
-	p.vol = &effects.Volume{Streamer: p.tap, Base: 2}
+	p.vol = &fader{s: p.tap}
+	p.vol.setRate(int(d.format.SampleRate))
 	p.applyLevel()
+	if p.fade && !wasPlaying {
+		p.vol.fadeIn()
+	} else {
+		p.vol.settle()
+	}
 	p.ctrl = &beep.Ctrl{Streamer: beep.Seq(p.vol, beep.Callback(func() {
 		p.notify(func() {
 			if p.gen == gen {
@@ -340,6 +351,9 @@ func (p *player) TogglePause() bool {
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
 	p.ctrl.Paused = !p.ctrl.Paused
+	if !p.ctrl.Paused && p.fade {
+		p.vol.fadeIn()
+	}
 	return p.ctrl.Paused
 }
 
@@ -432,9 +446,14 @@ func (p *player) SetVolume(level float64) {
 // is about -36 dB. At full volume the gain is exactly 1, so the samples
 // pass through unchanged.
 func (p *player) applyLevel() {
-	p.vol.Silent = p.level <= 0
-	p.vol.Volume = (p.level - 1) * 6
+	gain := 0.0
+	if p.level > 0 {
+		gain = math.Pow(2, (p.level-1)*6)
+	}
+	p.vol.set(gain)
 }
+
+func (p *player) SetFadeIn(on bool) { p.fade = on }
 
 func (p *player) Samples(dst []float64) int {
 	if p.tap == nil {

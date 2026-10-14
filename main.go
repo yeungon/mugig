@@ -320,6 +320,7 @@ type ui struct {
 	speedBtn       *widget.Button   // in the player bar
 	speedItems     []*fyne.MenuItem // one per speed, in the Controls menu
 	crossfeed      crossfeedLevel
+	fadeInItem     *fyne.MenuItem
 	eq             eqSettings
 	eqView         *eqView          // the Equalizer window, while open
 	crossfeedItems []*fyne.MenuItem // one per level, in the Controls menu
