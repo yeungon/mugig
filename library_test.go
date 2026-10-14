@@ -101,8 +101,8 @@ func TestSortIsCaseInsensitiveAndStable(t *testing.T) {
 
 func TestHeaderShowsSortArrow(t *testing.T) {
 	u, _, _ := newTestUI(t)
-	header := func(col int) *widget.Button {
-		b := newHeader().(*widget.Button)
+	header := func(col int) *headerCell {
+		b := newHeader().(*headerCell)
 		u.updateHeader(widget.TableCellID{Row: -1, Col: col}, b)
 		return b
 	}

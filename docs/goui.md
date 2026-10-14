@@ -52,6 +52,9 @@ silicon).
   shortcuts fire wherever focus is, so it would stop ⌘A selecting the
   search text. Handle `fyne.ShortcutSelectAll` in the list's
   `TypedShortcut`, and on the canvas for when nothing has focus.
+- **Hiding table columns**: a column of width 0 still leaves a gap. Map
+  the table's column positions to your columns instead (`shownCols`), and
+  set the widths again whenever the set changes.
 - **Highlighting a table row**: the table leaves a padding between cells,
   so a background per cell shows as separate blocks. Lay the background out
   half a padding wider on each side and the row reads as one.

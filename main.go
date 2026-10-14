@@ -310,9 +310,11 @@ type ui struct {
 	queuePop        *widget.PopUp
 	cued            *cuedSong       // the last session's song, waiting for Play (see resume.go)
 	selected        map[string]bool // paths of the songs selected (see selection.go)
-	anchor          string          // the song last ⌘- or ⇧-clicked, where ⇧-click selects from
-	resumePending   bool            // the last session is still to be restored
-	sessionSaved    bool            // saved on quit already
+	shownCols       []int           // the columns shown, in order (see columns.go)
+	columnItems     []*fyne.MenuItem
+	anchor          string // the song last ⌘- or ⇧-clicked, where ⇧-click selects from
+	resumePending   bool   // the last session is still to be restored
+	sessionSaved    bool   // saved on quit already
 	clearQueueItem  *fyne.MenuItem
 
 	// The fields below are only read or modified on the UI thread (inside
@@ -464,6 +466,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 }
 
 func (u *ui) build() {
+	u.loadColumns()
 	u.mainMenu = u.buildMenu()
 	u.applyAppearance()
 	u.win.SetMainMenu(u.mainMenu)
@@ -485,12 +488,13 @@ func (u *ui) build() {
 	u.cancelBtn.Hide()
 
 	u.table = newTrackTable(
-		func() (int, int) { return len(u.tracks), len(columns) },
+		func() (int, int) { return len(u.tracks), len(u.shownCols) },
 		func() fyne.CanvasObject { return newTrackCell() },
 		func(id widget.TableCellID, o fyne.CanvasObject) {
 			c := o.(*trackCell)
-			if id.Row < 0 || id.Row >= len(u.tracks) {
-				c.set("", id.Col, false)
+			col := u.colAt(id.Col)
+			if id.Row < 0 || id.Row >= len(u.tracks) || col < 0 {
+				c.set("", col, false)
 				c.setSelected(false)
 				c.onMenu, c.onTap = nil, nil
 				return
@@ -498,11 +502,11 @@ func (u *ui) build() {
 			t := u.tracks[id.Row]
 			c.setSelected(u.selected[t.Path])
 			c.onTap = func(at fyne.Position) { u.clickTrack(t, at) }
-			if id.Col == qualityCol {
+			if col == qualityCol {
 				l := u.levelOf(t)
 				c.setColoured(levelNames[l], levelColours[l])
 			} else {
-				c.set(cellText(t, id.Col), id.Col, t.Path == u.playing.Path)
+				c.set(cellText(t, col), col, t.Path == u.playing.Path)
 			}
 			c.onMenu = func(at fyne.Position) {
 				widget.ShowPopUpMenuAtPosition(u.rowMenu(t), u.win.Canvas(), at)
@@ -528,9 +532,7 @@ func (u *ui) build() {
 	u.table.ShowHeaderRow = true
 	u.table.CreateHeader = newHeader
 	u.table.UpdateHeader = u.updateHeader
-	for i, width := range []float32{250, 170, 190, 70, 70, 80, 85, 100, 400} {
-		u.table.SetColumnWidth(i, width)
-	}
+	u.applyColumns()
 
 	u.search = widget.NewEntry()
 	u.search.PlaceHolder = "Search title, artist or album"

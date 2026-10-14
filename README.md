@@ -52,6 +52,8 @@ Written in Go with [Fyne](https://fyne.io).
 - Search, and sort by any column: title, artist, album, **time**, year,
   format, **size**, **quality** or path. The line under the title totals the
   songs shown: tracks, artists, albums, listening time and size.
+  **Show or hide columns** by right-clicking a column header, or in
+  View → Columns.
 - **Select several songs** with ⌘-click (Ctrl-click on Windows and Linux),
   ⇧-click for a run of them, or ⌘A for the whole list. Right-click them to
   play them, queue them, check their quality or copy their paths; the line
@@ -164,7 +166,7 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 |---|---|
 | `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
 | `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, the music folders, the saved library, folder watching |
-| `selection.go` | Selecting several songs and acting on them |
+| `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
 | `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
 | `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
 | `player.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go` | Decoding, read-ahead, damage-tolerant FLAC, speed, audio output |

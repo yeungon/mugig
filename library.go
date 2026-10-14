@@ -132,31 +132,26 @@ func (u *ui) sortBy(col int) {
 	u.applyView()
 }
 
-// Column headers are flat buttons that sort by their column and show an
-// arrow on the active one.
-func newHeader() fyne.CanvasObject {
-	b := widget.NewButton("", nil)
-	b.Alignment = widget.ButtonAlignLeading
-	b.IconPlacement = widget.ButtonIconTrailingText
-	b.Importance = widget.LowImportance
-	return b
-}
-
+// Column headers (see headerCell) sort by their column and show an arrow
+// on the active one.
 func (u *ui) updateHeader(id widget.TableCellID, o fyne.CanvasObject) {
-	if id.Col < 0 || id.Col >= len(columns) {
+	col := u.colAt(id.Col)
+	if col < 0 {
 		return
 	}
-	b := o.(*widget.Button)
-	b.SetText(strings.ToUpper(columns[id.Col]))
+	b := o.(*headerCell)
+	b.onMenu = func(at fyne.Position) {
+		widget.ShowPopUpMenuAtPosition(u.columnsMenu(), u.win.Canvas(), at)
+	}
+	b.SetText(strings.ToUpper(columns[col]))
 	switch {
-	case id.Col != u.sortCol:
+	case col != u.sortCol:
 		b.SetIcon(nil)
 	case u.sortDesc:
 		b.SetIcon(theme.MenuDropDownIcon())
 	default:
 		b.SetIcon(theme.MenuDropUpIcon())
 	}
-	col := id.Col
 	b.OnTapped = func() { u.sortBy(col) }
 }
 
