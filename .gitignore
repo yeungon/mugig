@@ -4,3 +4,7 @@
 
 # macOS clutter
 .DS_Store
+
+# Builds for other systems (make mac, windows, linux…)
+/dist/
+/fyne-cross/
