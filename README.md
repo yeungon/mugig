@@ -37,8 +37,11 @@ Written in Go with [Fyne](https://fyne.io).
   from its quality check, or is measured in the background as it starts or
   is readied to follow (under a second on a USB disk), and saved; until then
   it plays at the last song's gain, then glides to its own. Songs joined
-  without a gap change level on the very sample. Off unless turned on, as it
-  changes the sound; Now Playing says by how much.
+  without a gap change level on the very sample. Now Playing says by how
+  much. Off unless turned on, and best for shuffle and mixed playlists. For
+  whole albums leave it off: it levels each song on its own, so an album's
+  quiet tracks would be raised to match its loud ones, and the sound is no
+  longer bit-perfect.
 - **Exclusive access** (macOS, Controls → Exclusive Access): while a song
   plays or is paused, Mugig has the device to itself, so no other app's
   sound or alert is mixed into the music or changes the device's rate.
@@ -105,7 +108,9 @@ Written in Go with [Fyne](https://fyne.io).
   the playlists.
 - Add folders with the **+** beside Folders, the Open panel, or by dropping
   them on the window. Audio files opened or dropped are played.
-- Search, and sort by any column: title, artist, album, **time**, year,
+- **Search** without minding accents or case: "trinh cong son" finds
+  "Trịnh Công Sơn", and smart playlists' text rules match the same way.
+- Sort by any column: title, artist, album, **time**, year,
   format, **size**, **quality** or path. The line under the title totals the
   songs shown: tracks, artists, albums, listening time and size.
   **Show or hide columns** by right-clicking a column header, or in
