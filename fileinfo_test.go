@@ -2,6 +2,7 @@ package main
 
 import (
 	"mugig/internal/humanize"
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"strings"
@@ -100,7 +101,7 @@ func TestGetInfo(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	tr := genuineFLAC(t, "song")
 	tr.Artist, tr.Year = "Someone", 1999
-	u.setLevel(tr.Path, qualityLossless)
+	u.setLevel(tr.Path, quality.Lossless)
 	u.showInfo(tr)
 	top := u.win.Canvas().Overlays().Top()
 	if top == nil {

@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package quality
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func TestAppleDecoderIsBitExact(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if rep.Checksum != checksumOK || rep.ReadBy != "macOS" || rep.UsedBits != bits || rep.Damaged != "" {
+		if rep.Checksum != ChecksumOK || rep.ReadBy != "macOS" || rep.UsedBits != bits || rep.Damaged != "" {
 			t.Errorf("%d-bit: %+v", bits, rep)
 		}
 		if res := spec.result(); !res.Analysed || res.Cutoff != 0 {
@@ -49,16 +49,16 @@ func TestSecondOpinionFromMacOS(t *testing.T) {
 	os.WriteFile(path, data, 0o644)
 
 	info, rep := checkFile(t, path)
-	a := assess(info, &rep)
-	t.Logf("%+v", a.checks)
+	a := Assess(info, &rep)
+	t.Logf("%+v", a.Checks)
 	switch rep.ReadBy {
 	case "macOS": // macOS doesn't check frame checksums
-		if rep.Checksum != checksumOK || rep.OwnStopAt == 0 || a.level == qualityDamaged ||
-			!hasCheck(a, checkInfo, "stopped at") {
+		if rep.Checksum != ChecksumOK || rep.OwnStopAt == 0 || a.Level == Damaged ||
+			!hasCheck(a, CheckInfo, "stopped at") {
 			t.Errorf("report %+v, assessed %+v", rep, a)
 		}
 	default: // macOS refused it too
-		if a.level != qualityDamaged {
+		if a.Level != Damaged {
 			t.Errorf("both decoders failed but not damaged: %+v", a)
 		}
 	}

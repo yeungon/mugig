@@ -4,6 +4,7 @@ package main
 
 import (
 	"mugig/internal/audio"
+	"mugig/internal/quality"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
@@ -15,48 +16,27 @@ var lossyFormats = map[string]bool{"MP3": true, "OGG": true}
 // levelOf returns t's verdict: saved from a check, or Lossy by its format.
 //
 // Verdicts are kept by file, so the songs of a disc image share its one.
-func (u *ui) levelOf(t Track) qualityLevel {
+func (u *ui) levelOf(t Track) quality.Level {
 	if l, ok := u.levels[audio.FileOf(t.Path)]; ok {
 		return l
 	}
 	if lossyFormats[t.Format] {
-		return qualityLossy
+		return quality.Lossy
 	}
-	return qualityUnknown
-}
-
-// levelNames are the column's words for each verdict; unchecked songs stay
-// blank.
-var levelNames = map[qualityLevel]string{
-	qualityLossy:    "Lossy",
-	qualityLossless: "Lossless",
-	qualityHiRes:    "Hi-Res",
-	qualitySuspect:  "Lossless?",
-	qualityDamaged:  "Damaged",
+	return quality.Unknown
 }
 
 // levelColours match the badges, in text-safe colours.
-var levelColours = map[qualityLevel]fyne.ThemeColorName{
-	qualityLossy:    theme.ColorNameDisabled,
-	qualityLossless: colorNameAccent,
-	qualityHiRes:    colorNameAccent,
-	qualitySuspect:  theme.ColorNameWarning,
-	qualityDamaged:  theme.ColorNameError,
-}
-
-// levelRank orders the column so problems sort first and unchecked songs
-// last.
-var levelRank = map[qualityLevel]int{
-	qualityDamaged:  0,
-	qualitySuspect:  1,
-	qualityLossy:    2,
-	qualityLossless: 3,
-	qualityHiRes:    4,
-	qualityUnknown:  5,
+var levelColours = map[quality.Level]fyne.ThemeColorName{
+	quality.Lossy:    theme.ColorNameDisabled,
+	quality.Lossless: colorNameAccent,
+	quality.HiRes:    colorNameAccent,
+	quality.Suspect:  theme.ColorNameWarning,
+	quality.Damaged:  theme.ColorNameError,
 }
 
 // setLevel records a song's new verdict and shows it.
-func (u *ui) setLevel(path string, l qualityLevel) {
+func (u *ui) setLevel(path string, l quality.Level) {
 	u.levels[audio.FileOf(path)] = l
 	u.table.Refresh()
 }

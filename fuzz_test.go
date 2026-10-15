@@ -10,11 +10,8 @@ package main
 // before (saved under testdata/fuzz).
 
 import (
-	"context"
-	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"testing"
-	"time"
 )
 
 // FuzzReadTrack covers tag reading, which the scan does for every file.
@@ -27,27 +24,5 @@ func FuzzReadTrack(f *testing.F) {
 				t.Error("a track needs a title, if only its file name")
 			}
 		})
-	})
-}
-
-// FuzzAnalyse covers the quality check: decoding in full, the checksum,
-// the spectrum and the loudness meter.
-func FuzzAnalyse(f *testing.F) {
-	audiotest.FuzzSeeds(f)
-	f.Fuzz(func(t *testing.T, data []byte, ext uint8) {
-		path := audiotest.FuzzFile(t, data, ext)
-		info, err := audio.Probe(path)
-		if err != nil || !canAnalyse(info) {
-			return
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		rep, _, err := analyse(ctx, path, info, false, nil)
-		if ctx.Err() != nil {
-			t.Fatalf("analysis took over 10 s on %d bytes", len(data))
-		}
-		if err == nil {
-			assess(info, &rep)
-		}
 	})
 }

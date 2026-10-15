@@ -29,6 +29,7 @@ import (
 
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/quality"
 	"mugig/internal/trash"
 
 	"github.com/dhowden/tag"
@@ -297,7 +298,7 @@ type ui struct {
 	checkBtn       *widget.Button // Check Audio Quality, on the Now Playing page
 	checkItem      *fyne.MenuItem // the same in the menu
 	quality        trackQuality   // the playing track's (see qualityview.go)
-	qualityStore   *qualityStore
+	qualityStore   *quality.Store
 	volume         *widget.Slider
 	muteBtn        *widget.Button
 	shuffleBtn     *widget.Button
@@ -377,8 +378,8 @@ type ui struct {
 	discardScan  bool                          // the folder being scanned was removed or unplugged
 	run          scanRun
 
-	levels         map[string]qualityLevel // saved verdicts, for the Quality column
-	batch          *batchCheck             // the latest Check All Songs run (see batch.go)
+	levels         map[string]quality.Level // saved verdicts, for the Quality column
+	batch          *batchCheck              // the latest Check All Songs run (see batch.go)
 	checkAllBtn    *widget.Button
 	checkAllItem   *fyne.MenuItem
 	batchBar       *fyne.Container // progress, or the summary when done
@@ -432,7 +433,7 @@ func main() {
 	u := newUI(w, a.Preferences(), uiDeps{
 		player:    pl,
 		cache:     loadCache(filepath.Join(a.Storage().RootURI().Path(), "library.gob")),
-		saved:     loadQualityStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
+		saved:     quality.LoadStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
 		media:     media,
 		playlists: filepath.Join(a.Storage().RootURI().Path(), "playlists.json"),
 	})
@@ -466,7 +467,7 @@ func main() {
 		u.stopAllWatching()
 		if u.batch != nil && !u.batch.finished {
 			u.batch.cancel()
-			u.qualityStore.save() // keep what was checked so far
+			u.qualityStore.Save() // keep what was checked so far
 		}
 		if u.cancel != nil {
 			u.cancel()
@@ -483,10 +484,10 @@ func main() {
 type uiDeps struct {
 	player audioPlayer
 	cache  *libraryCache
-	saved  *qualityStore // optional; defaults to memory only
-	media  mediaCenter   // optional
-	async  func(func())  // optional; defaults to a new goroutine
-	pick   picker        // optional; defaults to the system's Open panel
+	saved  *quality.Store // optional; defaults to memory only
+	media  mediaCenter    // optional
+	async  func(func())   // optional; defaults to a new goroutine
+	pick   picker         // optional; defaults to the system's Open panel
 	// playlists is where playlists are saved; "" keeps them in memory.
 	playlists string
 }
@@ -494,9 +495,9 @@ type uiDeps struct {
 func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	u := &ui{win: w, prefs: prefs, player: d.player, cache: d.cache, qualityStore: d.saved, media: d.media, async: d.async}
 	if u.qualityStore == nil {
-		u.qualityStore = loadQualityStore("")
+		u.qualityStore = quality.LoadStore("")
 	}
-	u.levels = u.qualityStore.levels()
+	u.levels = u.qualityStore.Levels()
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
 	u.reveal, u.modifiers, u.trash = reveal, keyModifiers, trash.Move
 	u.canHog = audio.CanHogDevice
@@ -552,7 +553,7 @@ func (u *ui) build() {
 			c.onTap = func(at fyne.Position) { u.clickTrack(t, at) }
 			if col == qualityCol {
 				l := u.levelOf(t)
-				c.setColoured(levelNames[l], levelColours[l])
+				c.setColoured(quality.LevelNames[l], levelColours[l])
 			} else {
 				c.set(cellText(t, col), col, t.Path == u.playing.Path)
 			}

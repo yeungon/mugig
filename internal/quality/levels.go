@@ -1,4 +1,4 @@
-package main
+package quality
 
 // Loudness and peaks, measured in the same pass that checks a file's
 // quality: integrated loudness (LUFS), true peak, the DR dynamic range
@@ -189,6 +189,7 @@ func (l *levels) result() levelsResult {
 	return r
 }
 
+// db gives an amplitude in decibels, 0 for full scale.
 func db(amplitude float64) float64 { return 20 * math.Log10(amplitude) }
 
 // loudness is BS.1770-4's gated integrated loudness: 400 ms blocks every

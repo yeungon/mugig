@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"mugig/internal/quality"
 	"slices"
 	"strings"
 	"testing"
@@ -19,7 +20,7 @@ func TestMoveSongsToTrash(t *testing.T) {
 	u.trash = func(p string) error { moved = append(moved, p); return nil }
 	u.jump(u.tracks[1]) // Help
 	u.playLater(u.tracks[3], u.tracks[4])
-	u.levels[u.tracks[3].Path] = qualitySuspect
+	u.levels[u.tracks[3].Path] = quality.Suspect
 	u.selectAll()
 
 	ts := []Track{u.tracks[1], u.tracks[3]}
@@ -38,7 +39,7 @@ func TestMoveSongsToTrash(t *testing.T) {
 	if got := titles(u.queued); !slices.Equal(got, []string{"Zebra"}) {
 		t.Errorf("Up Next %v", got)
 	}
-	if len(u.selected) != 3 || u.levels[ts[1].Path] != qualityUnknown {
+	if len(u.selected) != 3 || u.levels[ts[1].Path] != quality.Unknown {
 		t.Errorf("%d selected, level %v", len(u.selected), u.levels[ts[1].Path])
 	}
 	if u.playing.Path != "" || fp.onEnd != nil {

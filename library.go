@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"fmt"
 	"mugig/internal/humanize"
+	"mugig/internal/quality"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -183,7 +184,7 @@ func (u *ui) compareColumn(a, b Track, col int) int {
 	case sizeCol:
 		return cmp.Compare(a.Size, b.Size)
 	case qualityCol:
-		return cmp.Compare(levelRank[u.levelOf(a)], levelRank[u.levelOf(b)])
+		return cmp.Compare(quality.LevelRank[u.levelOf(a)], quality.LevelRank[u.levelOf(b)])
 	}
 	return compareFold(cellText(a, col), cellText(b, col))
 }

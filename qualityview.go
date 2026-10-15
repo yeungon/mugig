@@ -6,20 +6,14 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	hexenc "encoding/hex"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"mugig/internal/audio"
-	"os"
-	"path/filepath"
+	"mugig/internal/quality"
 	"slices"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -48,8 +42,8 @@ const (
 type trackQuality struct {
 	path   string // "" while the headers are being read, or nothing plays
 	info   audio.Info
-	err    error          // the headers couldn't be read
-	rep    *qualityReport // nil until checked
+	err    error           // the headers couldn't be read
+	rep    *quality.Report // nil until checked
 	state  checkState
 	cancel context.CancelFunc // stops reading the headers when the track changes
 }
@@ -70,8 +64,8 @@ func (u *ui) loadQuality(t Track) {
 	u.async(func() {
 		file := audio.FileOf(t.Path)
 		info, err := audio.Probe(file)
-		var rep qualityReport
-		saved := err == nil && canAnalyse(info) && u.qualityStore.get(file, fileStamp(file), &rep)
+		var rep quality.Report
+		saved := err == nil && quality.CanAnalyse(info) && u.qualityStore.Get(file, quality.FileStamp(file), &rep)
 		onUI(func() {
 			if ctx.Err() != nil {
 				return // the track has changed
@@ -90,12 +84,12 @@ func (u *ui) loadQuality(t Track) {
 // Audio Quality dialog.
 func (u *ui) canOpenQuality() bool {
 	q := &u.quality
-	return q.path != "" && q.err == nil && canAnalyse(q.info)
+	return q.path != "" && q.err == nil && quality.CanAnalyse(q.info)
 }
 
 // needsCheck reports whether the playing track is lossless and unchecked.
 func (u *ui) needsCheck() bool {
-	return u.canOpenQuality() && canVerify(u.quality.info) && u.quality.state == notChecked
+	return u.canOpenQuality() && quality.CanVerify(u.quality.info) && u.quality.state == notChecked
 }
 
 // checkAudioQuality opens the Audio Quality dialog for the playing track.
@@ -107,16 +101,16 @@ func (u *ui) checkAudioQuality() {
 
 // qualityText sums up what is known about a file's quality, adding a line
 // for a check that is running or could be run.
-func qualityText(info audio.Info, err error, rep *qualityReport, state checkState, offerCheck bool) assessment {
+func qualityText(info audio.Info, err error, rep *quality.Report, state checkState, offerCheck bool) quality.Assessment {
 	if err != nil {
-		return assessment{checks: []check{{checkInfo, "Can't read the audio format: " + err.Error()}}}
+		return quality.Assessment{Checks: []quality.Check{{Kind: quality.CheckInfo, Text: "Can't read the audio format: " + err.Error()}}}
 	}
-	a := assess(info, rep)
+	a := quality.Assess(info, rep)
 	switch {
 	case state == checking:
-		a.checks = append(a.checks, check{checkPending, "Checking the audio…"})
+		a.Checks = append(a.Checks, quality.Check{Kind: quality.CheckPending, Text: "Checking the audio…"})
 	case offerCheck:
-		a.checks = append(a.checks, check{checkInfo, "Not yet checked for damage or a lossy source"})
+		a.Checks = append(a.Checks, quality.Check{Kind: quality.CheckInfo, Text: "Not yet checked for damage or a lossy source"})
 	}
 	return a
 }
@@ -125,11 +119,11 @@ func qualityText(info audio.Info, err error, rep *qualityReport, state checkStat
 // the check can be run.
 func (u *ui) renderQuality() {
 	q := &u.quality
-	var a assessment
+	var a quality.Assessment
 	if q.path != "" || q.err != nil {
 		a = qualityText(q.info, q.err, q.rep, q.state, u.needsCheck())
 	}
-	u.barBadge.set(a.level)
+	u.barBadge.set(a.Level)
 	u.barArtistRow.Refresh() // lay out again, as the badge may have appeared or gone
 	u.np.show(a)
 
@@ -147,7 +141,7 @@ func (u *ui) renderQuality() {
 
 // qualityChecked takes a result from the Audio Quality dialog: for the song
 // list, and in case it is for the playing track.
-func (u *ui) qualityChecked(path string, rep qualityReport, level qualityLevel) {
+func (u *ui) qualityChecked(path string, rep quality.Report, level quality.Level) {
 	u.setLevel(path, level)
 	if q := &u.quality; q.path == path && q.state == notChecked {
 		q.rep, q.state = &rep, checked
@@ -176,12 +170,12 @@ func newQualityPanel() *qualityPanel {
 	return p
 }
 
-func (p *qualityPanel) show(a assessment) {
-	p.badge.set(a.level)
-	p.spec.SetText(a.spec)
+func (p *qualityPanel) show(a quality.Assessment) {
+	p.badge.set(a.Level)
+	p.spec.SetText(a.Format)
 	p.format.Refresh() // lay out again, as the badge may have appeared or gone
-	rows := make([]fyne.CanvasObject, len(a.checks))
-	for i, c := range a.checks {
+	rows := make([]fyne.CanvasObject, len(a.Checks))
+	for i, c := range a.Checks {
 		rows[i] = checkRow(c)
 	}
 	p.checks.Objects = rows
@@ -197,19 +191,19 @@ func (p *qualityPanel) texts() []string {
 	return out
 }
 
-func checkRow(c check) fyne.CanvasObject {
+func checkRow(c quality.Check) fyne.CanvasObject {
 	icon, colour := theme.InfoIcon(), theme.ColorNamePlaceHolder
-	switch c.kind {
-	case checkOK:
+	switch c.Kind {
+	case quality.CheckOK:
 		icon, colour = theme.ConfirmIcon(), theme.ColorNameSuccess
-	case checkWarn:
+	case quality.CheckWarn:
 		icon, colour = theme.WarningIcon(), theme.ColorNameWarning
-	case checkBad:
+	case quality.CheckBad:
 		icon, colour = theme.ErrorIcon(), theme.ColorNameError
-	case checkPending:
+	case quality.CheckPending:
 		icon = theme.MoreHorizontalIcon()
 	}
-	l := widget.NewLabel(c.text)
+	l := widget.NewLabel(c.Text)
 	l.Wrapping = fyne.TextWrapWord
 	// Keep the icon beside the first line when the text wraps.
 	return container.NewBorder(nil, nil,
@@ -260,16 +254,16 @@ func (compactTheme) Size(n fyne.ThemeSizeName) float32 {
 // Badge
 // ---------------------------------------------------------------------------
 
-var badgeStyles = map[qualityLevel]struct {
+var badgeStyles = map[quality.Level]struct {
 	text   string
 	colour fyne.ThemeColorName
 	filled bool
 }{
-	qualityLossy:    {"LOSSY", theme.ColorNameDisabled, false},
-	qualityLossless: {"LOSSLESS", colorNameAccent, false},
-	qualityHiRes:    {"HI-RES LOSSLESS", theme.ColorNamePrimary, true},
-	qualitySuspect:  {"LOSSLESS?", theme.ColorNameWarning, false},
-	qualityDamaged:  {"DAMAGED", theme.ColorNameError, false},
+	quality.Lossy:    {"LOSSY", theme.ColorNameDisabled, false},
+	quality.Lossless: {"LOSSLESS", colorNameAccent, false},
+	quality.HiRes:    {"HI-RES LOSSLESS", theme.ColorNamePrimary, true},
+	quality.Suspect:  {"LOSSLESS?", theme.ColorNameWarning, false},
+	quality.Damaged:  {"DAMAGED", theme.ColorNameError, false},
 }
 
 const badgeTextSize = 10
@@ -279,7 +273,7 @@ const badgeTextSize = 10
 // height it is given.
 type qualityBadge struct {
 	widget.BaseWidget
-	level qualityLevel
+	level quality.Level
 	onTap func()
 }
 
@@ -290,7 +284,7 @@ func newQualityBadge(onTap func()) *qualityBadge {
 	return b
 }
 
-func (b *qualityBadge) set(l qualityLevel) {
+func (b *qualityBadge) set(l quality.Level) {
 	b.level = l
 	if _, ok := badgeStyles[l]; ok {
 		b.Show()
@@ -374,179 +368,6 @@ func (r *badgeRenderer) Destroy() {}
 // Cache
 // ---------------------------------------------------------------------------
 
-// qualityStore keeps check results on disk, so each file is checked only
-// once. Entries are tied to the file's size and modification time, so an
-// edited file is checked afresh.
-type qualityStore struct {
-	mu       sync.Mutex
-	path     string // where it is saved; "" keeps it in memory only
-	entries  map[string]storedQuality
-	pictures map[string][]byte // spectrograms, when kept in memory
-}
-
-type storedQuality struct {
-	Stamp  string
-	Report qualityReport
-	Level  qualityLevel // the verdict, for the song list's Quality column
-}
-
-// qualityVersion is bumped whenever qualityReport changes shape or the
-// analysis measures differently, so old results are checked again.
-const qualityVersion = 5
-
-type qualityFile struct {
-	Version int
-	Entries map[string]storedQuality
-}
-
-// loadQualityStore reads the results saved at path. A missing, corrupt or
-// outdated file just gives an empty store.
-func loadQualityStore(path string) *qualityStore {
-	s := &qualityStore{path: path, entries: map[string]storedQuality{}, pictures: map[string][]byte{}}
-	var f qualityFile
-	if path != "" && loadGob(path, &f) == nil && f.Version == qualityVersion && f.Entries != nil {
-		s.entries = f.Entries
-	}
-	s.dropOldPictures()
-	return s
-}
-
-// lookup returns the saved entry for path, if the file is unchanged.
-func (s *qualityStore) lookup(path, stamp string) (storedQuality, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e, ok := s.entries[path]
-	return e, ok && e.Stamp == stamp && stamp != ""
-}
-
-// get fills rep with the saved result for path, if the file is unchanged.
-func (s *qualityStore) get(path, stamp string, rep *qualityReport) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e, ok := s.entries[path]
-	if !ok || e.Stamp != stamp || stamp == "" {
-		return false
-	}
-	*rep = e.Report
-	return true
-}
-
-// put records a result and saves the store. Saving errors are ignored: the
-// result is still remembered for this session.
-func (s *qualityStore) put(path, stamp string, rep qualityReport, level qualityLevel) {
-	s.putQuietly(path, stamp, rep, level)
-	s.save()
-}
-
-// putQuietly records a result without saving, for checking many files at
-// once: saving after each would rewrite the whole store thousands of
-// times. Call save now and then, and at the end.
-func (s *qualityStore) putQuietly(path, stamp string, rep qualityReport, level qualityLevel) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.entries[path] = storedQuality{stamp, rep, level}
-}
-
-func (s *qualityStore) save() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.path != "" {
-		saveGob(s.path, qualityFile{Version: qualityVersion, Entries: s.entries})
-	}
-}
-
-// forget drops the result for a file that has changed or gone.
-func (s *qualityStore) forget(paths []string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, p := range paths {
-		delete(s.entries, p)
-	}
-}
-
-// levels returns every saved verdict, by path. Whether each file is still
-// unchanged isn't checked here: that would mean reading thousands of files
-// at startup. The watcher drops results for files that change.
-func (s *qualityStore) levels() map[string]qualityLevel {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make(map[string]qualityLevel, len(s.entries))
-	for p, e := range s.entries {
-		out[p] = e.Level
-	}
-	return out
-}
-
-// Spectrograms are kept as PNG files of their levels beside the store,
-// named after a hash of the track's path, and only read when shown.
-func (s *qualityStore) picturePath(path string) string {
-	sum := sha256.Sum256([]byte(path))
-	return filepath.Join(s.pictureDir(), hexenc.EncodeToString(sum[:12])+".png")
-}
-
-func (s *qualityStore) pictureDir() string {
-	return filepath.Join(filepath.Dir(s.path), "spectrograms")
-}
-
-// dropOldPictures deletes spectrograms saved as coloured JPEGs by earlier
-// versions, which can't be drawn for another range of levels. Their tracks
-// are analysed again when next shown.
-func (s *qualityStore) dropOldPictures() {
-	if s.path == "" {
-		return
-	}
-	old, _ := filepath.Glob(filepath.Join(s.pictureDir(), "*.jpg"))
-	for _, f := range old {
-		os.Remove(f)
-	}
-}
-
-// putPicture saves the spectrogram for path. Saving errors are ignored, as
-// for put.
-func (s *qualityStore) putPicture(path string, img *image.Gray) {
-	if img == nil {
-		return
-	}
-	data, err := encodePicture(img)
-	if err != nil {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.path == "" {
-		s.pictures[path] = data
-		return
-	}
-	file := s.picturePath(path)
-	if os.MkdirAll(filepath.Dir(file), 0o755) == nil {
-		os.WriteFile(file, data, 0o644)
-	}
-}
-
-// picture returns the saved spectrogram for path.
-func (s *qualityStore) picture(path string) (*image.Gray, bool) {
-	s.mu.Lock()
-	data, ok := s.pictures[path]
-	s.mu.Unlock()
-	if !ok && s.path != "" {
-		var err error
-		data, err = os.ReadFile(s.picturePath(path))
-		ok = err == nil
-	}
-	if !ok {
-		return nil, false
-	}
-	return decodePicture(data)
-}
-
-func fileStamp(path string) string {
-	st, err := os.Stat(path)
-	if err != nil {
-		return ""
-	}
-	return st.ModTime().Format(time.RFC3339Nano) + "/" + strconv.FormatInt(st.Size(), 10)
-}
-
 // ---------------------------------------------------------------------------
 // Checking any track
 // ---------------------------------------------------------------------------
@@ -601,7 +422,7 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 		content.Refresh()
 		d.Resize(fyne.NewSize(700, content.MinSize().Height)) // grows with the findings
 	}
-	p.show(assessment{checks: []check{{checkPending, "Reading the file…"}}})
+	p.show(quality.Assessment{Checks: []quality.Check{{Kind: quality.CheckPending, Text: "Reading the file…"}}})
 	relayout()
 	d.Show()
 
@@ -617,23 +438,23 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 		}
 		file := audio.FileOf(t.Path) // a song from a CUE sheet: its whole disc image
 		info, err := audio.Probe(file)
-		if err != nil || !canAnalyse(info) {
+		if err != nil || !quality.CanAnalyse(info) {
 			post(func() {
 				p.show(qualityText(info, err, nil, notChecked, false))
 				spec.set(nil, 0, 0, 0, "No spectrogram: this file can't be decoded")
 			})
 			return
 		}
-		show := func(rep qualityReport, img *image.Gray) {
+		show := func(rep quality.Report, img *image.Gray) {
 			p.show(qualityText(info, nil, &rep, checked, false))
 			spec.set(img, info.SampleRate, info.Duration, rep.Spectrum.Cutoff, "No sound to draw")
 			levels.Hidden = img == nil
 		}
 
-		stamp := fileStamp(file)
-		var rep qualityReport
-		if u.qualityStore.get(file, stamp, &rep) {
-			if img, ok := u.qualityStore.picture(file); ok {
+		stamp := quality.FileStamp(file)
+		var rep quality.Report
+		if u.qualityStore.Get(file, stamp, &rep) {
+			if img, ok := u.qualityStore.Picture(file); ok {
 				post(func() { show(rep, img) })
 				return
 			}
@@ -643,15 +464,15 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 			spec.set(nil, info.SampleRate, 0, 0, "Analysing…")
 			bar.Show()
 		})
-		rep, img, err := analyse(ctx, file, info, true, func(done float64) {
+		rep, img, err := quality.Analyse(ctx, file, info, true, func(done float64) {
 			post(func() { bar.SetValue(done) })
 		})
 		if err != nil {
 			return // closed
 		}
-		level := assess(info, &rep).level
-		u.qualityStore.putPicture(file, img)
-		u.qualityStore.put(file, stamp, rep, level)
+		level := quality.Assess(info, &rep).Level
+		u.qualityStore.PutPicture(file, img)
+		u.qualityStore.Put(file, stamp, rep, level)
 		post(func() {
 			bar.Hide()
 			show(rep, img)

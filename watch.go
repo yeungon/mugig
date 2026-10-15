@@ -274,8 +274,8 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 			fyne.LogError("saving library cache", err)
 		}
 		if len(stale) > 0 {
-			store.forget(stale)
-			store.save()
+			store.Forget(stale)
+			store.Save()
 		}
 	})
 }

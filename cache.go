@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bufio"
-	"encoding/gob"
-	"os"
+	"mugig/internal/gobfile"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -45,7 +43,7 @@ type cacheFile struct {
 func loadCache(path string) *libraryCache {
 	c := &libraryCache{path: path, entries: map[string]cacheEntry{}}
 	var cf cacheFile
-	if loadGob(path, &cf) == nil && cf.Version == cacheVersion && cf.Entries != nil {
+	if gobfile.Load(path, &cf) == nil && cf.Version == cacheVersion && cf.Entries != nil {
 		c.entries = cf.Entries
 	}
 	return c
@@ -126,41 +124,5 @@ func (c *libraryCache) save() error {
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return saveGob(c.path, cacheFile{Version: cacheVersion, Entries: c.entries})
-}
-
-// saveGob writes v to a temporary file and renames it into place, so a
-// crash mid-write can't leave a half-written file.
-func saveGob(path string, v any) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, strings.TrimSuffix(filepath.Base(path), ".gob")+"-*.tmp")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name()) // no-op once renamed
-	w := bufio.NewWriter(tmp)
-	err = gob.NewEncoder(w).Encode(v)
-	if err == nil {
-		err = w.Flush()
-	}
-	if cerr := tmp.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
-}
-
-// loadGob reads what saveGob wrote at path into v.
-func loadGob(path string, v any) error {
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return gob.NewDecoder(bufio.NewReader(f)).Decode(v)
+	return gobfile.Save(c.path, cacheFile{Version: cacheVersion, Entries: c.entries})
 }

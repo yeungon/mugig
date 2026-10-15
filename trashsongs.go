@@ -114,7 +114,7 @@ func (u *ui) dropSongs(paths []string) {
 		if err := cache.save(); err != nil {
 			fyne.LogError("saving library cache", err)
 		}
-		store.forget(paths)
-		store.save()
+		store.Forget(paths)
+		store.Save()
 	})
 }

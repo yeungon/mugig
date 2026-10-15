@@ -218,3 +218,5 @@ func allText(o fyne.CanvasObject) string {
 	})
 	return strings.Join(out, " ")
 }
+
+func near(got, want, tol float64) bool { return math.Abs(got-want) <= tol }

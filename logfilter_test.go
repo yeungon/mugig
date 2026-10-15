@@ -6,6 +6,7 @@ import (
 	"log"
 	"mugig/internal/audio"
 	"mugig/internal/audiotest"
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,9 +39,9 @@ func TestQuietLogWhileDecoding(t *testing.T) {
 
 	var raw, quiet bytes.Buffer
 	log.SetOutput(&raw)
-	analyse(context.Background(), path, info, false, nil)
+	quality.Analyse(context.Background(), path, info, false, nil)
 	log.SetOutput(quietLog{&quiet})
-	rep, _, err := analyse(context.Background(), path, info, false, nil)
+	rep, _, err := quality.Analyse(context.Background(), path, info, false, nil)
 	if raw.Len() == 0 {
 		t.Fatal("the library logged nothing: this test no longer tests anything")
 	}

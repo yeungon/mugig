@@ -9,6 +9,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"slices"
@@ -98,8 +99,8 @@ const notCheckedChoice = "Not checked"
 
 // qualityChoices are the Quality rule's values, in the column's order.
 func qualityChoices() []string {
-	return []string{levelNames[qualityDamaged], levelNames[qualitySuspect], levelNames[qualityLossy],
-		levelNames[qualityLossless], levelNames[qualityHiRes], notCheckedChoice}
+	return []string{quality.LevelNames[quality.Damaged], quality.LevelNames[quality.Suspect], quality.LevelNames[quality.Lossy],
+		quality.LevelNames[quality.Lossless], quality.LevelNames[quality.HiRes], notCheckedChoice}
 }
 
 func fieldKindOf(name string) (fieldKind, bool) {
@@ -113,7 +114,7 @@ func fieldKindOf(name string) (fieldKind, bool) {
 
 // songFacts is what rules need to know about a song beyond its tags.
 type songFacts struct {
-	level   func(Track) qualityLevel
+	level   func(Track) quality.Level
 	modTime func(path string) time.Time // zero if unknown
 	now     time.Time
 }
@@ -144,7 +145,7 @@ func (r smartRule) matches(t Track, f songFacts) bool {
 			return strings.HasPrefix(have, want)
 		}
 	case qualityField:
-		name := levelNames[f.level(t)]
+		name := quality.LevelNames[f.level(t)]
 		if name == "" {
 			name = notCheckedChoice
 		}

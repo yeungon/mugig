@@ -1,4 +1,4 @@
-package main
+package quality
 
 import (
 	"math"
@@ -61,12 +61,12 @@ func TestHolesDetectLossySource(t *testing.T) {
 	s := gappy(8*rate, rate, 0.3)
 	audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(s, 16), audiotest.Quantize(s, 16))
 	info, rep := checkFile(t, path)
-	a := assess(info, &rep)
+	a := Assess(info, &rep)
 	if rep.Spectrum.Cutoff != 0 {
 		t.Errorf("cut-off %v: this test is about holes alone", rep.Spectrum.Cutoff)
 	}
-	if rep.Spectrum.Holes < strongHoles || a.level != qualitySuspect ||
-		!hasCheck(a, checkWarn, "gaps of the kind MP3 and AAC encoders leave: very likely") {
+	if rep.Spectrum.Holes < strongHoles || a.Level != Suspect ||
+		!hasCheck(a, CheckWarn, "gaps of the kind MP3 and AAC encoders leave: very likely") {
 		t.Errorf("holes %.4f, assessed %+v", rep.Spectrum.Holes, a)
 	}
 }
@@ -86,7 +86,7 @@ func TestGenuineAudioHasNoHoles(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "genuine.flac")
 		audiotest.WriteFLAC(t, path, c.rate, c.bits, audiotest.Quantize(audiotest.Noise(6*c.rate, float64(c.rate), c.gain), c.bits))
 		info, rep := checkFile(t, path)
-		if rep.Spectrum.Holes >= holesThreshold || assess(info, &rep).level == qualitySuspect {
+		if rep.Spectrum.Holes >= holesThreshold || Assess(info, &rep).Level == Suspect {
 			t.Errorf("%s: holes %.4f", c.name, rep.Spectrum.Holes)
 		}
 	}

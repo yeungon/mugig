@@ -6,13 +6,12 @@ package main
 // out unevenly.
 
 import (
-	"bytes"
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
 	"math"
 	"mugig/internal/humanize"
+	"mugig/internal/quality"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -21,57 +20,19 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// The range of levels drawn, from black to pale yellow, unless changed.
+// -120 dBFS is about the level of 16-bit dither.
 const (
-	specRows     = 256 // frequency rows, from 0 Hz to half the sample rate
-	pictureWidth = 720 // time columns
-
-	// A picture keeps each point's level, from 0 dBFS down to keptFloorDB,
-	// so it can be drawn for any range of levels without analysing again.
-	keptFloorDB = -140
-
-	// The range of levels drawn, from black to pale yellow, unless changed.
-	// -120 dBFS is about the level of 16-bit dither.
 	defaultTopDB   = 0
 	defaultFloorDB = -120
 )
-
-// picture returns the spectrogram's levels, or nil if no audio was
-// analysed. Each pixel is a level: 0 for keptFloorDB or quieter, up to 255
-// for full scale. paint turns it into colours.
-func (s *spectrum) picture() *image.Gray {
-	n := len(s.columns)
-	if n == 0 {
-		return nil
-	}
-	img := image.NewGray(image.Rect(0, 0, pictureWidth, specRows))
-	fullScale := math.Pow(specSize/4, 2) // a full-scale tone's bin, after the Hann window
-	binsPerRow := float64(specSize / 2 / specRows)
-	for x := range pictureWidth {
-		a := x * n / pictureWidth
-		b := max((x+1)*n/pictureWidth, a+1)
-		for r := range specRows {
-			p := 0.0
-			for _, col := range s.columns[a:b] {
-				p += float64(col[r])
-			}
-			p /= float64(b-a) * binsPerRow
-			db := 10 * math.Log10(p/fullScale+1e-30)
-			v := math.Round((db - keptFloorDB) / -keptFloorDB * 255)
-			img.Pix[(specRows-1-r)*img.Stride+x] = uint8(min(max(v, 0), 255))
-		}
-	}
-	return img
-}
-
-// levelDB is the level a picture's pixel value stands for.
-func levelDB(v uint8) float64 { return keptFloorDB * (1 - float64(v)/255) }
 
 // paint colours a spectrogram's levels, from black at floor dBFS or below
 // to pale yellow at top or above.
 func paint(levels *image.Gray, top, floor float64) *image.RGBA {
 	var lut [256]color.RGBA
 	for v := range lut {
-		c := heat((levelDB(uint8(v)) - floor) / (top - floor))
+		c := heat((quality.LevelDB(uint8(v)) - floor) / (top - floor))
 		lut[v] = color.RGBA{c.R, c.G, c.B, 0xFF}
 	}
 	b := levels.Bounds()
@@ -113,19 +74,6 @@ func heatScale() image.Image {
 		img.SetNRGBA(0, y, heat(1-float64(y)/255))
 	}
 	return img
-}
-
-// Levels are saved losslessly, as a greyscale PNG.
-func encodePicture(levels *image.Gray) ([]byte, error) {
-	var buf bytes.Buffer
-	err := png.Encode(&buf, levels)
-	return buf.Bytes(), err
-}
-
-func decodePicture(data []byte) (*image.Gray, bool) {
-	img, err := png.Decode(bytes.NewReader(data))
-	g, ok := img.(*image.Gray)
-	return g, err == nil && ok && g.Bounds().Dx() > 0
 }
 
 // ---------------------------------------------------------------------------

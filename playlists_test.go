@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,7 +15,7 @@ func TestSmartRules(t *testing.T) {
 		Year: 1968, Format: "FLAC", Size: 30e6, Length: 7*time.Minute + 11*time.Second}
 	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
 	facts := songFacts{
-		level:   func(Track) qualityLevel { return qualitySuspect },
+		level:   func(Track) quality.Level { return quality.Suspect },
 		modTime: func(string) time.Time { return now.Add(-10 * 24 * time.Hour) },
 		now:     now,
 	}
@@ -55,7 +56,7 @@ func TestSmartRules(t *testing.T) {
 			t.Errorf("a song without a %s matched %s %s", r.Field, r.Op, r.Value)
 		}
 	}
-	unchecked := songFacts{level: func(Track) qualityLevel { return qualityUnknown }, modTime: facts.modTime, now: now}
+	unchecked := songFacts{level: func(Track) quality.Level { return quality.Unknown }, modTime: facts.modTime, now: now}
 	if !(smartRule{"Quality", opIs, notCheckedChoice}).matches(song, unchecked) {
 		t.Error("an unchecked song should match Quality is Not checked")
 	}
@@ -81,7 +82,7 @@ func TestPlaylistSongs(t *testing.T) {
 	if n := p.add(lib[3].Path, "/gone.mp3", lib[0].Path, lib[3].Path); n != 3 {
 		t.Errorf("added %d, want 3: a song already in it isn't added twice", n)
 	}
-	facts := songFacts{level: func(Track) qualityLevel { return qualityUnknown }, modTime: func(string) time.Time { return time.Time{} }}
+	facts := songFacts{level: func(Track) quality.Level { return quality.Unknown }, modTime: func(string) time.Time { return time.Time{} }}
 	got := p.tracks(lib, nil, facts)
 	if !slices.Equal(titles(got), []string{"Bohemian Rhapsody", "Come Together"}) {
 		t.Errorf("listed %v", titles(got))

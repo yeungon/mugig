@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"slices"
@@ -58,9 +59,9 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 		return l
 	}
 	format, length := value("Reading…"), value("Reading…")
-	quality := "Not checked yet"
-	if l := u.levelOf(t); l != qualityUnknown {
-		quality = levelNames[l]
+	verdict := "Not checked yet"
+	if l := u.levelOf(t); l != quality.Unknown {
+		verdict = quality.LevelNames[l]
 	}
 	year := ""
 	if t.Year > 0 {
@@ -77,7 +78,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 		widget.NewFormItem("Artist", value(t.Artist)),
 		widget.NewFormItem("Album", value(t.Album)),
 		widget.NewFormItem("Year", value(year)),
-		widget.NewFormItem("Quality", value(quality)),
+		widget.NewFormItem("Quality", value(verdict)),
 	)
 	cue := audio.FromCue(t.Path)
 	if cue {
@@ -98,7 +99,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 				length.SetText("")
 				return
 			}
-			format.SetText(describe(info))
+			format.SetText(quality.Describe(info))
 			length.SetText(humanize.Clock(info.Duration))
 			if cue {
 				length.SetText(fmt.Sprintf("%s, of %s for the whole image", humanize.Clock(t.Length), humanize.Clock(info.Duration)))

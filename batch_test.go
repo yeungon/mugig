@@ -2,6 +2,7 @@ package main
 
 import (
 	"mugig/internal/audiotest"
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"slices"
@@ -48,17 +49,17 @@ func libraryOf(tracks map[string]Track) []Track {
 func TestCheckAllSongs(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	store := filepath.Join(t.TempDir(), "quality.gob")
-	u.qualityStore = loadQualityStore(store)
+	u.qualityStore = quality.LoadStore(store)
 	_, tracks := mixedLibrary(t)
 	setLibrary(u, libraryOf(tracks)...)
 
 	u.checkAllSongs()
-	want := map[string]qualityLevel{
-		"genuine.flac": qualityLossless,
-		"fake.flac":    qualitySuspect,
-		"damaged.flac": qualityDamaged,
-		"plain.wav":    qualityLossless,
-		"song.mp3":     qualityLossy, // by its format: nothing to check
+	want := map[string]quality.Level{
+		"genuine.flac": quality.Lossless,
+		"fake.flac":    quality.Suspect,
+		"damaged.flac": quality.Damaged,
+		"plain.wav":    quality.Lossless,
+		"song.mp3":     quality.Lossy, // by its format: nothing to check
 	}
 	for name, l := range want {
 		if got := u.levelOf(tracks[name]); got != l {
@@ -81,10 +82,10 @@ func TestCheckAllSongs(t *testing.T) {
 	// Saved: the next session shows the verdicts, and checking again
 	// reuses them rather than decoding anything.
 	u2, _, _ := newTestUI(t)
-	u2.qualityStore = loadQualityStore(store)
-	u2.levels = u2.qualityStore.levels()
+	u2.qualityStore = quality.LoadStore(store)
+	u2.levels = u2.qualityStore.Levels()
 	setLibrary(u2, libraryOf(tracks)...)
-	if u2.levelOf(tracks["fake.flac"]) != qualitySuspect {
+	if u2.levelOf(tracks["fake.flac"]) != quality.Suspect {
 		t.Error("verdicts not saved")
 	}
 	u2.checkAllSongs()
@@ -98,9 +99,9 @@ func TestSortByQuality(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	_, tracks := mixedLibrary(t)
 	setLibrary(u, libraryOf(tracks)...)
-	u.levels[tracks["fake.flac"].Path] = qualitySuspect
-	u.levels[tracks["damaged.flac"].Path] = qualityDamaged
-	u.levels[tracks["genuine.flac"].Path] = qualityLossless
+	u.levels[tracks["fake.flac"].Path] = quality.Suspect
+	u.levels[tracks["damaged.flac"].Path] = quality.Damaged
+	u.levels[tracks["genuine.flac"].Path] = quality.Lossless
 	u.sortBy(qualityCol)
 	var got []string
 	for _, tr := range u.tracks {
@@ -109,7 +110,7 @@ func TestSortByQuality(t *testing.T) {
 	if want := []string{"damaged.flac", "fake.flac", "song.mp3", "genuine.flac", "plain.wav"}; !slices.Equal(got, want) {
 		t.Errorf("order %v, want %v", got, want)
 	}
-	if levelNames[u.levelOf(tracks["plain.wav"])] != "" {
+	if quality.LevelNames[u.levelOf(tracks["plain.wav"])] != "" {
 		t.Error("an unchecked lossless song should be blank")
 	}
 }
@@ -136,15 +137,15 @@ func TestCheckAllSongsCancelled(t *testing.T) {
 func TestChangedFileLosesVerdict(t *testing.T) {
 	u, fw, dir := watchedLibrary(t)
 	path := filepath.Join(dir, "sample.flac")
-	u.levels[path] = qualityLossless
-	u.qualityStore.put(path, fileStamp(path), qualityReport{}, qualityLossless)
+	u.levels[path] = quality.Lossless
+	u.qualityStore.Put(path, quality.FileStamp(path), quality.Report{}, quality.Lossless)
 	later := time.Now().Add(time.Hour)
 	os.Chtimes(path, later, later)
 	fw.changed([]string{path})
 	if _, ok := u.levels[path]; ok {
 		t.Error("verdict kept for a changed file")
 	}
-	if _, ok := u.qualityStore.levels()[path]; ok {
+	if _, ok := u.qualityStore.Levels()[path]; ok {
 		t.Error("saved verdict kept for a changed file")
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/quality"
 	"runtime"
 	"strings"
 	"sync"
@@ -33,7 +34,7 @@ type batchCheck struct {
 	total    int // songs to go through
 	done     int // songs gone through, saved results included
 	analysed int // songs actually decoded, for the time estimate
-	counts   map[qualityLevel]int
+	counts   map[quality.Level]int
 	started  time.Time
 	finished bool
 }
@@ -41,7 +42,7 @@ type batchCheck struct {
 // batchResult is one song's outcome, from a worker.
 type batchResult struct {
 	path   string
-	level  qualityLevel
+	level  quality.Level
 	reused bool // a saved result, so it took no time
 }
 
@@ -102,7 +103,7 @@ func (u *ui) checkSongs(songs []Track) {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	b := &batchCheck{cancel: cancel, total: len(todo), counts: map[qualityLevel]int{}, started: time.Now()}
+	b := &batchCheck{cancel: cancel, total: len(todo), counts: map[quality.Level]int{}, started: time.Now()}
 	u.batch = b
 	u.checkAllBtn.Disable()
 	u.checkAllItem.Disabled = true
@@ -166,7 +167,7 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 		pending = append(pending, r)
 		if !r.reused {
 			if sinceSave++; sinceSave == batchSaveEvery {
-				u.qualityStore.save()
+				u.qualityStore.Save()
 				sinceSave = 0
 			}
 		}
@@ -175,7 +176,7 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 			lastShown = time.Now()
 		}
 	}
-	u.qualityStore.save()
+	u.qualityStore.Save()
 	flush()
 	onUI(func() { u.batchFinished(b, ctx.Err() != nil) })
 }
@@ -184,21 +185,21 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 // run was cancelled before it finished.
 func (u *ui) checkOne(ctx context.Context, path string) (r batchResult, ok bool) {
 	r.path = path
-	stamp := fileStamp(path)
-	if e, found := u.qualityStore.lookup(path, stamp); found {
+	stamp := quality.FileStamp(path)
+	if e, found := u.qualityStore.Lookup(path, stamp); found {
 		r.level, r.reused = e.Level, true
 		return r, true
 	}
 	info, err := audio.Probe(path)
-	if err != nil || !canVerify(info) {
+	if err != nil || !quality.CanVerify(info) {
 		return r, true // unreadable or not checkable: stays unknown
 	}
-	rep, _, err := analyse(ctx, path, info, false, nil)
+	rep, _, err := quality.Analyse(ctx, path, info, false, nil)
 	if err != nil {
 		return r, false // cancelled
 	}
-	r.level = assess(info, &rep).level
-	u.qualityStore.putQuietly(path, stamp, rep, r.level)
+	r.level = quality.Assess(info, &rep).Level
+	u.qualityStore.PutQuietly(path, stamp, rep, r.level)
 	return r, true
 }
 
@@ -210,7 +211,7 @@ func (u *ui) batchProgressed(b *batchCheck, got []batchResult) {
 			b.analysed++
 		}
 		b.counts[r.level]++
-		if r.level != qualityUnknown {
+		if r.level != quality.Unknown {
 			u.levels[r.path] = r.level
 		}
 	}
@@ -243,9 +244,9 @@ func (u *ui) showBatch() {
 	b := u.batch
 	u.batchProgress.SetValue(float64(b.done) / float64(b.total))
 	var found []string
-	for _, l := range []qualityLevel{qualityDamaged, qualitySuspect, qualityLossless, qualityHiRes} {
+	for _, l := range []quality.Level{quality.Damaged, quality.Suspect, quality.Lossless, quality.HiRes} {
 		if n := b.counts[l]; n > 0 {
-			found = append(found, fmt.Sprintf("%s %s", humanize.Thousands(n), strings.ToLower(levelNames[l])))
+			found = append(found, fmt.Sprintf("%s %s", humanize.Thousands(n), strings.ToLower(quality.LevelNames[l])))
 		}
 	}
 	verb := "Checking"

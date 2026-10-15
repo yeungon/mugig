@@ -3,6 +3,7 @@ package main
 import (
 	"mugig/internal/audio"
 	"mugig/internal/audiotest"
+	"mugig/internal/quality"
 	"os"
 	"path/filepath"
 	"slices"
@@ -234,9 +235,9 @@ func TestCueSongsShareTheImage(t *testing.T) {
 	u, _, a := newTestUI(t)
 	u.addFolder(dir)
 	image := filepath.Join(dir, "Album.wav")
-	u.setLevel(cuePath(image, 2), qualitySuspect)
+	u.setLevel(cuePath(image, 2), quality.Suspect)
 	for _, tr := range u.all {
-		if u.levelOf(tr) != qualitySuspect {
+		if u.levelOf(tr) != quality.Suspect {
 			t.Errorf("%s: %v", tr.Title, u.levelOf(tr))
 		}
 	}
