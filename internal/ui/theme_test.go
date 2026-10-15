@@ -140,7 +140,14 @@ func TestFolderPlace(t *testing.T) {
 		"/Volumes/OneTouch/2.Music B/Nhạc":   "OneTouch/2.Music B",
 		"/Users/shared/Music":                "/Users/shared",
 	}
-	if runtime.GOOS != "darwin" {
+	switch runtime.GOOS {
+	case "windows": // a drive is a disk, and a folder is shown by where it is
+		want = map[string]string{
+			filepath.Join(home, "Music", "Jazz"): filepath.Join("~", "Music"),
+			`D:\`:                                "Disk",
+			`D:\Music\Jazz`:                      `D:\Music`,
+		}
+	case "linux":
 		want["/Volumes/OneTouch/2.Music B/Nhạc"] = "/Volumes/OneTouch/2.Music B"
 	}
 	for path, place := range want {

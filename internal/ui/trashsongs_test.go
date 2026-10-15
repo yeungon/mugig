@@ -29,7 +29,7 @@ func TestMoveSongsToTrash(t *testing.T) {
 	if len(moved) != 0 {
 		t.Fatal("nothing should move before it is confirmed")
 	}
-	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Move to Trash"))
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), strings.TrimSuffix(trashLabel, "…")))
 
 	if !slices.Equal(moved, []string{"/music/Help.mp3", "/music/Bohemian Rhapsody.mp3"}) {
 		t.Errorf("moved %v", moved)
