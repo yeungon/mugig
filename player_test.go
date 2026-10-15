@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"math"
+	"mugig/internal/audiotest"
 	"path/filepath"
 	"testing"
 	"time"
@@ -48,7 +49,7 @@ func TestPlayerPlaysToTheEnd(t *testing.T) {
 func longFLAC(t *testing.T, rate, bits, seconds int) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "long.flac")
-	writeFLAC(t, path, rate, bits, quantize(noise(seconds*rate, float64(rate), pink), bits))
+	audiotest.WriteFLAC(t, path, rate, bits, audiotest.Quantize(audiotest.Noise(seconds*rate, float64(rate), audiotest.Pink), bits))
 	return path
 }
 

@@ -20,47 +20,6 @@ import (
 	mewflac "github.com/mewkiz/flac"
 )
 
-// audioPlayer is what the UI needs from playback. The real one is player;
-// tests use a fake so they make no sound.
-type audioPlayer interface {
-	Play(path string, onEnd func(error)) error
-	TogglePause() bool
-	Stop()
-	Position() time.Duration
-	Duration() time.Duration
-	Seek(d time.Duration) error
-	// Prepare readies the song at path to follow the current one without a
-	// gap, or none for "". Once it has taken over, Play with its path
-	// carries on with it rather than starting it again.
-	Prepare(path string)
-	SetVolume(level float64)
-	// SetFadeIn turns fading in from near silence, when playing starts or
-	// resumes, on or off.
-	SetFadeIn(on bool)
-	SetSpeed(speed float64) // 1 is normal; the pitch is kept
-	SetCrossfeed(level crossfeedLevel)
-	SetEQ(s eqSettings)
-	// Samples fills dst with the most recent audio, mono and oldest first,
-	// and returns its sample rate, or 0 if nothing is playing.
-	Samples(dst []float64) int
-	// Output describes where the sound goes: the device's rate, and the
-	// track's rate, which differ if the audio is converted. 0s if stopped.
-	Output() (deviceRate, trackRate int)
-	// Devices lists the output devices, and SetDevice picks one by ID, ""
-	// for the system default. SetMatchRate turns switching the device to
-	// each track's rate on or off.
-	Devices() []outputDevice
-	SetDevice(id string)
-	SetMatchRate(on bool)
-	// SetExclusive turns taking the device for Mugig alone on or off, and
-	// Exclusive reports whether Mugig has it now.
-	SetExclusive(on bool)
-	Exclusive() bool
-	// DevicesChanged is called when devices come or go, or the system's
-	// default output changes.
-	DevicesChanged()
-}
-
 // player plays one track at a time through out, the next one joined on
 // without a gap if it is readied in time. Its fields are only touched on
 // the UI thread, except what the audio thread reads through out's lock.

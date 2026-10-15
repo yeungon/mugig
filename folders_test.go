@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -65,7 +66,7 @@ func TestFoldersMakeOneLibrary(t *testing.T) {
 // Clicking a folder shows only its songs; Songs shows them all again.
 func TestFolderNarrowsList(t *testing.T) {
 	u, a, b := twoFolders(t)
-	copyFile(t, "testdata/sample.mp3", filepath.Join(b, "Album", "extra.mp3"))
+	audiotest.CopyFile(t, "testdata/sample.mp3", filepath.Join(b, "Album", "extra.mp3"))
 	u.scanLibrary()
 
 	test.Tap(u.folders[1].row)
@@ -106,7 +107,7 @@ func TestAddFolderOverlapping(t *testing.T) {
 	parent := t.TempDir()
 	inner := filepath.Join(parent, "Rock")
 	for _, name := range []string{"Rock/a.mp3", "Rock/b.mp3", "Jazz/c.mp3"} {
-		copyFile(t, "testdata/sample.mp3", filepath.Join(parent, name))
+		audiotest.CopyFile(t, "testdata/sample.mp3", filepath.Join(parent, name))
 	}
 	u.addFolder(inner)
 	test.Tap(u.folders[0].row)

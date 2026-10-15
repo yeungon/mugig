@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -39,7 +40,7 @@ func cueImage(t *testing.T, name string, encode func(string) []byte) (string, []
 	for i := range samples {
 		samples[i] = int32(i%30000 - 15000)
 	}
-	writeWAV(t, filepath.Join(dir, name+".wav"), 44100, 16, 2, samples, samples)
+	audiotest.WriteWAV(t, filepath.Join(dir, name+".wav"), 44100, 16, 2, samples, samples)
 	text := strings.ReplaceAll(testCue, "%s", name+".wav")
 	data := []byte(text)
 	if encode != nil {
@@ -109,7 +110,7 @@ func TestReadCueFallbacks(t *testing.T) {
 	split := t.TempDir()
 	var text strings.Builder
 	for i, name := range []string{"01 A.wav", "02 B.wav"} {
-		writeWAV(t, filepath.Join(split, name), 44100, 16, 2, []int32{1, 2}, []int32{1, 2})
+		audiotest.WriteWAV(t, filepath.Join(split, name), 44100, 16, 2, []int32{1, 2}, []int32{1, 2})
 		text.WriteString("FILE \"" + name + "\" WAVE\n  TRACK 0" + string(rune('1'+i)) + " AUDIO\n    INDEX 01 00:00:00\n")
 	}
 	os.WriteFile(filepath.Join(split, "Album.cue"), []byte(text.String()), 0o644)
@@ -122,7 +123,7 @@ func TestReadCueFallbacks(t *testing.T) {
 // and not the image; a rescan from the cache lists the same.
 func TestScanCueSongs(t *testing.T) {
 	dir, _ := cueImage(t, "Album", nil)
-	copyFile(t, "testdata/sample.flac", filepath.Join(dir, "Bonus.flac"))
+	audiotest.CopyFile(t, "testdata/sample.flac", filepath.Join(dir, "Bonus.flac"))
 	u, _, _ := newTestUI(t)
 	u.addFolder(dir)
 	check := func(when string) {
@@ -143,7 +144,7 @@ func TestScanCueSongs(t *testing.T) {
 		}
 	}
 	check("first scan")
-	cueSpans.Clear() // as at the next start
+	forgetSpans() // as at the next start
 	u.scanLibrary()
 	check("from the cache")
 }
@@ -203,12 +204,12 @@ func TestWatchCueSheet(t *testing.T) {
 	u, fw, dir := watchedLibrary(t)
 	cueDir, _ := cueImage(t, "Album", nil)
 	album := filepath.Join(dir, "Album")
-	copyFile(t, filepath.Join(cueDir, "Album.wav"), filepath.Join(album, "Album.wav"))
+	audiotest.CopyFile(t, filepath.Join(cueDir, "Album.wav"), filepath.Join(album, "Album.wav"))
 	fw.changed([]string{album})
 	if !slices.Contains(titles(u.all), "Album") {
 		t.Fatalf("the image alone should be a song: %v", titles(u.all))
 	}
-	copyFile(t, filepath.Join(cueDir, "Album.cue"), filepath.Join(album, "Album.cue"))
+	audiotest.CopyFile(t, filepath.Join(cueDir, "Album.cue"), filepath.Join(album, "Album.cue"))
 	fw.changed([]string{filepath.Join(album, "Album.cue")})
 	if got := titles(u.all); slices.Contains(got, "Album") || !slices.Contains(got, "Second") || len(got) != 6 {
 		t.Errorf("with the sheet: %v", got)

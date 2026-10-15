@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"math/rand"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,8 +20,8 @@ const playRate = 44100
 func damagedFLAC(t *testing.T, damage func(data []byte) []byte) (string, []int32) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "x.flac")
-	s := quantize(noise(10*playRate, playRate, pink), 16)
-	writeFLAC(t, path, playRate, 16, s, s)
+	s := audiotest.Quantize(audiotest.Noise(10*playRate, playRate, audiotest.Pink), 16)
+	audiotest.WriteFLAC(t, path, playRate, 16, s, s)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

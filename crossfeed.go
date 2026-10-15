@@ -12,7 +12,6 @@ package main
 import (
 	"math"
 
-	"fyne.io/fyne/v2"
 	"github.com/gopxl/beep/v2"
 )
 
@@ -90,39 +89,3 @@ func (c *crossfeed) Stream(samples [][2]float64) (int, bool) {
 func (c *crossfeed) Err() error { return c.s.Err() }
 
 const prefCrossfeed = "crossfeed"
-
-// buildCrossfeedMenu creates Controls > Crossfeed, and applies the level
-// last chosen.
-func (u *ui) buildCrossfeedMenu() *fyne.MenuItem {
-	u.crossfeedItems = nil
-	for i, name := range crossfeedNames {
-		u.crossfeedItems = append(u.crossfeedItems, fyne.NewMenuItem(name, func() { u.setCrossfeed(crossfeedLevel(i)) }))
-	}
-	sub := fyne.NewMenuItem("Crossfeed (for Headphones)", nil)
-	sub.ChildMenu = fyne.NewMenu("", u.crossfeedItems...)
-	u.crossfeed = crossfeedLevel(u.prefs.Int(prefCrossfeed))
-	if u.crossfeed < crossfeedOff || u.crossfeed > crossfeedStrong {
-		u.crossfeed = crossfeedOff
-	}
-	u.showCrossfeed()
-	return sub
-}
-
-// setCrossfeed changes the crossfeed level and remembers it.
-func (u *ui) setCrossfeed(level crossfeedLevel) {
-	u.crossfeed = level
-	u.prefs.SetInt(prefCrossfeed, int(level))
-	u.showCrossfeed()
-	u.updateOutputInfo()
-}
-
-// showCrossfeed applies the level to the player and ticks it in the menu.
-func (u *ui) showCrossfeed() {
-	u.player.SetCrossfeed(u.crossfeed)
-	for i, it := range u.crossfeedItems {
-		it.Checked = crossfeedLevel(i) == u.crossfeed
-	}
-	if u.mainMenu != nil {
-		u.mainMenu.Refresh()
-	}
-}

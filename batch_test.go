@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,16 +16,16 @@ func mixedLibrary(t *testing.T) (dir string, tracks map[string]Track) {
 	t.Helper()
 	dir = t.TempDir()
 	const rate = 44100
-	genuine := quantize(noise(3*rate, rate, pink), 16)
-	writeFLAC(t, filepath.Join(dir, "genuine.flac"), rate, 16, genuine, genuine)
-	fake := quantize(noise(3*rate, rate, lowpass(pink, 16000, 300)), 16)
-	writeFLAC(t, filepath.Join(dir, "fake.flac"), rate, 16, fake, fake)
-	writeFLAC(t, filepath.Join(dir, "damaged.flac"), rate, 16, genuine, genuine)
+	genuine := audiotest.Quantize(audiotest.Noise(3*rate, rate, audiotest.Pink), 16)
+	audiotest.WriteFLAC(t, filepath.Join(dir, "genuine.flac"), rate, 16, genuine, genuine)
+	fake := audiotest.Quantize(audiotest.Noise(3*rate, rate, audiotest.Lowpass(audiotest.Pink, 16000, 300)), 16)
+	audiotest.WriteFLAC(t, filepath.Join(dir, "fake.flac"), rate, 16, fake, fake)
+	audiotest.WriteFLAC(t, filepath.Join(dir, "damaged.flac"), rate, 16, genuine, genuine)
 	data, _ := os.ReadFile(filepath.Join(dir, "damaged.flac"))
 	data[len(data)/2] ^= 0x10
 	os.WriteFile(filepath.Join(dir, "damaged.flac"), data, 0o644)
-	writeWAV(t, filepath.Join(dir, "plain.wav"), rate, 16, 2, genuine, genuine)
-	copyFile(t, "testdata/sample.mp3", filepath.Join(dir, "song.mp3"))
+	audiotest.WriteWAV(t, filepath.Join(dir, "plain.wav"), rate, 16, 2, genuine, genuine)
+	audiotest.CopyFile(t, "testdata/sample.mp3", filepath.Join(dir, "song.mp3"))
 
 	tracks = map[string]Track{}
 	for _, name := range []string{"genuine.flac", "fake.flac", "damaged.flac", "plain.wav", "song.mp3"} {

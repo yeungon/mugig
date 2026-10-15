@@ -10,14 +10,12 @@ package main
 import (
 	"math"
 
-	"fyne.io/fyne/v2"
 	"github.com/gopxl/beep/v2"
 )
 
 const (
 	riseDBPerSecond = 40   // how fast the volume rises
 	fadeFloor       = 0.01 // -40 dB: where a fade in starts, a second below full
-	prefFadeIn      = "fadeIn"
 )
 
 // fader applies a gain, rising to it gradually. Stream runs on the audio
@@ -74,18 +72,3 @@ func (f *fader) Stream(samples [][2]float64) (int, bool) {
 }
 
 func (f *fader) Err() error { return f.s.Err() }
-
-// buildFadeInItem creates Controls > Fade In When Playing, and applies the
-// choice last made.
-func (u *ui) buildFadeInItem() *fyne.MenuItem {
-	u.fadeInItem = fyne.NewMenuItem("Fade In When Playing", func() {
-		on := !u.fadeInItem.Checked
-		u.fadeInItem.Checked = on
-		u.prefs.SetBool(prefFadeIn, on)
-		u.player.SetFadeIn(on)
-		u.mainMenu.Refresh()
-	})
-	u.fadeInItem.Checked = u.prefs.BoolWithFallback(prefFadeIn, true)
-	u.player.SetFadeIn(u.fadeInItem.Checked)
-	return u.fadeInItem
-}

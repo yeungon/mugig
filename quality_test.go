@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/binary"
 	"math"
-	"math/cmplx"
-	"math/rand/v2"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,175 +13,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
-	"github.com/mewkiz/flac"
-	"github.com/mewkiz/flac/frame"
-	"github.com/mewkiz/flac/meta"
 )
-
-// noise synthesises n samples of random-phase noise whose amplitude at
-// each frequency is gain(f), scaled so the loudest sample is 0.5. Shaping
-// it in the frequency domain gives exact cut-offs, as a lossy encoder would.
-func noise(n int, rate float64, gain func(f float64) float64) []float64 {
-	size := 1
-	for size < n {
-		size <<= 1
-	}
-	rng := rand.New(rand.NewPCG(1, 2))
-	x := make([]complex128, size)
-	for k := 1; k < size/2; k++ {
-		a := gain(float64(k) * rate / float64(size))
-		x[k] = cmplx.Rect(a, rng.Float64()*2*math.Pi)
-		x[size-k] = cmplx.Conj(x[k])
-	}
-	fft(x) // the inverse transform of a real signal's spectrum, up to scale and order
-	out := make([]float64, n)
-	peak := 0.0
-	for i := range out {
-		out[i] = real(x[i])
-		peak = max(peak, math.Abs(out[i]))
-	}
-	for i := range out {
-		out[i] *= 0.5 / peak
-	}
-	return out
-}
-
-// pink is a rough model of music: level falling 3 dB per octave.
-func pink(f float64) float64 {
-	if f < 20 {
-		return 0
-	}
-	return 1 / math.Sqrt(f)
-}
-
-// lowpass cuts gain off at hz, falling 60 dB over width Hz as an MP3
-// encoder's filter does, then silent.
-func lowpass(gain func(float64) float64, hz, width float64) func(float64) float64 {
-	return func(f float64) float64 {
-		switch {
-		case f <= hz:
-			return gain(f)
-		case f < hz+width:
-			return gain(f) * math.Pow(10, -3*(f-hz)/width)
-		}
-		return 0
-	}
-}
-
-// quantize turns s into bits-bit integers with TPDF dither, as converting
-// to 16 bits for a CD or FLAC does.
-func quantize(s []float64, bits int) []int32 {
-	rng := rand.New(rand.NewPCG(3, 4))
-	full := float64(int64(1) << (bits - 1))
-	out := make([]int32, len(s))
-	for i, v := range s {
-		out[i] = int32(math.Round(v*full + rng.Float64() - rng.Float64()))
-	}
-	return out
-}
-
-// writeFLAC encodes channels of samples, which must have equal lengths, as
-// a FLAC file with an MD5 checksum.
-func writeFLAC(t *testing.T, path string, rate, bits int, channels ...[]int32) {
-	t.Helper()
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := len(channels[0])
-	info := &meta.StreamInfo{
-		BlockSizeMin: 4096, BlockSizeMax: 4096,
-		SampleRate: uint32(rate), NChannels: uint8(len(channels)), BitsPerSample: uint8(bits),
-		NSamples: uint64(n),
-	}
-	enc, err := flac.NewEncoder(f, info)
-	if err != nil {
-		t.Fatal(err)
-	}
-	layout := map[int]frame.Channels{1: frame.ChannelsMono, 2: frame.ChannelsLR}[len(channels)]
-	for start := 0; start < n; start += 4096 {
-		end := min(start+4096, n)
-		fr := &frame.Frame{Header: frame.Header{
-			HasFixedBlockSize: true, BlockSize: uint16(end - start),
-			SampleRate: uint32(rate), Channels: layout, BitsPerSample: uint8(bits),
-		}}
-		for _, ch := range channels {
-			fr.Subframes = append(fr.Subframes, &frame.Subframe{
-				SubHeader: frame.SubHeader{Pred: frame.PredVerbatim},
-				Samples:   ch[start:end], NSamples: end - start,
-			})
-		}
-		if err := enc.WriteFrame(fr); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := enc.Close(); err != nil {
-		t.Fatal(err)
-	}
-	// The encoder writes STREAMINFO as no real encoder does: its minimum
-	// block size is the short last block's, and its maximum frame size is
-	// 0 ("unknown"). macOS's decoder refuses such files, so write them as
-	// real encoders do: the fixed block size, and a bound on frame size.
-	g, err := os.OpenFile(path, os.O_RDWR, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	maxFrame := 16 + 4096*len(channels)*((bits+7)/8)
-	g.WriteAt([]byte{0x10, 0x00}, 8) // minimum block size 4096
-	g.WriteAt([]byte{byte(maxFrame >> 16), byte(maxFrame >> 8), byte(maxFrame)}, 8+7)
-	g.Close()
-}
-
-// writeWAV writes integer PCM, each sample stored in sampleBytes bytes with
-// the given valid bits (using the extensible header if they differ).
-func writeWAV(t *testing.T, path string, rate, bits, sampleBytes int, channels ...[]int32) {
-	t.Helper()
-	n, nch := len(channels[0]), len(channels)
-	var data []byte
-	for i := range n {
-		for _, ch := range channels {
-			v := uint32(ch[i]) << (8*sampleBytes - bits)
-			if sampleBytes == 1 {
-				v = uint32(ch[i] + 128)
-			}
-			for b := range sampleBytes {
-				data = append(data, byte(v>>(8*b)))
-			}
-		}
-	}
-	le16 := func(v int) []byte { return binary.LittleEndian.AppendUint16(nil, uint16(v)) }
-	le32 := func(v int) []byte { return binary.LittleEndian.AppendUint32(nil, uint32(v)) }
-	var fmtChunk []byte
-	format := 1
-	if bits != 8*sampleBytes {
-		format = 0xFFFE
-	}
-	fmtChunk = append(fmtChunk, le16(format)...)
-	fmtChunk = append(fmtChunk, le16(nch)...)
-	fmtChunk = append(fmtChunk, le32(rate)...)
-	fmtChunk = append(fmtChunk, le32(rate*nch*sampleBytes)...)
-	fmtChunk = append(fmtChunk, le16(nch*sampleBytes)...)
-	fmtChunk = append(fmtChunk, le16(8*sampleBytes)...)
-	if format == 0xFFFE {
-		fmtChunk = append(fmtChunk, le16(22)...)
-		fmtChunk = append(fmtChunk, le16(bits)...)
-		fmtChunk = append(fmtChunk, le32(3)...) // front left and right
-		fmtChunk = append(fmtChunk, le16(1)...) // PCM sub-format GUID…
-		fmtChunk = append(fmtChunk, 0, 0, 0, 0, 0x10, 0, 0x80, 0, 0, 0xAA, 0, 0x38, 0x9B, 0x71)
-	}
-	var out []byte
-	out = append(out, "RIFF"...)
-	out = append(out, le32(4+8+len(fmtChunk)+8+len(data))...)
-	out = append(out, "WAVEfmt "...)
-	out = append(out, le32(len(fmtChunk))...)
-	out = append(out, fmtChunk...)
-	out = append(out, "data"...)
-	out = append(out, le32(len(data))...)
-	out = append(out, data...)
-	if err := os.WriteFile(path, out, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
 
 // checkFile probes and verifies path.
 func checkFile(t *testing.T, path string) (audioInfo, qualityReport) {
@@ -256,9 +86,9 @@ func TestMisnamedFile(t *testing.T) {
 func TestGenuineFLACPasses(t *testing.T) {
 	const rate = 44100
 	path := filepath.Join(t.TempDir(), "genuine.flac")
-	l := quantize(noise(6*rate, rate, pink), 16)
-	r := quantize(noise(6*rate, rate, pink), 16)
-	writeFLAC(t, path, rate, 16, l, r)
+	l := audiotest.Quantize(audiotest.Noise(6*rate, rate, audiotest.Pink), 16)
+	r := audiotest.Quantize(audiotest.Noise(6*rate, rate, audiotest.Pink), 16)
+	audiotest.WriteFLAC(t, path, rate, 16, l, r)
 
 	info, rep := checkFile(t, path)
 	if info.SampleRate != rate || info.Bits != 16 || info.Channels != 2 || info.Duration.Seconds() != 6 || info.Kbps < 800 || info.Kbps > 1450 { // 16-bit stereo, compressed or not
@@ -281,14 +111,14 @@ func TestSteepNaturalRollOffPasses(t *testing.T) {
 	const rate = 44100
 	for _, slope := range []float64{6, 12, 20, 30} { // dB per kHz above 12 kHz
 		gain := func(f float64) float64 {
-			g := pink(f)
+			g := audiotest.Pink(f)
 			if f > 12000 {
 				g *= math.Pow(10, -slope*(f-12000)/1000/20)
 			}
 			return g
 		}
 		path := filepath.Join(t.TempDir(), "rolloff.flac")
-		writeFLAC(t, path, rate, 16, quantize(noise(6*rate, rate, gain), 16))
+		audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(audiotest.Noise(6*rate, rate, gain), 16))
 		if _, rep := checkFile(t, path); rep.Spectrum.Cutoff != 0 {
 			t.Errorf("%v dB/kHz: cut-off reported at %v Hz", slope, rep.Spectrum.Cutoff)
 		}
@@ -301,8 +131,8 @@ func TestLossySourceDetected(t *testing.T) {
 	for _, hz := range []float64{11000, 16000, 17000, 19000} {
 		for _, width := range []float64{100, 300, 600} { // encoders' filters differ in steepness
 			path := filepath.Join(t.TempDir(), "transcoded.flac")
-			s := noise(6*rate, rate, lowpass(pink, hz, width))
-			writeFLAC(t, path, rate, 16, quantize(s, 16), quantize(s, 16))
+			s := audiotest.Noise(6*rate, rate, audiotest.Lowpass(audiotest.Pink, hz, width))
+			audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(s, 16), audiotest.Quantize(s, 16))
 
 			info, rep := checkFile(t, path)
 			if !near(rep.Spectrum.Cutoff, hz+width/2, 250) {
@@ -323,7 +153,7 @@ func TestUpsampledHiResDetected(t *testing.T) {
 	dir := t.TempDir()
 
 	upsampled := filepath.Join(dir, "upsampled.flac")
-	writeFLAC(t, upsampled, rate, 24, quantize(noise(4*rate, rate, lowpass(pink, 21000, 1050)), 24))
+	audiotest.WriteFLAC(t, upsampled, rate, 24, audiotest.Quantize(audiotest.Noise(4*rate, rate, audiotest.Lowpass(audiotest.Pink, 21000, 1050)), 24))
 	info, rep := checkFile(t, upsampled)
 	a := assess(info, &rep)
 	if a.level != qualitySuspect || !hasCheck(a, checkWarn, "upsampled") {
@@ -331,7 +161,7 @@ func TestUpsampledHiResDetected(t *testing.T) {
 	}
 
 	real := filepath.Join(dir, "hires.flac")
-	writeFLAC(t, real, rate, 24, quantize(noise(4*rate, rate, pink), 24))
+	audiotest.WriteFLAC(t, real, rate, 24, audiotest.Quantize(audiotest.Noise(4*rate, rate, audiotest.Pink), 24))
 	info, rep = checkFile(t, real)
 	if a := assess(info, &rep); a.level != qualityHiRes || rep.UsedBits != 24 {
 		t.Errorf("true hi-res: report %+v, assessed %+v", rep, a)
@@ -341,7 +171,7 @@ func TestUpsampledHiResDetected(t *testing.T) {
 // A 24-bit file made from a 16-bit one never uses its low 8 bits.
 func TestPaddedBitsDetected(t *testing.T) {
 	const rate = 48000
-	s := quantize(noise(3*rate, rate, pink), 16)
+	s := audiotest.Quantize(audiotest.Noise(3*rate, rate, audiotest.Pink), 16)
 	padded := make([]int32, len(s))
 	for i, v := range s {
 		padded[i] = v << 8
@@ -349,9 +179,9 @@ func TestPaddedBitsDetected(t *testing.T) {
 	dir := t.TempDir()
 	for _, path := range []string{filepath.Join(dir, "padded.flac"), filepath.Join(dir, "padded.wav")} {
 		if strings.HasSuffix(path, ".flac") {
-			writeFLAC(t, path, rate, 24, padded)
+			audiotest.WriteFLAC(t, path, rate, 24, padded)
 		} else {
-			writeWAV(t, path, rate, 24, 3, padded)
+			audiotest.WriteWAV(t, path, rate, 24, 3, padded)
 		}
 		info, rep := checkFile(t, path)
 		a := assess(info, &rep)
@@ -363,11 +193,11 @@ func TestPaddedBitsDetected(t *testing.T) {
 
 func TestWAVFormats(t *testing.T) {
 	const rate = 44100
-	s := noise(2*rate, rate, pink)
+	s := audiotest.Noise(2*rate, rate, audiotest.Pink)
 	dir := t.TempDir()
 	for _, c := range []struct{ bits, bytes int }{{8, 1}, {16, 2}, {24, 3}, {24, 4}, {32, 4}} {
 		path := filepath.Join(dir, "x.wav")
-		writeWAV(t, path, rate, c.bits, c.bytes, quantize(s, c.bits), quantize(s, c.bits))
+		audiotest.WriteWAV(t, path, rate, c.bits, c.bytes, audiotest.Quantize(s, c.bits), audiotest.Quantize(s, c.bits))
 		info, rep := checkFile(t, path)
 		if !info.Lossless || info.Bits != c.bits || info.Channels != 2 || rep.UsedBits != c.bits || rep.Missing != 0 || rep.Damaged != "" {
 			t.Errorf("%d-bit in %d bytes: info %+v report %+v", c.bits, c.bytes, info, rep)
@@ -378,11 +208,11 @@ func TestWAVFormats(t *testing.T) {
 func TestDamageDetected(t *testing.T) {
 	const rate = 44100
 	dir := t.TempDir()
-	s := quantize(noise(3*rate, rate, pink), 16)
+	s := audiotest.Quantize(audiotest.Noise(3*rate, rate, audiotest.Pink), 16)
 
 	// A flipped bit in the audio: FLAC's frame and MD5 checksums catch it.
 	path := filepath.Join(dir, "flipped.flac")
-	writeFLAC(t, path, rate, 16, s)
+	audiotest.WriteFLAC(t, path, rate, 16, s)
 	data, _ := os.ReadFile(path)
 	data[len(data)/2] ^= 0x10
 	os.WriteFile(path, data, 0o644)
@@ -393,7 +223,7 @@ func TestDamageDetected(t *testing.T) {
 
 	// A WAV cut short, e.g. by an interrupted copy.
 	path = filepath.Join(dir, "short.wav")
-	writeWAV(t, path, rate, 16, 2, s)
+	audiotest.WriteWAV(t, path, rate, 16, 2, s)
 	data, _ = os.ReadFile(path)
 	os.WriteFile(path, data[:len(data)-rate*2], 0o644) // lose the last second
 	info, rep = checkFile(t, path)
@@ -404,7 +234,7 @@ func TestDamageDetected(t *testing.T) {
 
 func TestVerifyStopsWhenCancelled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
-	writeFLAC(t, path, 44100, 16, quantize(noise(44100, 44100, pink), 16))
+	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(44100, 44100, audiotest.Pink), 16))
 	info, _ := probe(path)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -415,7 +245,7 @@ func TestVerifyStopsWhenCancelled(t *testing.T) {
 
 func TestQuietAudioIsNotJudged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "silence.flac")
-	writeFLAC(t, path, 44100, 16, make([]int32, 3*44100))
+	audiotest.WriteFLAC(t, path, 44100, 16, make([]int32, 3*44100))
 	info, rep := checkFile(t, path)
 	a := assess(info, &rep)
 	if rep.Spectrum.Analysed || a.level != qualityLossless || !hasCheck(a, checkInfo, "quiet") {
@@ -436,7 +266,7 @@ func hasCheck(a assessment, kind checkKind, text string) bool {
 func genuineFLAC(t *testing.T, name string) Track {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name+".flac")
-	writeFLAC(t, path, 44100, 16, quantize(noise(2*44100, 44100, pink), 16))
+	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(2*44100, 44100, audiotest.Pink), 16))
 	return Track{Path: path, Title: name, Format: "FLAC"}
 }
 
@@ -618,7 +448,7 @@ func TestBadgeOpensNowPlaying(t *testing.T) {
 // be found.
 func TestLongFilesSampled(t *testing.T) {
 	const rate = 44100
-	s := noise(1<<18, rate, lowpass(pink, 16000, 300))
+	s := audiotest.Noise(1<<18, rate, audiotest.Lowpass(audiotest.Pink, 16000, 300))
 	spec := newSpectrum(rate, specSize*specMaxFrame*4) // as if 4 times the analysed length
 	if spec.every != 4 {
 		t.Fatalf("every = %d, want 4", spec.every)
@@ -648,12 +478,12 @@ func TestWeakCutoffWordedCautiously(t *testing.T) {
 	const rate = 44100
 	gain := func(f float64) float64 {
 		if f > 16000 {
-			return pink(f) * math.Pow(10, -35.0/20)
+			return audiotest.Pink(f) * math.Pow(10, -35.0/20)
 		}
-		return pink(f)
+		return audiotest.Pink(f)
 	}
 	path := filepath.Join(t.TempDir(), "weak.flac")
-	writeFLAC(t, path, rate, 16, quantize(noise(6*rate, rate, gain), 16))
+	audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(audiotest.Noise(6*rate, rate, gain), 16))
 	info, rep := checkFile(t, path)
 	a := assess(info, &rep)
 	if rep.Spectrum.Drop < cutoffDrop || rep.Spectrum.Drop >= strongDrop || !hasCheck(a, checkWarn, "probably converted") {
@@ -698,8 +528,8 @@ func TestCheckAnyTrack(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	playing := genuineFLAC(t, "playing")
 	other := filepath.Join(t.TempDir(), "other.flac")
-	s := noise(4*44100, 44100, lowpass(pink, 16000, 300))
-	writeFLAC(t, other, 44100, 16, quantize(s, 16))
+	s := audiotest.Noise(4*44100, 44100, audiotest.Lowpass(audiotest.Pink, 16000, 300))
+	audiotest.WriteFLAC(t, other, 44100, 16, audiotest.Quantize(s, 16))
 	otherTrack := Track{Path: other, Title: "Other", Artist: "Someone"}
 	setLibrary(u, playing, otherTrack)
 	u.jump(playing)

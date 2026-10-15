@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/cmplx"
 	"math/rand/v2"
+	"mugig/internal/audiotest"
 	"path/filepath"
 	"testing"
 )
@@ -34,7 +35,7 @@ func gappy(n int, rate float64, dropShare float64) []float64 {
 			if dropped[k/band] {
 				continue
 			}
-			x[k] = cmplx.Rect(pink(float64(k)*rate/frame), rng.Float64()*2*math.Pi)
+			x[k] = cmplx.Rect(audiotest.Pink(float64(k)*rate/frame), rng.Float64()*2*math.Pi)
 			x[frame-k] = cmplx.Conj(x[k])
 		}
 		fft(x) // inverse, up to scale and order, for a real signal
@@ -57,7 +58,7 @@ func TestHolesDetectLossySource(t *testing.T) {
 	const rate = 44100
 	path := filepath.Join(t.TempDir(), "gappy.flac")
 	s := gappy(8*rate, rate, 0.3)
-	writeFLAC(t, path, rate, 16, quantize(s, 16), quantize(s, 16))
+	audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(s, 16), audiotest.Quantize(s, 16))
 	info, rep := checkFile(t, path)
 	a := assess(info, &rep)
 	if rep.Spectrum.Cutoff != 0 {
@@ -77,12 +78,12 @@ func TestGenuineAudioHasNoHoles(t *testing.T) {
 		rate, bits int
 		gain       func(float64) float64
 	}{
-		{"pink 16-bit", 44100, 16, pink},
-		{"dark", 44100, 16, func(f float64) float64 { return pink(f) * math.Pow(10, -f/1000*1.5/20) }},
-		{"hi-res", 96000, 24, pink},
+		{"pink 16-bit", 44100, 16, audiotest.Pink},
+		{"dark", 44100, 16, func(f float64) float64 { return audiotest.Pink(f) * math.Pow(10, -f/1000*1.5/20) }},
+		{"hi-res", 96000, 24, audiotest.Pink},
 	} {
 		path := filepath.Join(t.TempDir(), "genuine.flac")
-		writeFLAC(t, path, c.rate, c.bits, quantize(noise(6*c.rate, float64(c.rate), c.gain), c.bits))
+		audiotest.WriteFLAC(t, path, c.rate, c.bits, audiotest.Quantize(audiotest.Noise(6*c.rate, float64(c.rate), c.gain), c.bits))
 		info, rep := checkFile(t, path)
 		if rep.Spectrum.Holes >= holesThreshold || assess(info, &rep).level == qualitySuspect {
 			t.Errorf("%s: holes %.4f", c.name, rep.Spectrum.Holes)
@@ -95,7 +96,7 @@ func TestGenuineAudioHasNoHoles(t *testing.T) {
 func TestCutoffSilenceIsNotHoles(t *testing.T) {
 	const rate = 44100
 	path := filepath.Join(t.TempDir(), "cut.flac")
-	writeFLAC(t, path, rate, 16, quantize(noise(6*rate, rate, lowpass(pink, 16000, 300)), 16))
+	audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(audiotest.Noise(6*rate, rate, audiotest.Lowpass(audiotest.Pink, 16000, 300)), 16))
 	_, rep := checkFile(t, path)
 	if rep.Spectrum.Holes >= holesThreshold {
 		t.Errorf("holes %.4f", rep.Spectrum.Holes)

@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -34,7 +35,7 @@ func brightness(img image.Image, y0, y1 int) float64 {
 func TestSpectrogramShowsShelf(t *testing.T) {
 	const rate = 44100
 	path := filepath.Join(t.TempDir(), "x.flac")
-	writeFLAC(t, path, rate, 16, quantize(noise(4*rate, rate, lowpass(pink, 16000, 300)), 16))
+	audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(audiotest.Noise(4*rate, rate, audiotest.Lowpass(audiotest.Pink, 16000, 300)), 16))
 	info, _ := probe(path)
 	_, img, err := analyse(context.Background(), path, info, true, nil)
 	if err != nil || img == nil {
@@ -54,7 +55,7 @@ func TestSpectrogramShowsShelf(t *testing.T) {
 
 func TestAnalyseReportsProgress(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
-	writeFLAC(t, path, 44100, 16, quantize(noise(3*44100, 44100, pink), 16))
+	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(3*44100, 44100, audiotest.Pink), 16))
 	info, _ := probe(path)
 	var got []float64
 	analyse(context.Background(), path, info, true, func(f float64) { got = append(got, f) })

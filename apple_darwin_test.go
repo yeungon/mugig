@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"math"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,8 +16,8 @@ import (
 func TestAppleDecoderIsBitExact(t *testing.T) {
 	for _, bits := range []int{16, 24} {
 		path := filepath.Join(t.TempDir(), "x.flac")
-		s := noise(3*44100, 44100, pink)
-		writeFLAC(t, path, 44100, bits, quantize(s, bits), quantize(s, bits))
+		s := audiotest.Noise(3*44100, 44100, audiotest.Pink)
+		audiotest.WriteFLAC(t, path, 44100, bits, audiotest.Quantize(s, bits), audiotest.Quantize(s, bits))
 		info, _ := probe(path)
 		lv := newLevels(44100, 2)
 		rep, spec, err := verifyWithApple(context.Background(), path, info, func(int64) {}, lv)
@@ -39,8 +40,8 @@ func TestAppleDecoderIsBitExact(t *testing.T) {
 // library, and can seek.
 func TestApplePlaybackMatches(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
-	s := quantize(noise(2*44100, 44100, pink), 16)
-	writeFLAC(t, path, 44100, 16, s, s)
+	s := audiotest.Quantize(audiotest.Noise(2*44100, 44100, audiotest.Pink), 16)
+	audiotest.WriteFLAC(t, path, 44100, 16, s, s)
 	a, format, err := appleDecode(path)
 	if err != nil {
 		t.Fatal(err)
@@ -67,8 +68,8 @@ func TestApplePlaybackMatches(t *testing.T) {
 // checksum shows the audio is whole.
 func TestSecondOpinionFromMacOS(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
-	s := quantize(noise(3*44100, 44100, pink), 16)
-	writeFLAC(t, path, 44100, 16, s, s)
+	s := audiotest.Quantize(audiotest.Noise(3*44100, 44100, audiotest.Pink), 16)
+	audiotest.WriteFLAC(t, path, 44100, 16, s, s)
 	data, _ := os.ReadFile(path)
 	data[len(data)-1] ^= 0xFF // the last frame's CRC-16
 	os.WriteFile(path, data, 0o644)

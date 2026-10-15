@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -44,24 +45,12 @@ func paths(ts []Track) []string {
 	return out
 }
 
-func copyFile(t *testing.T, from, to string) {
-	t.Helper()
-	data, err := os.ReadFile(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.MkdirAll(filepath.Dir(to), 0o755)
-	if err := os.WriteFile(to, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestWatchAddsAndRemovesFiles(t *testing.T) {
 	u, fw, dir := watchedLibrary(t)
 	setLibraryView := func() []string { return paths(u.tracks) }
 
 	added := filepath.Join(dir, "new.mp3")
-	copyFile(t, "testdata/sample.mp3", added)
+	audiotest.CopyFile(t, "testdata/sample.mp3", added)
 	fw.changed([]string{added})
 	if got := setLibraryView(); !slices.Contains(got, "new.mp3") || len(got) != 4 {
 		t.Errorf("after adding: %q", got)
@@ -96,8 +85,8 @@ func TestWatchAddsAndRemovesFiles(t *testing.T) {
 func TestWatchFolders(t *testing.T) {
 	u, fw, dir := watchedLibrary(t)
 	album := filepath.Join(dir, "Album")
-	copyFile(t, "testdata/sample.flac", filepath.Join(album, "01.flac"))
-	copyFile(t, "testdata/sample.wav", filepath.Join(album, "CD2", "02.wav"))
+	audiotest.CopyFile(t, "testdata/sample.flac", filepath.Join(album, "01.flac"))
+	audiotest.CopyFile(t, "testdata/sample.wav", filepath.Join(album, "CD2", "02.wav"))
 	fw.changed([]string{album, filepath.Join(album, "01.flac")}) // overlapping reports
 	if len(u.all) != 5 {
 		t.Fatalf("after adding an album: %q", paths(u.all))
@@ -150,7 +139,7 @@ func TestWatchHidesSongsWhenDiskGoes(t *testing.T) {
 func TestWatchWaitsForScan(t *testing.T) {
 	u, fw, dir := watchedLibrary(t)
 	added := filepath.Join(dir, "new.mp3")
-	copyFile(t, "testdata/sample.mp3", added)
+	audiotest.CopyFile(t, "testdata/sample.mp3", added)
 	u.cancel = func() {} // as if a scan were running
 	fw.changed([]string{added})
 	if len(u.all) != 3 {
@@ -175,7 +164,7 @@ func TestWatchEachFolder(t *testing.T) {
 	}
 
 	added := filepath.Join(other, "new.mp3")
-	copyFile(t, "testdata/sample.mp3", added)
+	audiotest.CopyFile(t, "testdata/sample.mp3", added)
 	second.changed([]string{added})
 	if len(u.all) != 7 {
 		t.Errorf("%d tracks after adding to the second folder", len(u.all))
@@ -185,7 +174,7 @@ func TestWatchEachFolder(t *testing.T) {
 	if !first.stopped || len(u.all) != 4 {
 		t.Errorf("first watch stopped %v, %d tracks", first.stopped, len(u.all))
 	}
-	copyFile(t, "testdata/sample.mp3", filepath.Join(dir, "late.mp3"))
+	audiotest.CopyFile(t, "testdata/sample.mp3", filepath.Join(dir, "late.mp3"))
 	first.changed([]string{filepath.Join(dir, "late.mp3")})
 	if len(u.all) != 4 {
 		t.Errorf("%d tracks after news from a removed folder", len(u.all))
@@ -219,7 +208,7 @@ func TestHiddenFilesIgnored(t *testing.T) {
 	junk := filepath.Join(dir, "._new.flac")
 	os.WriteFile(junk, []byte("Mac metadata"), 0o644)
 	trashed := filepath.Join(dir, ".Trashes", "501", "old.mp3")
-	copyFile(t, "testdata/sample.mp3", trashed)
+	audiotest.CopyFile(t, "testdata/sample.mp3", trashed)
 	fw.changed([]string{junk, trashed, filepath.Join(dir, ".Trashes")})
 	if len(u.all) != 3 {
 		t.Errorf("watcher listed %q", paths(u.all))
@@ -234,7 +223,7 @@ func newTestUIWithHidden(t *testing.T) (*ui, *fakeWatcher, string) {
 	u.watchFolder, u.settle = fw.watch, 0
 	dir := sampleFolder(t)
 	os.WriteFile(filepath.Join(dir, "._sample.mp3"), []byte("Mac metadata"), 0o644)
-	copyFile(t, "testdata/sample.flac", filepath.Join(dir, ".Trashes", "501", "deleted.flac"))
+	audiotest.CopyFile(t, "testdata/sample.flac", filepath.Join(dir, ".Trashes", "501", "deleted.flac"))
 	u.addFolder(dir)
 	return u, fw, dir
 }

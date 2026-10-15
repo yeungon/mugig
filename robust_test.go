@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -62,7 +63,7 @@ func TestEmptyAndMacOSXFilesSkipped(t *testing.T) {
 	u, fw, _ := newTestUIWithHidden(t)
 	dir := fw.root
 	os.WriteFile(filepath.Join(dir, "14 Track 14.mp3"), nil, 0o644)
-	copyFile(t, "testdata/sample.mp3", filepath.Join(dir, "__MACOSX", "Album", "01.mp3"))
+	audiotest.CopyFile(t, "testdata/sample.mp3", filepath.Join(dir, "__MACOSX", "Album", "01.mp3"))
 	u.queueScan(dir)
 	if got := paths(u.all); len(got) != 3 {
 		t.Fatalf("scan listed %q", got)
@@ -114,7 +115,7 @@ func TestFLACReadable(t *testing.T) {
 func corruptTagFLAC(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "x.flac")
-	writeFLAC(t, path, 44100, 16, quantize(noise(44100, 44100, pink), 16))
+	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(44100, 44100, audiotest.Pink), 16))
 	data, _ := os.ReadFile(path)
 	head, rest := data[:4+4+34], data[4+4+34:]
 	head[4] &^= 0x80 // STREAMINFO is no longer the last block

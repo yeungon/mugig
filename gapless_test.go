@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audiotest"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -18,7 +19,7 @@ func flatFLAC(t *testing.T, name string, rate, frames int, value int32) string {
 	for i := range s {
 		s[i] = value
 	}
-	writeFLAC(t, path, rate, 16, s)
+	audiotest.WriteFLAC(t, path, rate, 16, s)
 	return path
 }
 
