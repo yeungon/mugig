@@ -20,10 +20,13 @@ jobs:
       # Fyne drops cached drawing objects after a minute; the tests run
       # longer than that (see the Makefile).
       FYNE_CACHE: 1h
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.24"
 
@@ -33,19 +36,33 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
 
       - name: Vet
-        run: go vet ./...
+        run: go vet ./... 2>&1 | tee vet.log; exit ${PIPESTATUS[0]}
 
       - name: Test with coverage (macOS)
         if: runner.os == 'macOS'
-        run: go test -race -coverpkg=./internal/... -coverprofile=coverage.out ./...
+        run: go test -race -coverpkg=./internal/... -coverprofile=coverage.out ./... 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
 
       - name: Test (Linux)
         if: runner.os == 'Linux'
-        run: go test -race ./...
+        run: go test -race ./... 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
 
       - name: Test (Windows)
         if: runner.os == 'Windows'
-        run: go test ./...
+        run: go test ./... 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+
+      # A failure's last lines, as an annotation on the run's page, so they
+      # can be read there without opening the log.
+      - name: Show what failed
+        if: failure()
+        run: |
+          for f in vet.log test.log; do
+            [ -f "$f" ] || continue
+            out=$(grep -v -e '^ok ' -e 'no test files' "$f" | tail -n 120)
+            out=${out//'%'/'%25'}
+            out=${out//$'\r'/}
+            out=${out//$'\n'/'%0A'}
+            echo "::error title=$f on ${{ runner.os }}::$out"
+          done
 
       - name: Upload coverage reports to Codecov
         if: runner.os == 'macOS'
