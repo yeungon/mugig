@@ -72,7 +72,7 @@ func TestSpeedButtonOpensChoices(t *testing.T) {
 			}
 		})
 	}
-	if menu == nil || len(menu.Items) != len(speeds) {
+	if menu == nil || len(menu.Items) != len(Speeds) {
 		t.Fatalf("menu %v", menu)
 	}
 }

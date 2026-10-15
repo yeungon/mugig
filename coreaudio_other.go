@@ -7,9 +7,9 @@ package main
 
 func nominalRate(string) float64          { return 0 }
 func setNominalRate(string, float64) bool { return false }
-func watchDevices(func())                 {}
+func WatchDevices(func())                 {}
 
-const canHogDevice = false
+const CanHogDevice = false
 
 func hogDevice(string) uint32 { return 0 }
 func unhogDevice(uint32)      {}

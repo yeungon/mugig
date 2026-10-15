@@ -33,7 +33,7 @@ func trashName() string {
 // sheet: their file is the whole disc image, with the album's other songs.
 func (u *ui) trashItem(ts []Track) *fyne.MenuItem {
 	item := fyne.NewMenuItem(trashLabel, func() { u.confirmTrash(ts) })
-	item.Disabled = slices.ContainsFunc(ts, func(t Track) bool { return fromCue(t.Path) })
+	item.Disabled = slices.ContainsFunc(ts, func(t Track) bool { return FromCue(t.Path) })
 	return item
 }
 

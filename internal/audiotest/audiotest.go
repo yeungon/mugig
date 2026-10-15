@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/mewkiz/flac"
 	"github.com/mewkiz/flac/frame"
@@ -226,5 +227,53 @@ func fft(x []complex128) {
 				w *= step
 			}
 		}
+	}
+}
+
+var FuzzExts = []string{".flac", ".wav", ".mp3", ".ogg"}
+
+// fuzzSeeds adds the sample files, whole and cut short, as starting points,
+// each under its own extension and under the wrong one.
+func FuzzSeeds(f *testing.F) {
+	for i, ext := range FuzzExts {
+		data, err := os.ReadFile(Sample("sample" + ext))
+		if err != nil {
+			f.Fatal(err)
+		}
+		for _, cut := range []int{len(data), len(data) / 2, 64, 12} {
+			f.Add(data[:min(cut, len(data))], uint8(i))
+		}
+		f.Add(data, uint8(i+1)) // misnamed
+	}
+}
+
+// slowLimit is how long reading one small, corrupt file may take: longer
+// would stall a scan of thousands of them.
+const SlowLimit = 2 * time.Second
+
+func Timed(t testing.TB, what string, f func()) {
+	start := time.Now()
+	f()
+	if d := time.Since(start); d > SlowLimit {
+		t.Errorf("%s took %v", what, d)
+	}
+}
+
+// fuzzFile writes data to a file with one of the audio extensions.
+func FuzzFile(t testing.TB, data []byte, ext uint8) string {
+	path := filepath.Join(t.TempDir(), "x"+FuzzExts[int(ext)%len(FuzzExts)])
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func WriteFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

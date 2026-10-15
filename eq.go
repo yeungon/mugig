@@ -16,36 +16,36 @@ import (
 )
 
 const (
-	eqBands   = 10
-	eqMaxGain = 12 // dB, either way
+	EQBands   = 10
+	EQMaxGain = 12 // dB, either way
 )
 
 // eqBand is one band's setting.
-type eqBand struct {
+type EQBand struct {
 	Freq float64 // Hz
 	Gain float64 // dB
 	Q    float64
 }
 
 // eqSettings is the whole equalizer's setting.
-type eqSettings struct {
+type EQSettings struct {
 	On    bool
-	Bands [eqBands]eqBand
+	Bands [EQBands]EQBand
 }
 
 // defaultEQBands are octave bands from 31 Hz to 16 kHz, flat. Peaks an
 // octave wide have a Q of 1.41; shelves are at their usual 0.71.
-func defaultEQBands() [eqBands]eqBand {
-	var b [eqBands]eqBand
+func DefaultEQBands() [EQBands]EQBand {
+	var b [EQBands]EQBand
 	for i, f := range []float64{31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000} {
-		b[i] = eqBand{Freq: f, Q: 1.41}
+		b[i] = EQBand{Freq: f, Q: 1.41}
 	}
-	b[0].Q, b[eqBands-1].Q = 0.71, 0.71
+	b[0].Q, b[EQBands-1].Q = 0.71, 0.71
 	return b
 }
 
 // flat reports whether the setting changes nothing.
-func (s eqSettings) flat() bool {
+func (s EQSettings) Flat() bool {
 	for _, b := range s.Bands {
 		if b.Gain != 0 {
 			return false
@@ -55,7 +55,7 @@ func (s eqSettings) flat() bool {
 }
 
 // active reports whether the equalizer changes the sound.
-func (s eqSettings) active() bool { return s.On && !s.flat() }
+func (s EQSettings) Active() bool { return s.On && !s.Flat() }
 
 // eqFilter is one band's filter, a biquad: its coefficients, normalized
 // so a0 is 1, and its state for each channel.
@@ -65,7 +65,7 @@ type eqFilter struct {
 }
 
 // design sets the filter for band i of n at rate.
-func (f *eqFilter) design(b eqBand, i, n int, rate float64) {
+func (f *eqFilter) design(b EQBand, i, n int, rate float64) {
 	freq := min(max(b.Freq, 10), 0.45*rate) // below the top of the range
 	q := max(b.Q, 0.1)
 	A := math.Pow(10, b.Gain/40)
@@ -105,24 +105,24 @@ func (f *eqFilter) response(freq, rate float64) float64 {
 
 // eqFilters are the ten filters for a setting at a rate, and the gain
 // that keeps their largest boost from clipping.
-type eqFilters struct {
-	f    [eqBands]eqFilter
+type EQFilters struct {
+	f    [EQBands]eqFilter
 	gain float64
 	rate float64
 }
 
-func newEQFilters(s eqSettings, rate float64) *eqFilters {
-	e := &eqFilters{rate: rate}
+func NewEQFilters(s EQSettings, rate float64) *EQFilters {
+	e := &EQFilters{rate: rate}
 	for i, b := range s.Bands {
-		e.f[i].design(b, i, eqBands, rate)
+		e.f[i].design(b, i, EQBands, rate)
 	}
-	e.gain = math.Pow(10, -max(e.peak(), 0)/20)
+	e.gain = math.Pow(10, -max(e.Peak(), 0)/20)
 	return e
 }
 
 // responseDB is the filters' combined gain at freq, in dB, not counting
 // the gain that stops clipping.
-func (e *eqFilters) responseDB(freq float64) float64 {
+func (e *EQFilters) ResponseDB(freq float64) float64 {
 	g := 1.0
 	for i := range e.f {
 		g *= e.f[i].response(freq, e.rate)
@@ -132,12 +132,12 @@ func (e *eqFilters) responseDB(freq float64) float64 {
 
 // peak is the largest gain from 20 Hz to 20 kHz (or the top of the
 // range), in dB.
-func (e *eqFilters) peak() float64 {
+func (e *EQFilters) Peak() float64 {
 	top := min(20000, 0.49*e.rate)
 	peak := math.Inf(-1)
 	for i := range 400 {
 		f := 20 * math.Pow(top/20, float64(i)/399)
-		peak = max(peak, e.responseDB(f))
+		peak = max(peak, e.ResponseDB(f))
 	}
 	return peak
 }
@@ -146,26 +146,26 @@ func (e *eqFilters) peak() float64 {
 // set with the output locked.
 type equalizer struct {
 	s       beep.Streamer
-	setting eqSettings
-	filters *eqFilters // nil while it changes nothing
+	setting EQSettings
+	filters *EQFilters // nil while it changes nothing
 }
 
 // designEQ makes the filters for a setting at rate, or nil if it changes
 // nothing.
-func designEQ(s eqSettings, rate int) *eqFilters {
-	if !s.active() || rate <= 0 {
+func DesignEQ(s EQSettings, rate int) *EQFilters {
+	if !s.Active() || rate <= 0 {
 		return nil
 	}
-	return newEQFilters(s, float64(rate))
+	return NewEQFilters(s, float64(rate))
 }
 
 // set applies a setting at the sample rate of the audio.
-func (e *equalizer) set(s eqSettings, rate int) { e.use(s, designEQ(s, rate)) }
+func (e *equalizer) set(s EQSettings, rate int) { e.use(s, DesignEQ(s, rate)) }
 
 // use applies a setting, with its filters from designEQ. They take over
 // the old filters' state, so moving a band while music plays doesn't
 // click.
-func (e *equalizer) use(s eqSettings, f *eqFilters) {
+func (e *equalizer) use(s EQSettings, f *EQFilters) {
 	e.setting = s
 	if f != nil && e.filters != nil && e.filters.rate == f.rate {
 		for i := range f.f {

@@ -245,7 +245,7 @@ func (a *analyzer) bands(samples, out []float64) {
 	for i, s := range samples {
 		a.buf[i] = complex(s*a.window[i], 0)
 	}
-	fft(a.buf)
+	FFT(a.buf)
 	for b := range out {
 		peak := 0.0
 		for k := a.edges[b]; k < a.edges[b+1] && k < fftSize/2; k++ {

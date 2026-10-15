@@ -178,7 +178,7 @@ func scanFile(cache *libraryCache, path string) scanResult {
 		r.track = readTrack(path)
 	} else if r.track.Length == 0 {
 		// Cached before lengths were read, or the disk didn't answer then.
-		r.track.Length = fileLength(path)
+		r.track.Length = FileLength(path)
 	}
 	r.track.Size = r.size // also for tracks cached before sizes were shown
 	r.track.search = searchKey(r.track)
@@ -223,7 +223,7 @@ func readTrack(path string) Track {
 		return t
 	}
 	defer f.Close()
-	t.Length = trackLength(f)
+	t.Length = TrackLength(f)
 
 	m, err := tag.ReadFrom(f) // reads only the tag section, not the audio
 	if err != nil {
@@ -321,9 +321,9 @@ type ui struct {
 	speed          float64          // playback speed, 1 being normal (see speed.go)
 	speedBtn       *widget.Button   // in the player bar
 	speedItems     []*fyne.MenuItem // one per speed, in the Controls menu
-	crossfeed      crossfeedLevel
+	crossfeed      CrossfeedLevel
 	fadeInItem     *fyne.MenuItem
-	eq             eqSettings
+	eq             EQSettings
 	eqView         *eqView          // the Equalizer window, while open
 	crossfeedItems []*fyne.MenuItem // one per level, in the Controls menu
 
@@ -427,16 +427,16 @@ func main() {
 	w.SetMaster() // closing it quits, even with the Equalizer window open
 
 	media := newSystemMedia()
-	audio := newPlayer()
+	pl := NewPlayer(onUI)
 	u := newUI(w, a.Preferences(), uiDeps{
-		player:    audio,
+		player:    pl,
 		cache:     loadCache(filepath.Join(a.Storage().RootURI().Path(), "library.gob")),
 		saved:     loadQualityStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
 		media:     media,
 		playlists: filepath.Join(a.Storage().RootURI().Path(), "playlists.json"),
 	})
 	media.Start(u.remote)
-	watchDevices(u.devicesChanged)
+	WatchDevices(func() { onUI(u.devicesChanged) })
 	go u.watchConnections()
 
 	// Pick up where the user left off: the library, then the song.
@@ -470,7 +470,7 @@ func main() {
 		if u.cancel != nil {
 			u.cancel()
 		}
-		audio.Close() // also puts back the output device's sample rate
+		pl.Close() // also puts back the output device's sample rate
 	})
 	go u.trackProgress()
 	w.Resize(fyne.NewSize(1200, 740))
@@ -498,7 +498,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	u.levels = u.qualityStore.levels()
 	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
 	u.reveal, u.modifiers, u.trash = reveal, keyModifiers, trash.Move
-	u.canHog = canHogDevice
+	u.canHog = CanHogDevice
 	u.playlistsPath = d.playlists
 	u.playlists = loadPlaylists(d.playlists)
 	u.selected = map[string]bool{}

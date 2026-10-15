@@ -13,10 +13,10 @@ import (
 )
 
 // fileKind is the kind of file, found from its first bytes.
-type fileKind int
+type Kind int
 
 // audioInfo describes a file's audio as its headers state it.
-type audioInfo struct {
+type Info struct {
 	Codec      string // e.g. "FLAC", "WAV", "MP3", "Ogg Vorbis"
 	Lossless   bool
 	Float      bool // floating-point samples, which have no fixed bit depth
@@ -30,20 +30,20 @@ type audioInfo struct {
 	// e.g. ".flac" for an MP3 renamed to .flac.
 	Mismatch string
 
-	kind        fileKind
-	md5         [md5.Size]byte // FLAC's checksum of the audio, all zero if absent
-	samples     int64          // per channel, 0 if unknown
-	dataStart   int64          // WAV: where the samples start
-	dataSize    int64          // WAV: bytes of samples the header promises
+	Kind        Kind
+	MD5         [md5.Size]byte // FLAC's checksum of the audio, all zero if absent
+	Samples     int64          // per channel, 0 if unknown
+	DataStart   int64          // WAV: where the samples start
+	DataSize    int64          // WAV: bytes of samples the header promises
 	format      uint16         // WAV: format code (1 integer PCM, 3 float)
-	sampleBytes int            // WAV: bytes per sample as stored
+	SampleBytes int            // WAV: bytes per sample as stored
 }
 
 // sniff identifies a file from its first bytes, or returns unknownFile.
-func sniff(path string) fileKind {
+func sniff(path string) Kind {
 	f, err := os.Open(path)
 	if err != nil {
-		return unknownFile
+		return Unknown
 	}
 	defer f.Close()
 	kind, _ := sniffFile(f)
@@ -51,55 +51,55 @@ func sniff(path string) fileKind {
 }
 
 // sniffFile also returns where the audio starts, past any ID3v2 tag.
-func sniffFile(f *os.File) (fileKind, int64) {
+func sniffFile(f *os.File) (Kind, int64) {
 	start := skipID3(f)
 	var magic [12]byte
 	if _, err := f.ReadAt(magic[:], start); err != nil {
-		return unknownFile, start
+		return Unknown, start
 	}
 	switch {
 	case string(magic[:4]) == "fLaC":
-		return flacFile, start
+		return FLAC, start
 	case string(magic[:4]) == "RIFF" && string(magic[8:12]) == "WAVE":
-		return wavFile, start
+		return WAV, start
 	case string(magic[:4]) == "OggS":
-		return oggFile, start
+		return Ogg, start
 	case magic[0] == 0xFF && magic[1]&0xE0 == 0xE0: // MPEG audio frame sync
-		return mp3File, start
+		return MP3, start
 	}
-	return unknownFile, start
+	return Unknown, start
 }
 
 // probe reads the headers of the file at path.
-func probe(path string) (audioInfo, error) {
+func Probe(path string) (Info, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return audioInfo{}, err
+		return Info{}, err
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		return audioInfo{}, err
+		return Info{}, err
 	}
 	kind, start := sniffFile(f)
-	var info audioInfo
+	var info Info
 	switch kind {
-	case flacFile:
+	case FLAC:
 		info, err = probeFLAC(f, start, st.Size())
-	case wavFile:
+	case WAV:
 		info, err = probeWAV(f, st.Size())
-	case oggFile:
+	case Ogg:
 		info, err = probeOgg(f, path, st.Size())
-	case mp3File:
-		info, err = probeLossy(path, mp3File, "MP3", st.Size()-start)
+	case MP3:
+		info, err = probeLossy(path, MP3, "MP3", st.Size()-start)
 	default:
-		return audioInfo{}, errors.New("not a recognised audio format")
+		return Info{}, errors.New("not a recognised audio format")
 	}
 	if err != nil {
-		return audioInfo{}, err
+		return Info{}, err
 	}
 	ext := strings.ToLower(filepath.Ext(path))
-	named := map[string]fileKind{".flac": flacFile, ".wav": wavFile, ".mp3": mp3File, ".ogg": oggFile}
+	named := map[string]Kind{".flac": FLAC, ".wav": WAV, ".mp3": MP3, ".ogg": Ogg}
 	if k, ok := named[ext]; ok && k != kind {
 		info.Mismatch = ext
 	}
@@ -122,8 +122,8 @@ func skipID3(f *os.File) int64 {
 
 // probeFLAC reads the STREAMINFO block, and skips the other metadata (which
 // may hold large pictures) to find how many bytes of audio there are.
-func probeFLAC(f *os.File, start, size int64) (audioInfo, error) {
-	info := audioInfo{Codec: "FLAC", Lossless: true, kind: flacFile}
+func probeFLAC(f *os.File, start, size int64) (Info, error) {
+	info := Info{Codec: "FLAC", Lossless: true, Kind: FLAC}
 	pos := start + 4
 	for found := false; ; {
 		var h [4]byte
@@ -142,8 +142,8 @@ func probeFLAC(f *os.File, start, size int64) (audioInfo, error) {
 			info.SampleRate = int(b[10])<<12 | int(b[11])<<4 | int(b[12])>>4
 			info.Channels = int(b[12]>>1&7) + 1
 			info.Bits = int(b[12]&1)<<4 | int(b[13]>>4) + 1
-			info.samples = int64(b[13]&0xf)<<32 | int64(binary.BigEndian.Uint32(b[14:18]))
-			copy(info.md5[:], b[18:34])
+			info.Samples = int64(b[13]&0xf)<<32 | int64(binary.BigEndian.Uint32(b[14:18]))
+			copy(info.MD5[:], b[18:34])
 			found = true
 		}
 		pos += 4 + n
@@ -154,8 +154,8 @@ func probeFLAC(f *os.File, start, size int64) (audioInfo, error) {
 			break
 		}
 	}
-	if info.samples > 0 {
-		info.Duration = time.Duration(info.samples) * time.Second / time.Duration(info.SampleRate)
+	if info.Samples > 0 {
+		info.Duration = time.Duration(info.Samples) * time.Second / time.Duration(info.SampleRate)
 		info.Kbps = kbps(size-pos, info.Duration)
 	}
 	return info, nil
@@ -163,8 +163,8 @@ func probeFLAC(f *os.File, start, size int64) (audioInfo, error) {
 
 // probeWAV reads the format and finds the samples. WAV files can hold
 // compressed audio too, so the format code decides whether it is lossless.
-func probeWAV(f *os.File, size int64) (audioInfo, error) {
-	info := audioInfo{Codec: "WAV", kind: wavFile}
+func probeWAV(f *os.File, size int64) (Info, error) {
+	info := Info{Codec: "WAV", Kind: WAV}
 	var blockAlign int
 	for pos := int64(12); pos+8 <= size; {
 		var h [8]byte
@@ -194,20 +194,20 @@ func probeWAV(f *os.File, size int64) (audioInfo, error) {
 				info.format = binary.LittleEndian.Uint16(b[24:]) // from the sub-format GUID
 			}
 		case "data":
-			info.dataStart, info.dataSize = pos+8, n
+			info.DataStart, info.DataSize = pos+8, n
 		}
-		if info.dataStart > 0 && blockAlign > 0 {
+		if info.DataStart > 0 && blockAlign > 0 {
 			break
 		}
 		pos += 8 + n + n&1 // chunks are padded to an even length
 	}
-	if blockAlign == 0 || info.dataStart == 0 || info.Channels == 0 || info.SampleRate == 0 {
+	if blockAlign == 0 || info.DataStart == 0 || info.Channels == 0 || info.SampleRate == 0 {
 		return info, errors.New("WAV header is damaged")
 	}
-	info.sampleBytes = blockAlign / info.Channels
+	info.SampleBytes = blockAlign / info.Channels
 	switch info.format {
 	case 1:
-		info.Lossless = info.sampleBytes >= 1 && info.sampleBytes <= 4
+		info.Lossless = info.SampleBytes >= 1 && info.SampleBytes <= 4
 	case 3:
 		info.Lossless, info.Float = true, true
 		info.Codec = "WAV (floating point)"
@@ -218,8 +218,8 @@ func probeWAV(f *os.File, size int64) (audioInfo, error) {
 	if !info.Lossless {
 		return info, nil
 	}
-	info.samples = info.dataSize / int64(blockAlign)
-	info.Duration = time.Duration(info.samples) * time.Second / time.Duration(info.SampleRate)
+	info.Samples = info.DataSize / int64(blockAlign)
+	info.Duration = time.Duration(info.Samples) * time.Second / time.Duration(info.SampleRate)
 	return info, nil
 }
 
@@ -244,16 +244,16 @@ func oggCodec(f *os.File) string {
 }
 
 // probeOgg identifies the codec inside an Ogg file from its first packet.
-func probeOgg(f *os.File, path string, size int64) (audioInfo, error) {
+func probeOgg(f *os.File, path string, size int64) (Info, error) {
 	var page [27 + 255 + 8]byte
 	n, _ := f.ReadAt(page[:], 0)
 	if n < 28 || 27+int(page[26]) > n {
-		return audioInfo{}, errors.New("Ogg file is damaged")
+		return Info{}, errors.New("Ogg file is damaged")
 	}
 	packet := page[27+int(page[26]) : n]
 	switch {
 	case strings.HasPrefix(string(packet), "\x01vorbis"):
-		info, err := probeLossy(path, oggFile, "Ogg Vorbis", size)
+		info, err := probeLossy(path, Ogg, "Ogg Vorbis", size)
 		if len(packet) >= 24 { // prefer the encoder's nominal bitrate: size also counts tags and art
 			if nominal := int32(binary.LittleEndian.Uint32(packet[20:])); nominal > 0 {
 				info.Kbps = int(nominal) / 1000
@@ -261,25 +261,25 @@ func probeOgg(f *os.File, path string, size int64) (audioInfo, error) {
 		}
 		return info, err
 	case strings.HasPrefix(string(packet), "OpusHead"):
-		return audioInfo{Codec: "Ogg Opus", kind: oggFile}, nil
+		return Info{Codec: "Ogg Opus", Kind: Ogg}, nil
 	case strings.HasPrefix(string(packet), "\x7fFLAC"):
-		return audioInfo{Codec: "FLAC in Ogg", Lossless: true, kind: oggFile}, nil
+		return Info{Codec: "FLAC in Ogg", Lossless: true, Kind: Ogg}, nil
 	}
-	return audioInfo{}, errors.New("unknown codec in Ogg file")
+	return Info{}, errors.New("unknown codec in Ogg file")
 }
 
 // probeLossy gets the length and format of an MP3 or Ogg Vorbis file from
 // its decoder, and works out the average bitrate from the audio's size.
-func probeLossy(path string, kind fileKind, codec string, audioBytes int64) (audioInfo, error) {
-	info := audioInfo{Codec: codec, kind: kind}
-	s, format, err := decodeAs(path, kind)
+func probeLossy(path string, kind Kind, codec string, audioBytes int64) (Info, error) {
+	info := Info{Codec: codec, Kind: kind}
+	s, format, err := DecodeAs(path, kind)
 	if err != nil {
 		return info, err
 	}
 	defer s.Close()
 	info.SampleRate, info.Channels = int(format.SampleRate), format.NumChannels
 	if s.Len() > 0 {
-		info.samples = int64(s.Len())
+		info.Samples = int64(s.Len())
 		info.Duration = format.SampleRate.D(s.Len())
 		info.Kbps = kbps(audioBytes, info.Duration)
 	}
@@ -294,9 +294,9 @@ func kbps(bytes int64, d time.Duration) int {
 }
 
 const (
-	unknownFile fileKind = iota
-	flacFile
-	wavFile
-	mp3File
-	oggFile
+	Unknown Kind = iota
+	FLAC
+	WAV
+	MP3
+	Ogg
 )

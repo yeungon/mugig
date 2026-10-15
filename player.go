@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -12,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
 	"github.com/gopxl/beep/v2"
 	"github.com/gopxl/beep/v2/mp3"
 	"github.com/gopxl/beep/v2/vorbis"
@@ -23,8 +23,9 @@ import (
 // player plays one track at a time through out, the next one joined on
 // without a gap if it is readied in time. Its fields are only touched on
 // the UI thread, except what the audio thread reads through out's lock.
-type player struct {
-	out output
+type Player struct {
+	out    output
+	onMain func(func()) // runs a function on the UI thread
 
 	decks *decks // the song playing and the one readied to follow; nil if stopped
 	eq    *equalizer
@@ -35,9 +36,9 @@ type player struct {
 	gen   int     // bumped on every Stop so stale end-of-track callbacks are ignored
 	level float64 // volume from 0 (silent) to 1 (full), kept across tracks
 	speed float64 // playback speed, kept across tracks
-	feed  crossfeedLevel
+	feed  CrossfeedLevel
 	fade  bool // fade in when playing starts or resumes
-	eqSet eqSettings
+	eqSet EQSettings
 
 	onEnd     func(error) // the current song's end-of-track callback
 	nextPath  string      // the song asked to follow, "" for none
@@ -51,8 +52,10 @@ type player struct {
 	hogged    uint32             // the device Mugig has to itself, 0 for none
 }
 
-func newPlayer() *player {
-	return &player{level: 1, speed: 1, matchRate: true, original: map[string]float64{}}
+// newPlayer makes a player whose callbacks, such as a song's end, are run
+// by onMain on the UI thread.
+func NewPlayer(onMain func(func())) *Player {
+	return &Player{onMain: onMain, level: 1, speed: 1, matchRate: true, original: map[string]float64{}}
 }
 
 // Play stops any current track and starts the one at path. onEnd is called
@@ -61,7 +64,7 @@ func newPlayer() *player {
 //
 // If the song at path is the one readied that has just taken over, it
 // carries on: the song before ended, and this is the UI moving on to it.
-func (p *player) Play(path string, onEnd func(error)) error {
+func (p *Player) Play(path string, onEnd func(error)) error {
 	if p.handedOff && p.current().path == path {
 		p.handedOff = false
 		p.onEnd = onEnd
@@ -118,9 +121,9 @@ func (p *player) Play(path string, onEnd func(error)) error {
 // song's end is never seen before the switch to it. It is called on the
 // audio thread with the output locked, so f is handed over by a goroutine
 // that doesn't hold the lock.
-func (p *player) notify(f func()) {
+func (p *Player) notify(f func()) {
 	p.events = append(p.events, f)
-	go onUI(func() {
+	go p.onMain(func() {
 		p.out.mu.Lock()
 		fs := p.events
 		p.events = nil
@@ -134,7 +137,7 @@ func (p *player) notify(f func()) {
 // switched runs when the readied song has taken over from old. The UI is
 // told old ended, and moves on: with Play for the song that has already
 // begun, which claims it, or by stopping or playing something else.
-func (p *player) switched(gen int, old *deck) {
+func (p *Player) switched(gen int, old *deck) {
 	old.stream.Close()
 	if p.gen != gen {
 		return
@@ -145,7 +148,7 @@ func (p *player) switched(gen int, old *deck) {
 }
 
 // current is the song playing, or nil.
-func (p *player) current() *deck {
+func (p *Player) current() *deck {
 	if p.decks == nil {
 		return nil
 	}
@@ -156,7 +159,7 @@ func (p *player) current() *deck {
 
 // Prepare opens the song at path in the background and, if it is at the
 // current song's sample rate, has it follow on.
-func (p *player) Prepare(path string) {
+func (p *Player) Prepare(path string) {
 	cur := p.current()
 	if cur == nil || path == p.nextPath {
 		return
@@ -172,7 +175,7 @@ func (p *player) Prepare(path string) {
 		if err != nil {
 			return // Play will fail too, and say why
 		}
-		onUI(func() {
+		p.onMain(func() {
 			if p.gen != gen || p.nextPath != path || d.format.SampleRate != rate {
 				d.stream.Close()
 				return
@@ -183,7 +186,7 @@ func (p *player) Prepare(path string) {
 }
 
 // setNext makes d the song to follow, closing any readied before.
-func (p *player) setNext(d *deck) {
+func (p *Player) setNext(d *deck) {
 	p.out.mu.Lock()
 	old := p.decks.next
 	p.decks.next = d
@@ -198,7 +201,7 @@ func (p *player) setNext(d *deck) {
 
 // openOutput readies the device for a track at rate, first switching the
 // device itself to rate if allowed and possible.
-func (p *player) openOutput(rate int) error {
+func (p *Player) openOutput(rate int) error {
 	if p.exclusive {
 		// Taken first, so no other app can change the rate back.
 		dev := hogDevice(deviceUID(p.device))
@@ -224,14 +227,14 @@ func (p *player) openOutput(rate int) error {
 // falling back to its extension.
 //
 // A song from a CUE sheet plays its stretch of the disc image.
-func decode(path string) (beep.StreamSeekCloser, beep.Format, error) {
+func Decode(path string) (beep.StreamSeekCloser, beep.Format, error) {
 	span := spanOf(path)
-	path = span.file
+	path = span.File
 	kind := sniff(path)
-	if kind == unknownFile {
-		kind = map[string]fileKind{".mp3": mp3File, ".flac": flacFile, ".wav": wavFile, ".ogg": oggFile}[strings.ToLower(filepath.Ext(path))]
+	if kind == Unknown {
+		kind = map[string]Kind{".mp3": MP3, ".flac": FLAC, ".wav": WAV, ".ogg": Ogg}[strings.ToLower(filepath.Ext(path))]
 	}
-	s, format, err := decodeAs(path, kind)
+	s, format, err := DecodeAs(path, kind)
 	if err != nil {
 		return nil, format, err
 	}
@@ -243,7 +246,7 @@ func decode(path string) (beep.StreamSeekCloser, beep.Format, error) {
 	return cut, format, nil
 }
 
-func decodeAs(path string, kind fileKind) (s beep.StreamSeekCloser, format beep.Format, err error) {
+func DecodeAs(path string, kind Kind) (s beep.StreamSeekCloser, format beep.Format, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, beep.Format{}, err
@@ -255,29 +258,29 @@ func decodeAs(path string, kind fileKind) (s beep.StreamSeekCloser, format beep.
 			s, format, err = nil, beep.Format{}, fmt.Errorf("cannot play %s: the file is damaged", filepath.Base(path))
 		}
 	}()
-	if kind == oggFile {
+	if kind == Ogg {
 		if codec := oggCodec(f); codec != "Ogg Vorbis" {
 			f.Close()
 			return nil, beep.Format{}, fmt.Errorf("cannot play %s: %s files aren't supported yet", filepath.Base(path), codec)
 		}
 	}
-	if kind == flacFile && !flacReadable(f) && appleDecoding {
+	if kind == FLAC && !flacReadable(f) && AppleDecoding {
 		f.Close()
 		return appleDecode(path) // the FLAC library can't read this one; macOS can
 	}
 	switch kind {
-	case mp3File:
+	case MP3:
 		if s, format, err = mp3.Decode(f); err == nil {
 			s = newMP3Stream(s, f)
 		}
-	case flacFile:
+	case FLAC:
 		var fs *flacStream
 		if fs, format, err = newFLACStream(f); err == nil {
 			s = fs
 		}
-	case wavFile:
+	case WAV:
 		s, format, err = wav.Decode(f)
-	case oggFile:
+	case Ogg:
 		s, format, err = vorbis.Decode(f)
 	default:
 		err = fmt.Errorf("unsupported format")
@@ -303,7 +306,7 @@ func flacReadable(f *os.File) bool {
 
 // TogglePause pauses or resumes the current track and reports whether it is
 // now paused.
-func (p *player) TogglePause() bool {
+func (p *Player) TogglePause() bool {
 	if p.ctrl == nil {
 		return false
 	}
@@ -317,7 +320,7 @@ func (p *player) TogglePause() bool {
 }
 
 // Position reports how far into the current track playback is.
-func (p *player) Position() time.Duration {
+func (p *Player) Position() time.Duration {
 	if p.decks == nil {
 		return 0
 	}
@@ -328,7 +331,7 @@ func (p *player) Position() time.Duration {
 }
 
 // Duration reports the length of the current track, or 0 if unknown.
-func (p *player) Duration() time.Duration {
+func (p *Player) Duration() time.Duration {
 	if p.decks == nil {
 		return 0
 	}
@@ -340,7 +343,7 @@ func (p *player) Duration() time.Duration {
 
 // Seek jumps to d within the current track. The stream reads ahead and
 // guards itself, so the audio thread isn't held up while it seeks.
-func (p *player) Seek(d time.Duration) error {
+func (p *Player) Seek(d time.Duration) error {
 	cur := p.current()
 	if cur == nil {
 		return nil
@@ -351,7 +354,7 @@ func (p *player) Seek(d time.Duration) error {
 
 // SetSpeed sets the playback speed, keeping the pitch, for this track and
 // the ones after.
-func (p *player) SetSpeed(speed float64) {
+func (p *Player) SetSpeed(speed float64) {
 	p.speed = speed
 	if p.decks == nil {
 		return
@@ -366,7 +369,7 @@ func (p *player) SetSpeed(speed float64) {
 
 // SetCrossfeed sets how much of each channel reaches the other ear, for
 // this track and the ones after.
-func (p *player) SetCrossfeed(level crossfeedLevel) {
+func (p *Player) SetCrossfeed(level CrossfeedLevel) {
 	p.feed = level
 	if p.decks == nil {
 		return
@@ -377,20 +380,20 @@ func (p *player) SetCrossfeed(level crossfeedLevel) {
 }
 
 // SetEQ sets the equalizer, for this track and the ones after.
-func (p *player) SetEQ(s eqSettings) {
+func (p *Player) SetEQ(s EQSettings) {
 	p.eqSet = s
 	cur := p.current()
 	if cur == nil {
 		return
 	}
-	f := designEQ(s, int(cur.format.SampleRate)) // outside the lock: it takes a moment
+	f := DesignEQ(s, int(cur.format.SampleRate)) // outside the lock: it takes a moment
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
 	p.eq.use(s, f)
 }
 
 // SetVolume sets the volume from 0 (silent) to 1 (full).
-func (p *player) SetVolume(level float64) {
+func (p *Player) SetVolume(level float64) {
 	p.level = level
 	if p.vol == nil {
 		return
@@ -404,7 +407,7 @@ func (p *player) SetVolume(level float64) {
 // loudness better than scaling the samples linearly. The bottom of the range
 // is about -36 dB. At full volume the gain is exactly 1, so the samples
 // pass through unchanged.
-func (p *player) applyLevel() {
+func (p *Player) applyLevel() {
 	gain := 0.0
 	if p.level > 0 {
 		gain = math.Pow(2, (p.level-1)*6)
@@ -412,9 +415,9 @@ func (p *player) applyLevel() {
 	p.vol.set(gain)
 }
 
-func (p *player) SetFadeIn(on bool) { p.fade = on }
+func (p *Player) SetFadeIn(on bool) { p.fade = on }
 
-func (p *player) Samples(dst []float64) int {
+func (p *Player) Samples(dst []float64) int {
 	if p.tap == nil {
 		return 0
 	}
@@ -422,7 +425,7 @@ func (p *player) Samples(dst []float64) int {
 	return int(p.current().format.SampleRate)
 }
 
-func (p *player) Output() (deviceRate, trackRate int) {
+func (p *Player) Output() (deviceRate, trackRate int) {
 	cur := p.current()
 	if cur == nil {
 		return 0, 0
@@ -430,17 +433,17 @@ func (p *player) Output() (deviceRate, trackRate int) {
 	return p.out.deviceRate(), int(cur.format.SampleRate)
 }
 
-func (p *player) Devices() []outputDevice {
+func (p *Player) Devices() []Device {
 	d, err := p.out.devices()
 	if err != nil {
-		fyne.LogError("listing output devices", err)
+		log.Printf("listing output devices: %v", err)
 	}
 	return d
 }
 
 // SetDevice switches output to the device with id, carrying on with the
 // current track there.
-func (p *player) SetDevice(id string) {
+func (p *Player) SetDevice(id string) {
 	if id == p.device {
 		return
 	}
@@ -448,7 +451,7 @@ func (p *player) SetDevice(id string) {
 	p.reopen()
 }
 
-func (p *player) SetMatchRate(on bool) {
+func (p *Player) SetMatchRate(on bool) {
 	if on == p.matchRate {
 		return
 	}
@@ -459,7 +462,7 @@ func (p *player) SetMatchRate(on bool) {
 	p.reopen()
 }
 
-func (p *player) SetExclusive(on bool) {
+func (p *Player) SetExclusive(on bool) {
 	if on == p.exclusive {
 		return
 	}
@@ -471,39 +474,39 @@ func (p *player) SetExclusive(on bool) {
 	}
 }
 
-func (p *player) Exclusive() bool { return p.hogged != 0 }
+func (p *Player) Exclusive() bool { return p.hogged != 0 }
 
 // letGo gives the device back to every app.
-func (p *player) letGo() {
+func (p *Player) letGo() {
 	unhogDevice(p.hogged)
 	p.hogged = 0
 }
 
 // DevicesChanged moves the track to the system's new default output, at the
 // track's rate, or off a chosen device that was unplugged.
-func (p *player) DevicesChanged() {
-	if p.device == "" || !slices.ContainsFunc(p.Devices(), func(d outputDevice) bool { return d.ID == p.device }) {
+func (p *Player) DevicesChanged() {
+	if p.device == "" || !slices.ContainsFunc(p.Devices(), func(d Device) bool { return d.ID == p.device }) {
 		p.reopen()
 	}
 }
 
 // reopen moves the current track to a freshly opened device, after the
 // device or its rate has changed.
-func (p *player) reopen() {
+func (p *Player) reopen() {
 	cur := p.current()
 	p.out.closeDevice()
 	if cur == nil {
 		return // the next track opens the right one
 	}
 	if err := p.openOutput(int(cur.format.SampleRate)); err != nil {
-		fyne.LogError("reopening audio output", err)
+		log.Printf("reopening audio output: %v", err)
 		return
 	}
 	p.out.play(p.ctrl)
 }
 
 // Stop halts playback and closes the current file.
-func (p *player) Stop() {
+func (p *Player) Stop() {
 	p.gen++
 	if p.decks == nil {
 		return
@@ -513,7 +516,7 @@ func (p *player) Stop() {
 	p.letGo()
 }
 
-func (p *player) release() {
+func (p *Player) release() {
 	p.decks.cur.stream.Close()
 	if p.decks.next != nil {
 		p.decks.next.stream.Close()
@@ -524,14 +527,14 @@ func (p *player) release() {
 
 // Close stops playback, closes the device and puts back the device rates
 // that were switched, leaving the system as it was.
-func (p *player) Close() {
+func (p *Player) Close() {
 	p.Stop()
 	p.out.close()
 	p.letGo()
 	p.restoreRates()
 }
 
-func (p *player) restoreRates() {
+func (p *Player) restoreRates() {
 	for uid, rate := range p.original {
 		setNominalRate(uid, rate)
 	}

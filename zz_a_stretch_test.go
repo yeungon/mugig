@@ -95,7 +95,7 @@ func rms(frames [][2]float64, c int) float64 {
 // At any speed the song takes 1/speed as long, at the same pitch, with no
 // clicks where pieces join and no loss of level from blending.
 func TestStretchKeepsPitch(t *testing.T) {
-	for _, tempo := range speeds {
+	for _, tempo := range Speeds {
 		if tempo == 1 {
 			continue
 		}

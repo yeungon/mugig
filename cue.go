@@ -299,7 +299,7 @@ func cuePath(image string, number int) string {
 // rememberCue records where a song from a CUE sheet is.
 func rememberCue(t Track) {
 	if t.File != "" {
-		rememberSpan(t.Path, cueSpan{t.File, t.Start, t.End})
+		RememberSpan(t.Path, Span{t.File, t.Start, t.End})
 	}
 }
 

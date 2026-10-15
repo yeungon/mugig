@@ -23,18 +23,18 @@ import (
 
 // macOS's own decoders read the occasional FLAC file that Mugig's FLAC
 // library rejects (see verifyFLAC), so those still play and can be checked.
-const appleDecoding = true
+const AppleDecoding = true
 
 // appleFile is a file open in macOS's decoder.
-type appleFile struct {
+type AppleFile struct {
 	h        unsafe.Pointer
-	rate     float64
-	channels int
-	bits     int
-	frames   int64
+	Rate     float64
+	Channels int
+	Bits     int
+	Frames   int64
 }
 
-func appleOpen(path string, asFloat bool) (*appleFile, error) {
+func OpenApple(path string, asFloat bool) (*AppleFile, error) {
 	c := C.CString(path)
 	defer C.free(unsafe.Pointer(c))
 	var rate C.double
@@ -48,44 +48,44 @@ func appleOpen(path string, asFloat bool) (*appleFile, error) {
 	if h == nil {
 		return nil, errors.New("macOS can't decode it either")
 	}
-	return &appleFile{h: h, rate: float64(rate), channels: int(channels), bits: int(bits), frames: int64(frames)}, nil
+	return &AppleFile{h: h, Rate: float64(rate), Channels: int(channels), Bits: int(bits), Frames: int64(frames)}, nil
 }
 
 // read fills buf with interleaved samples (float32 or int32, as opened)
 // and returns the frames read, 0 at the end.
-func (f *appleFile) read(buf unsafe.Pointer, frames int) (int, error) {
-	n := int(C.appleRead(f.h, buf, C.int(frames), C.int(f.channels)))
+func (f *AppleFile) Read(buf unsafe.Pointer, frames int) (int, error) {
+	n := int(C.appleRead(f.h, buf, C.int(frames), C.int(f.Channels)))
 	if n < 0 {
 		return 0, errors.New("macOS's decoder failed partway")
 	}
 	return n, nil
 }
 
-func (f *appleFile) close() { C.appleClose(f.h) }
+func (f *AppleFile) Close() { C.appleClose(f.h) }
 
 // appleStream plays a file through macOS's decoder.
 type appleStream struct {
-	f   *appleFile
+	f   *AppleFile
 	buf []float32
 	pos int
 	err error
 }
 
 func appleDecode(path string) (beep.StreamSeekCloser, beep.Format, error) {
-	f, err := appleOpen(path, true)
+	f, err := OpenApple(path, true)
 	if err != nil {
 		return nil, beep.Format{}, err
 	}
-	format := beep.Format{SampleRate: beep.SampleRate(f.rate), NumChannels: f.channels, Precision: 4}
+	format := beep.Format{SampleRate: beep.SampleRate(f.Rate), NumChannels: f.Channels, Precision: 4}
 	return &appleStream{f: f}, format, nil
 }
 
 func (s *appleStream) Stream(samples [][2]float64) (int, bool) {
-	ch := s.f.channels
+	ch := s.f.Channels
 	if cap(s.buf) < len(samples)*ch {
 		s.buf = make([]float32, len(samples)*ch)
 	}
-	n, err := s.f.read(unsafe.Pointer(&s.buf[0]), len(samples))
+	n, err := s.f.Read(unsafe.Pointer(&s.buf[0]), len(samples))
 	if err != nil {
 		s.err = err
 		return 0, false
@@ -103,9 +103,9 @@ func (s *appleStream) Stream(samples [][2]float64) (int, bool) {
 }
 
 func (s *appleStream) Err() error    { return s.err }
-func (s *appleStream) Len() int      { return int(s.f.frames) }
+func (s *appleStream) Len() int      { return int(s.f.Frames) }
 func (s *appleStream) Position() int { return s.pos }
-func (s *appleStream) Close() error  { s.f.close(); return nil }
+func (s *appleStream) Close() error  { s.f.Close(); return nil }
 
 func (s *appleStream) Seek(p int) error {
 	if C.appleSeek(s.f.h, C.longlong(p)) != 0 {

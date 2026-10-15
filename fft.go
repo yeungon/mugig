@@ -7,7 +7,7 @@ import (
 
 // fft replaces x with its discrete Fourier transform. len(x) must be a power
 // of two.
-func fft(x []complex128) {
+func FFT(x []complex128) {
 	n := len(x)
 	for i, j := 1, 0; i < n; i++ { // reorder by bit-reversed index
 		bit := n >> 1

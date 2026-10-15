@@ -4,11 +4,13 @@ import (
 	"errors"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/widget"
 )
 
 // fakePlayer stands in for real audio so tests make no sound.
@@ -20,8 +22,8 @@ type fakePlayer struct {
 	level  float64
 	speed  float64
 	fade   bool
-	feed   crossfeedLevel
-	eq     eqSettings
+	feed   CrossfeedLevel
+	eq     EQSettings
 	bad    map[string]bool // paths that fail to play
 	next   string          // the path readied to follow, by Prepare
 
@@ -50,8 +52,8 @@ func (f *fakePlayer) Seek(d time.Duration) error    { f.pos = d; return nil }
 func (f *fakePlayer) SetVolume(level float64)       { f.level = level }
 func (f *fakePlayer) SetFadeIn(on bool)             { f.fade = on }
 func (f *fakePlayer) SetSpeed(speed float64)        { f.speed = speed }
-func (f *fakePlayer) SetCrossfeed(l crossfeedLevel) { f.feed = l }
-func (f *fakePlayer) SetEQ(s eqSettings)            { f.eq = s }
+func (f *fakePlayer) SetCrossfeed(l CrossfeedLevel) { f.feed = l }
+func (f *fakePlayer) SetEQ(s EQSettings)            { f.eq = s }
 
 // testRate is the sample rate of the fake player's audio.
 const testRate = 44100
@@ -74,8 +76,8 @@ func (f *fakePlayer) Output() (int, int) {
 	return testRate, testRate
 }
 
-func (f *fakePlayer) Devices() []outputDevice {
-	return []outputDevice{{ID: "aa", Name: "Speakers", IsDefault: true}, {ID: "bb", Name: "USB DAC"}}
+func (f *fakePlayer) Devices() []Device {
+	return []Device{{ID: "aa", Name: "Speakers", IsDefault: true}, {ID: "bb", Name: "USB DAC"}}
 }
 func (f *fakePlayer) SetDevice(id string)  { f.device = id }
 func (f *fakePlayer) SetMatchRate(on bool) { f.matchRate = on }
@@ -203,4 +205,15 @@ func fiveTracks() []Track {
 		track("Bohemian Rhapsody", "Queen", "A Night at the Opera", 1975),
 		track("Zebra", "", "", 0),
 	}
+}
+
+// allText joins the text of every label in o.
+func allText(o fyne.CanvasObject) string {
+	var out []string
+	visit(o, func(o fyne.CanvasObject) {
+		if l, ok := o.(*widget.Label); ok {
+			out = append(out, l.Text)
+		}
+	})
+	return strings.Join(out, " ")
 }

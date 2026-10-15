@@ -22,7 +22,7 @@ func speedLabel(s float64) string { return fmt.Sprintf("%g×", s) }
 func (u *ui) buildSpeedMenu(item func(string, fyne.KeyName, fyne.KeyModifier, func()) *fyne.MenuItem) []*fyne.MenuItem {
 	cmd := fyne.KeyModifierShortcutDefault
 	u.speedItems = nil
-	for _, s := range speeds {
+	for _, s := range Speeds {
 		label := speedLabel(s)
 		if s == 1 {
 			label += " (Normal)"
@@ -42,7 +42,7 @@ func (u *ui) buildSpeedMenu(item func(string, fyne.KeyName, fyne.KeyModifier, fu
 // speed last chosen.
 func (u *ui) buildSpeedButton() *widget.Button {
 	u.speedBtn = widget.NewButton("", u.showSpeedChoices)
-	u.speed = nearest(speeds, u.prefs.FloatWithFallback(prefSpeed, 1))
+	u.speed = nearest(Speeds, u.prefs.FloatWithFallback(prefSpeed, 1))
 	u.showSpeed()
 	return u.speedBtn
 }
@@ -71,9 +71,9 @@ func (u *ui) setSpeed(s float64) {
 
 // stepSpeed moves to the next speed up (by 1) or down (by -1).
 func (u *ui) stepSpeed(by int) {
-	i := slices.Index(speeds, u.speed) + by
-	if i >= 0 && i < len(speeds) {
-		u.setSpeed(speeds[i])
+	i := slices.Index(Speeds, u.speed) + by
+	if i >= 0 && i < len(Speeds) {
+		u.setSpeed(Speeds[i])
 	}
 }
 
@@ -88,7 +88,7 @@ func (u *ui) showSpeed() {
 	}
 	u.speedBtn.Refresh()
 	for i, it := range u.speedItems {
-		it.Checked = speeds[i] == u.speed
+		it.Checked = Speeds[i] == u.speed
 	}
 	if u.mainMenu != nil {
 		u.mainMenu.Refresh()

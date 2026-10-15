@@ -10,7 +10,7 @@ import (
 // toneThrough passes a second of a sine at hz and amplitude amp through
 // the equalizer at rate, and returns the output's RMS and peak after it
 // has settled.
-func toneThrough(s eqSettings, rate int, hz, amp float64) (rms, peak float64) {
+func toneThrough(s EQSettings, rate int, hz, amp float64) (rms, peak float64) {
 	pos := 0
 	src := beep.StreamerFunc(func(out [][2]float64) (int, bool) {
 		for i := range out {
@@ -35,20 +35,20 @@ func toneThrough(s eqSettings, rate int, hz, amp float64) (rms, peak float64) {
 // The sound changes by what the filters' response says, less the headroom
 // taken off so the largest boost can't clip.
 func TestEQMatchesItsResponse(t *testing.T) {
-	s := eqSettings{On: true, Bands: defaultEQBands()}
+	s := EQSettings{On: true, Bands: DefaultEQBands()}
 	for i, g := range []float64{6, 3, -4, 0, 2, -6, 0, 4, -3, 5} {
 		s.Bands[i].Gain = g
 	}
 	for _, rate := range []int{44100, 96000} {
-		f := newEQFilters(s, float64(rate))
+		f := NewEQFilters(s, float64(rate))
 		headroom := 20 * math.Log10(f.gain)
-		if want := -f.peak(); math.Abs(headroom-want) > 1e-9 {
+		if want := -f.Peak(); math.Abs(headroom-want) > 1e-9 {
 			t.Errorf("headroom %.2f dB, want %.2f", headroom, want)
 		}
 		for _, hz := range []float64{40, 125, 440, 1000, 3000, 8000, 15000} {
 			rms, _ := toneThrough(s, rate, hz, 0.5)
 			got := dB(rms / (0.5 / math.Sqrt2))
-			if want := f.responseDB(hz) + headroom; math.Abs(got-want) > 0.1 {
+			if want := f.ResponseDB(hz) + headroom; math.Abs(got-want) > 0.1 {
 				t.Errorf("%d Hz rate, %g Hz: %.2f dB, want %.2f", rate, hz, got, want)
 			}
 		}
@@ -60,9 +60,9 @@ func TestEQMatchesItsResponse(t *testing.T) {
 func TestEQBandShapes(t *testing.T) {
 	const rate = 48000
 	resp := func(band int, gain, hz float64) float64 {
-		s := eqSettings{On: true, Bands: defaultEQBands()}
+		s := EQSettings{On: true, Bands: DefaultEQBands()}
 		s.Bands[band].Gain = gain
-		return newEQFilters(s, rate).responseDB(hz)
+		return NewEQFilters(s, rate).ResponseDB(hz)
 	}
 	if got := resp(5, 6, 1000); math.Abs(got-6) > 0.01 {
 		t.Errorf("peak at its frequency: %.2f dB", got)
@@ -86,8 +86,8 @@ func TestEQBandShapes(t *testing.T) {
 
 // A full-scale tone at the most boosted frequency still doesn't clip.
 func TestEQDoesntClip(t *testing.T) {
-	s := eqSettings{On: true, Bands: defaultEQBands()}
-	s.Bands[1].Gain = eqMaxGain
+	s := EQSettings{On: true, Bands: DefaultEQBands()}
+	s.Bands[1].Gain = EQMaxGain
 	if _, peak := toneThrough(s, 44100, 62, 1); peak > 1.001 {
 		t.Errorf("peak %.3f", peak)
 	}
@@ -95,9 +95,9 @@ func TestEQDoesntClip(t *testing.T) {
 
 // Off, or flat, the samples pass through untouched.
 func TestEQOffIsBitExact(t *testing.T) {
-	boosted := eqSettings{Bands: defaultEQBands()}
+	boosted := EQSettings{Bands: DefaultEQBands()}
 	boosted.Bands[3].Gain = 6
-	for _, s := range []eqSettings{boosted, {On: true, Bands: defaultEQBands()}} {
+	for _, s := range []EQSettings{boosted, {On: true, Bands: DefaultEQBands()}} {
 		in := [][2]float64{{0.25, -0.5}, {0.125, 0}, {-1, 1}}
 		got := make([][2]float64, len(in))
 		e := &equalizer{s: beep.StreamerFunc(func(o [][2]float64) (int, bool) { return copy(o, in), true })}
@@ -114,10 +114,10 @@ func TestEQOffIsBitExact(t *testing.T) {
 // The band at 16 kHz still works at 32 kHz, where it is past the top of
 // the range: it moves down to just below it.
 func TestEQBandAboveTheRange(t *testing.T) {
-	s := eqSettings{On: true, Bands: defaultEQBands()}
+	s := EQSettings{On: true, Bands: DefaultEQBands()}
 	s.Bands[9].Gain = 6
-	f := newEQFilters(s, 32000)
-	if r := f.responseDB(15000); math.IsNaN(r) || r < 3 {
+	f := NewEQFilters(s, 32000)
+	if r := f.ResponseDB(15000); math.IsNaN(r) || r < 3 {
 		t.Errorf("response %.2f", r)
 	}
 }
@@ -126,7 +126,7 @@ func TestEQBandAboveTheRange(t *testing.T) {
 // song's rate.
 func TestPlayerEQ(t *testing.T) {
 	p := testPlayer(t)
-	s := eqSettings{On: true, Bands: defaultEQBands()}
+	s := EQSettings{On: true, Bands: DefaultEQBands()}
 	s.Bands[2].Gain = 3
 	p.SetEQ(s)
 	p.Play(longFLAC(t, 96000, 24, 2), func(error) {})
@@ -142,7 +142,7 @@ func TestPlayerEQ(t *testing.T) {
 
 // Ten bands on two channels at 192 kHz, a second of sound at a time.
 func BenchmarkEQ192k(b *testing.B) {
-	s := eqSettings{On: true, Bands: defaultEQBands()}
+	s := EQSettings{On: true, Bands: DefaultEQBands()}
 	for i := range s.Bands {
 		s.Bands[i].Gain = 3
 	}

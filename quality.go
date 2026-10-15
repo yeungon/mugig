@@ -68,7 +68,7 @@ type qualityReport struct {
 
 // verify decodes the whole of a lossless file. It stops early, returning
 // ctx's error, if ctx is cancelled.
-func verify(ctx context.Context, path string, info audioInfo) (qualityReport, error) {
+func verify(ctx context.Context, path string, info Info) (qualityReport, error) {
 	rep, _, err := analyse(ctx, path, info, false, nil)
 	return rep, err
 }
@@ -76,21 +76,21 @@ func verify(ctx context.Context, path string, info audioInfo) (qualityReport, er
 // analyse decodes the whole file, checking lossless audio (see verify) and,
 // if picture is set, drawing a spectrogram of any audio. progress, if not
 // nil, is called with the fraction done as decoding goes on.
-func analyse(ctx context.Context, path string, info audioInfo, picture bool, progress func(float64)) (rep qualityReport, img *image.Gray, err error) {
+func analyse(ctx context.Context, path string, info Info, picture bool, progress func(float64)) (rep qualityReport, img *image.Gray, err error) {
 	defer func() {
 		if r := recover(); r != nil { // a decoder choking on a damaged file
 			rep, img, err = qualityReport{Damaged: fmt.Sprint("the decoder failed: ", r)}, nil, nil
 		}
 	}()
-	report := progressReporter(info.samples, progress)
+	report := progressReporter(info.Samples, progress)
 	lv := newLevels(float64(info.SampleRate), info.Channels)
 	var spec *spectrum
 	switch {
-	case info.kind == flacFile:
+	case info.Kind == FLAC:
 		rep, spec, err = verifyFLAC(ctx, path, info, report, lv)
-	case info.kind == wavFile && info.Lossless:
+	case info.Kind == WAV && info.Lossless:
 		rep, spec, err = verifyWAV(ctx, path, info, report, lv)
-	case info.kind == mp3File || info.Codec == "Ogg Vorbis":
+	case info.Kind == MP3 || info.Codec == "Ogg Vorbis":
 		spec, err = decodeLossy(ctx, path, info, report, lv)
 	default:
 		return rep, nil, errors.New("cannot check this format")
@@ -107,8 +107,8 @@ func analyse(ctx context.Context, path string, info audioInfo, picture bool, pro
 }
 
 // canAnalyse reports whether analyse can decode the file.
-func canAnalyse(info audioInfo) bool {
-	return canVerify(info) || info.kind == mp3File || info.Codec == "Ogg Vorbis"
+func canAnalyse(info Info) bool {
+	return canVerify(info) || info.Kind == MP3 || info.Codec == "Ogg Vorbis"
 }
 
 // progressReporter turns a count of samples decoded into calls to f, at
@@ -129,8 +129,8 @@ func progressReporter(total int64, f func(float64)) func(done int64) {
 // decodeLossy runs a lossy file through the player's decoder to draw its
 // spectrogram. Lossy files have nothing to verify, but their spectrogram is
 // useful to compare: it shows the encoder's cut-off.
-func decodeLossy(ctx context.Context, path string, info audioInfo, report func(int64), lv *levels) (*spectrum, error) {
-	s, format, err := decodeAs(path, info.kind)
+func decodeLossy(ctx context.Context, path string, info Info, report func(int64), lv *levels) (*spectrum, error) {
+	s, format, err := DecodeAs(path, info.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -158,9 +158,9 @@ func decodeLossy(ctx context.Context, path string, info audioInfo, report func(i
 	return spec, nil
 }
 
-func verifyFLAC(ctx context.Context, path string, info audioInfo, report func(int64), lv *levels) (qualityReport, *spectrum, error) {
+func verifyFLAC(ctx context.Context, path string, info Info, report func(int64), lv *levels) (qualityReport, *spectrum, error) {
 	var rep qualityReport
-	spec := newSpectrum(float64(info.SampleRate), info.samples)
+	spec := newSpectrum(float64(info.SampleRate), info.Samples)
 	stream, err := flac.Open(path)
 	if err != nil {
 		return secondOpinion(ctx, path, info, report, lv, qualityReport{Damaged: err.Error()}, spec)
@@ -206,14 +206,14 @@ func verifyFLAC(ctx context.Context, path string, info audioInfo, report func(in
 		report(decoded)
 	}
 	if rep.Damaged == "" {
-		if info.md5 != [md5.Size]byte{} {
+		if info.MD5 != [md5.Size]byte{} {
 			rep.Checksum = checksumBad
-			if [md5.Size]byte(sum.Sum(nil)) == info.md5 {
+			if [md5.Size]byte(sum.Sum(nil)) == info.MD5 {
 				rep.Checksum = checksumOK
 			}
 		}
-		if info.samples > decoded {
-			rep.Missing = time.Duration(info.samples-decoded) * time.Second / time.Duration(info.SampleRate)
+		if info.Samples > decoded {
+			rep.Missing = time.Duration(info.Samples-decoded) * time.Second / time.Duration(info.SampleRate)
 		}
 	}
 	rep.UsedBits = usedBits(int64(used), info.Bits)
@@ -224,8 +224,8 @@ func verifyFLAC(ctx context.Context, path string, info audioInfo, report func(in
 // file (own holds where). Where macOS's decoder is available it reads the
 // file again from the start: if that succeeds, its result stands, noting
 // where Mugig's own decoder stopped. Otherwise the file is damaged.
-func secondOpinion(ctx context.Context, path string, info audioInfo, report func(int64), lv *levels, own qualityReport, spec *spectrum) (qualityReport, *spectrum, error) {
-	if !appleDecoding {
+func secondOpinion(ctx context.Context, path string, info Info, report func(int64), lv *levels, own qualityReport, spec *spectrum) (qualityReport, *spectrum, error) {
+	if !AppleDecoding {
 		return own, spec, nil
 	}
 	fresh := newLevels(float64(info.SampleRate), info.Channels)
@@ -244,23 +244,23 @@ func secondOpinion(ctx context.Context, path string, info audioInfo, report func
 // verifyWithApple checks a FLAC file with macOS's decoder. Its samples are
 // exact (floats hold 24-bit samples exactly), so the stored checksum can
 // be compared just as with the FLAC library.
-func verifyWithApple(ctx context.Context, path string, info audioInfo, report func(int64), lv *levels) (qualityReport, *spectrum, error) {
-	spec := newSpectrum(float64(info.SampleRate), info.samples)
-	f, err := appleOpen(path, true)
+func verifyWithApple(ctx context.Context, path string, info Info, report func(int64), lv *levels) (qualityReport, *spectrum, error) {
+	spec := newSpectrum(float64(info.SampleRate), info.Samples)
+	f, err := OpenApple(path, true)
 	if err != nil {
 		return qualityReport{Damaged: err.Error()}, spec, nil
 	}
-	defer f.close()
+	defer f.Close()
 	rep := qualityReport{ReadBy: "macOS"}
 	bits := info.Bits
 	if bits <= 0 || bits > 32 {
-		bits = f.bits
+		bits = f.Bits
 	}
 	full := float64(int64(1) << (bits - 1))
 	width := (bits + 7) / 8 // bytes per sample in FLAC's checksum
 	scale := 1 / full
 	sum := md5.New()
-	buf := make([]float32, 4096*f.channels)
+	buf := make([]float32, 4096*f.Channels)
 	out := make([]byte, 0, len(buf)*4)
 	mono := make([]float64, 0, 4096)
 	var used int64
@@ -269,7 +269,7 @@ func verifyWithApple(ctx context.Context, path string, info audioInfo, report fu
 		if err := ctx.Err(); err != nil {
 			return rep, nil, err
 		}
-		n, err := f.read(unsafe.Pointer(&buf[0]), 4096)
+		n, err := f.Read(unsafe.Pointer(&buf[0]), 4096)
 		if err != nil {
 			rep.Damaged = err.Error()
 			rep.DamageAt = time.Duration(decoded) * time.Second / time.Duration(info.SampleRate)
@@ -282,8 +282,8 @@ func verifyWithApple(ctx context.Context, path string, info audioInfo, report fu
 		for i := range n {
 			s := 0.0
 			var frame [2]float64
-			for c := range f.channels {
-				v := int64(math.Round(float64(buf[i*f.channels+c]) * full))
+			for c := range f.Channels {
+				v := int64(math.Round(float64(buf[i*f.Channels+c]) * full))
 				used |= v
 				for b := range width {
 					out = append(out, byte(v>>(8*b)))
@@ -294,7 +294,7 @@ func verifyWithApple(ctx context.Context, path string, info audioInfo, report fu
 					frame[c] = x
 				}
 			}
-			mono = append(mono, s/float64(f.channels))
+			mono = append(mono, s/float64(f.Channels))
 			lv.add(frame)
 		}
 		sum.Write(out)
@@ -303,23 +303,23 @@ func verifyWithApple(ctx context.Context, path string, info audioInfo, report fu
 		report(decoded)
 	}
 	if rep.Damaged == "" {
-		if info.md5 != [md5.Size]byte{} {
+		if info.MD5 != [md5.Size]byte{} {
 			rep.Checksum = checksumBad
-			if [md5.Size]byte(sum.Sum(nil)) == info.md5 {
+			if [md5.Size]byte(sum.Sum(nil)) == info.MD5 {
 				rep.Checksum = checksumOK
 			}
 		}
-		if info.samples > decoded {
-			rep.Missing = time.Duration(info.samples-decoded) * time.Second / time.Duration(info.SampleRate)
+		if info.Samples > decoded {
+			rep.Missing = time.Duration(info.Samples-decoded) * time.Second / time.Duration(info.SampleRate)
 		}
 	}
 	rep.UsedBits = usedBits(used, bits)
 	return rep, spec, nil
 }
 
-func verifyWAV(ctx context.Context, path string, info audioInfo, report func(int64), lv *levels) (qualityReport, *spectrum, error) {
+func verifyWAV(ctx context.Context, path string, info Info, report func(int64), lv *levels) (qualityReport, *spectrum, error) {
 	var rep qualityReport
-	spec := newSpectrum(float64(info.SampleRate), info.samples)
+	spec := newSpectrum(float64(info.SampleRate), info.Samples)
 	f, err := os.Open(path)
 	if err != nil {
 		rep.Damaged = err.Error()
@@ -327,22 +327,22 @@ func verifyWAV(ctx context.Context, path string, info audioInfo, report func(int
 	}
 	defer f.Close()
 	if st, err := f.Stat(); err == nil {
-		if avail := st.Size() - info.dataStart; avail < info.dataSize {
-			short := (info.dataSize - avail) / int64(info.sampleBytes*info.Channels)
+		if avail := st.Size() - info.DataStart; avail < info.DataSize {
+			short := (info.DataSize - avail) / int64(info.SampleBytes*info.Channels)
 			rep.Missing = time.Duration(short) * time.Second / time.Duration(info.SampleRate)
 		}
 	}
-	if _, err := f.Seek(info.dataStart, io.SeekStart); err != nil {
+	if _, err := f.Seek(info.DataStart, io.SeekStart); err != nil {
 		rep.Damaged = err.Error()
 		return rep, spec, nil
 	}
 
-	frame := info.sampleBytes * info.Channels
-	r := io.LimitReader(f, info.dataSize)
+	frame := info.SampleBytes * info.Channels
+	r := io.LimitReader(f, info.DataSize)
 	buf := make([]byte, frame*4096)
 	mono := make([]float64, 0, 4096)
 	var decoded int64
-	containerBits := info.sampleBytes * 8
+	containerBits := info.SampleBytes * 8
 	scale := 1 / float64(int64(1)<<(containerBits-1))
 	var used int64
 	for {
@@ -356,7 +356,7 @@ func verifyWAV(ctx context.Context, path string, info audioInfo, report func(int
 			s := 0.0
 			var fr [2]float64
 			for c := range info.Channels {
-				b := buf[off+c*info.sampleBytes : off+(c+1)*info.sampleBytes]
+				b := buf[off+c*info.SampleBytes : off+(c+1)*info.SampleBytes]
 				var x float64
 				if info.Float {
 					x = wavFloat(b)
@@ -522,7 +522,7 @@ func (s *spectrum) analyse() {
 		sq += v * v
 		s.buf[i] = complex(v*s.window[i], 0)
 	}
-	fft(s.buf)
+	FFT(s.buf)
 	col := make([]float32, specRows)
 	for k := range s.power {
 		re, im := real(s.buf[k]), imag(s.buf[k])
@@ -685,8 +685,8 @@ type assessment struct {
 }
 
 // canVerify reports whether verify can check the file's audio.
-func canVerify(info audioInfo) bool {
-	return info.Lossless && (info.kind == flacFile || info.kind == wavFile)
+func canVerify(info Info) bool {
+	return info.Lossless && (info.Kind == FLAC || info.Kind == WAV)
 }
 
 // lossyCutoff is below where a cut-off means a lossy source. Higher cut-offs
@@ -697,7 +697,7 @@ const lossyCutoff = 19_500.0
 // assess turns what probe and verify found into a verdict. rep is nil if
 // the audio hasn't been checked, in which case the verdict comes from the
 // headers alone.
-func assess(info audioInfo, rep *qualityReport) assessment {
+func assess(info Info, rep *qualityReport) assessment {
 	a := assessment{spec: describe(info)}
 	if info.Mismatch != "" {
 		a.checks = append(a.checks, check{checkWarn, fmt.Sprintf("Named %s, but holds %s audio", info.Mismatch, info.Codec)})
@@ -724,7 +724,7 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 
 	// Integrity.
 	switch {
-	case rep.Damaged != "" && info.kind == flacFile:
+	case rep.Damaged != "" && info.Kind == FLAC:
 		// The check stops at the first damage; playback skips each damaged
 		// frame (see flacStream).
 		a.checks = append(a.checks, check{checkBad, fmt.Sprintf(
@@ -738,7 +738,7 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 		a.checks = append(a.checks, check{checkBad, fmt.Sprintf("Incomplete: %s of audio is missing from the end", roundedDuration(rep.Missing))})
 	case rep.Checksum == checksumOK:
 		a.checks = append(a.checks, check{checkOK, "Intact: the audio matches the checksum stored in the file"})
-	case info.kind == flacFile:
+	case info.Kind == FLAC:
 		a.checks = append(a.checks, check{checkOK, "Reads cleanly (this file has no stored checksum to compare)"})
 	default:
 		a.checks = append(a.checks, check{checkOK, "Complete and readable (WAV files have no checksum)"})
@@ -881,7 +881,7 @@ func lossyGuess(hz float64) string {
 
 // describe sums up the format, e.g. "FLAC · 24-bit · 96 kHz · Stereo ·
 // 2,304 kbps".
-func describe(info audioInfo) string {
+func describe(info Info) string {
 	parts := []string{info.Codec}
 	switch {
 	case info.Float:

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,7 +14,7 @@ import (
 func TestCacheSkipsUnchangedFiles(t *testing.T) {
 	dir := t.TempDir()
 	song := filepath.Join(dir, "song.mp3")
-	writeFile(t, song, id3v23(map[string]string{"TIT2": "First"}))
+	audiotest.WriteFile(t, song, id3v23(map[string]string{"TIT2": "First"}))
 	cachePath := filepath.Join(t.TempDir(), "library.gob")
 
 	c := loadCache(cachePath)
@@ -32,7 +33,7 @@ func TestCacheSkipsUnchangedFiles(t *testing.T) {
 		t.Fatalf("rescan should come from cache: %+v", r)
 	}
 
-	writeFile(t, song, id3v23(map[string]string{"TIT2": "Second"}))
+	audiotest.WriteFile(t, song, id3v23(map[string]string{"TIT2": "Second"}))
 	later := time.Now().Add(time.Minute)
 	if err := os.Chtimes(song, later, later); err != nil {
 		t.Fatal(err)
@@ -70,7 +71,7 @@ func TestCacheDropsDeletedFilesOnlyAfterFullScan(t *testing.T) {
 func TestCacheIgnoresBadFiles(t *testing.T) {
 	dir := t.TempDir()
 	corrupt := filepath.Join(dir, "corrupt.gob")
-	writeFile(t, corrupt, []byte("definitely not gob"))
+	audiotest.WriteFile(t, corrupt, []byte("definitely not gob"))
 	if c := loadCache(corrupt); len(c.entries) != 0 {
 		t.Error("corrupt cache should load empty")
 	}
@@ -99,9 +100,9 @@ func TestCacheIgnoresBadFiles(t *testing.T) {
 func TestRescanUsesCache(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "a.mp3"), id3v23(map[string]string{"TIT2": "A"}))
-	writeFile(t, filepath.Join(dir, "sub", "b.mp3"), id3v23(map[string]string{"TIT2": "B"}))
-	writeFile(t, filepath.Join(dir, "notes.txt"), nil)
+	audiotest.WriteFile(t, filepath.Join(dir, "a.mp3"), id3v23(map[string]string{"TIT2": "A"}))
+	audiotest.WriteFile(t, filepath.Join(dir, "sub", "b.mp3"), id3v23(map[string]string{"TIT2": "B"}))
+	audiotest.WriteFile(t, filepath.Join(dir, "notes.txt"), nil)
 
 	for _, want := range []string{"0 unchanged", "2 unchanged"} {
 		u.runScan(context.Background(), dir, 2) // the second time, the tracks are updated, not added again

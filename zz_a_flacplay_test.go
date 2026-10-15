@@ -1,16 +1,11 @@
 package main
 
 import (
-	"errors"
 	"math/rand"
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/widget"
 )
 
 const playRate = 44100
@@ -35,7 +30,7 @@ func damagedFLAC(t *testing.T, damage func(data []byte) []byte) (string, []int32
 // playAll streams path to the end, returning the left channel.
 func playAll(t *testing.T, path string) ([]float64, *flacStream) {
 	t.Helper()
-	s, _, err := decode(path)
+	s, _, err := Decode(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +127,7 @@ func TestSeekDamaged(t *testing.T) {
 		data[len(data)/3] ^= 0x5A
 		return data
 	})
-	s, _, err := decode(path)
+	s, _, err := Decode(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,32 +162,4 @@ func TestSeekDamaged(t *testing.T) {
 	if len(after) != len(want)-lost-10 {
 		t.Errorf("after seeking into the damage, %d samples, want %d", len(after), len(want)-lost-10)
 	}
-}
-
-// When a song stops because it can't be read, that is said, and the next
-// song doesn't start as if it had finished.
-func TestStoppedEarlySays(t *testing.T) {
-	u, fp, _ := newTestUI(t)
-	setLibrary(u, fiveTracks()...)
-	u.jump(u.tracks[0])
-	fp.fail(t, errors.New("the file couldn't be read: input/output error"))
-	if len(fp.played) != 1 || u.playing.Path != "" {
-		t.Errorf("played %q, playing %q", fp.played, u.playing.Path)
-	}
-	if top := u.win.Canvas().Overlays().Top(); top == nil {
-		t.Error("no message shown")
-	} else if text := allText(top); !strings.Contains(text, "Stopped playing Come Together") {
-		t.Errorf("message %q", text)
-	}
-}
-
-// allText joins the text of every label in o.
-func allText(o fyne.CanvasObject) string {
-	var out []string
-	visit(o, func(o fyne.CanvasObject) {
-		if l, ok := o.(*widget.Label); ok {
-			out = append(out, l.Text)
-		}
-	})
-	return strings.Join(out, " ")
 }

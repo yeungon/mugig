@@ -378,7 +378,7 @@ func (u *ui) prepareNext() {
 	if u.playing.Path == "" {
 		return
 	}
-	if d := u.player.Duration(); d <= 0 || d-u.player.Position() > gaplessLead {
+	if d := u.player.Duration(); d <= 0 || d-u.player.Position() > GaplessLead {
 		return
 	}
 	t, _ := u.following()
@@ -678,8 +678,8 @@ type audioPlayer interface {
 	// resumes, on or off.
 	SetFadeIn(on bool)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
-	SetCrossfeed(level crossfeedLevel)
-	SetEQ(s eqSettings)
+	SetCrossfeed(level CrossfeedLevel)
+	SetEQ(s EQSettings)
 	// Samples fills dst with the most recent audio, mono and oldest first,
 	// and returns its sample rate, or 0 if nothing is playing.
 	Samples(dst []float64) int
@@ -689,7 +689,7 @@ type audioPlayer interface {
 	// Devices lists the output devices, and SetDevice picks one by ID, ""
 	// for the system default. SetMatchRate turns switching the device to
 	// each track's rate on or off.
-	Devices() []outputDevice
+	Devices() []Device
 	SetDevice(id string)
 	SetMatchRate(on bool)
 	// SetExclusive turns taking the device for Mugig alone on or off, and

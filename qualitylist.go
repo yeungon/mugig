@@ -14,7 +14,7 @@ var lossyFormats = map[string]bool{"MP3": true, "OGG": true}
 //
 // Verdicts are kept by file, so the songs of a disc image share its one.
 func (u *ui) levelOf(t Track) qualityLevel {
-	if l, ok := u.levels[fileOf(t.Path)]; ok {
+	if l, ok := u.levels[FileOf(t.Path)]; ok {
 		return l
 	}
 	if lossyFormats[t.Format] {
@@ -55,6 +55,6 @@ var levelRank = map[qualityLevel]int{
 
 // setLevel records a song's new verdict and shows it.
 func (u *ui) setLevel(path string, l qualityLevel) {
-	u.levels[fileOf(path)] = l
+	u.levels[FileOf(path)] = l
 	u.table.Refresh()
 }

@@ -12,31 +12,31 @@ import (
 // the song is. The scan records them here.
 var cueSpans sync.Map // song path → cueSpan
 
-type cueSpan struct {
-	file       string
-	start, end time.Duration // end 0 for the end of the file
+type Span struct {
+	File       string
+	Start, End time.Duration // end 0 for the end of the file
 }
 
 // rememberSpan records that the song at path is a stretch of an image.
-func rememberSpan(path string, s cueSpan) { cueSpans.Store(path, s) }
+func RememberSpan(path string, s Span) { cueSpans.Store(path, s) }
 
 // forgetSpans forgets every song recorded, as if starting afresh.
-func forgetSpans() { cueSpans.Clear() }
+func ForgetSpans() { cueSpans.Clear() }
 
 // spanOf returns where the song at path is: its image and the stretch of
 // it, or for any other song, the file itself, whole.
-func spanOf(path string) cueSpan {
+func spanOf(path string) Span {
 	if v, ok := cueSpans.Load(path); ok {
-		return v.(cueSpan)
+		return v.(Span)
 	}
-	return cueSpan{file: path}
+	return Span{File: path}
 }
 
 // fileOf is the file a song is in: its image, for a song from a CUE sheet.
-func fileOf(path string) string { return spanOf(path).file }
+func FileOf(path string) string { return spanOf(path).File }
 
 // fromCue reports whether the song at path is part of an image.
-func fromCue(path string) bool { return spanOf(path).file != path }
+func FromCue(path string) bool { return spanOf(path).File != path }
 
 // segment plays a stretch of s, as if it were all there is.
 type segment struct {
@@ -45,14 +45,14 @@ type segment struct {
 }
 
 // cut narrows s, of format f, to the span, if it is a part of the file.
-func (sp cueSpan) cut(s beep.StreamSeekCloser, f beep.Format) (beep.StreamSeekCloser, error) {
-	if sp.start == 0 && sp.end == 0 {
+func (sp Span) cut(s beep.StreamSeekCloser, f beep.Format) (beep.StreamSeekCloser, error) {
+	if sp.Start == 0 && sp.End == 0 {
 		return s, nil
 	}
-	skip := min(samplesAt(sp.start, f.SampleRate), s.Len())
+	skip := min(samplesAt(sp.Start, f.SampleRate), s.Len())
 	n := s.Len() - skip
-	if sp.end > 0 {
-		n = min(samplesAt(sp.end, f.SampleRate)-skip, n)
+	if sp.End > 0 {
+		n = min(samplesAt(sp.End, f.SampleRate)-skip, n)
 	}
 	if err := s.Seek(skip); err != nil {
 		return nil, err

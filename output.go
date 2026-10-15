@@ -19,7 +19,7 @@ import (
 )
 
 // outputDevice is a device that can play sound.
-type outputDevice struct {
+type Device struct {
 	ID        string // malgo's device ID in hex; stable for a device
 	Name      string
 	IsDefault bool
@@ -165,7 +165,7 @@ func (o *output) fill(out, _ []byte, frames uint32) {
 }
 
 // devices lists the devices that can play sound.
-func (o *output) devices() ([]outputDevice, error) {
+func (o *output) devices() ([]Device, error) {
 	ctx, err := o.context()
 	if err != nil {
 		return nil, err
@@ -174,9 +174,9 @@ func (o *output) devices() ([]outputDevice, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]outputDevice, len(infos))
+	out := make([]Device, len(infos))
 	for i, d := range infos {
-		out[i] = outputDevice{ID: d.ID.String(), Name: d.Name(), IsDefault: d.IsDefault != 0}
+		out[i] = Device{ID: d.ID.String(), Name: d.Name(), IsDefault: d.IsDefault != 0}
 	}
 	return out, nil
 }

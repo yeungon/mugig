@@ -16,23 +16,23 @@ import (
 )
 
 // crossfeedLevel is how much of each channel reaches the other ear.
-type crossfeedLevel int
+type CrossfeedLevel int
 
 const (
-	crossfeedOff crossfeedLevel = iota
-	crossfeedLight
-	crossfeedMedium
-	crossfeedStrong
+	CrossfeedOff CrossfeedLevel = iota
+	CrossfeedLight
+	CrossfeedMedium
+	CrossfeedStrong
 )
 
-var crossfeedNames = []string{"Off", "Light", "Medium", "Strong"}
+var CrossfeedNames = []string{"Off", "Light", "Medium", "Strong"}
 
 // crossfeedPresets are bs2b's: the low-pass cut-off of the far channel, in
 // Hz, and how far below the near channel it is fed in, in dB.
-var crossfeedPresets = map[crossfeedLevel]struct{ cutoff, feed float64 }{
-	crossfeedLight:  {650, 9.5}, // Jan Meier's
-	crossfeedMedium: {700, 6},   // Chu Moy's
-	crossfeedStrong: {700, 4.5}, // bs2b's default
+var crossfeedPresets = map[CrossfeedLevel]struct{ cutoff, feed float64 }{
+	CrossfeedLight:  {650, 9.5}, // Jan Meier's
+	CrossfeedMedium: {700, 6},   // Chu Moy's
+	CrossfeedStrong: {700, 4.5}, // bs2b's default
 }
 
 // crossfeed filters stereo audio. Off, it passes the samples through
@@ -40,7 +40,7 @@ var crossfeedPresets = map[crossfeedLevel]struct{ cutoff, feed float64 }{
 // locked.
 type crossfeed struct {
 	s     beep.Streamer
-	level crossfeedLevel
+	level CrossfeedLevel
 	rate  int
 
 	a0Lo, b1Lo, a0Hi, a1Hi, b1Hi, gain float64
@@ -49,12 +49,12 @@ type crossfeed struct {
 
 // set chooses the level, at the sample rate of the audio. The filters
 // start afresh.
-func (c *crossfeed) set(level crossfeedLevel, rate int) {
+func (c *crossfeed) set(level CrossfeedLevel, rate int) {
 	c.level, c.rate = level, rate
 	c.lo, c.hi, c.asis = [2]float64{}, [2]float64{}, [2]float64{}
 	p, ok := crossfeedPresets[level]
 	if !ok || rate <= 0 {
-		c.level = crossfeedOff
+		c.level = CrossfeedOff
 		return
 	}
 	gLoDB := -p.feed*5/6 - 3
@@ -72,7 +72,7 @@ func (c *crossfeed) set(level crossfeedLevel, rate int) {
 
 func (c *crossfeed) Stream(samples [][2]float64) (int, bool) {
 	n, ok := c.s.Stream(samples)
-	if c.level == crossfeedOff {
+	if c.level == CrossfeedOff {
 		return n, ok
 	}
 	for i, in := range samples[:n] {
@@ -87,5 +87,3 @@ func (c *crossfeed) Stream(samples [][2]float64) (int, bool) {
 }
 
 func (c *crossfeed) Err() error { return c.s.Err() }
-
-const prefCrossfeed = "crossfeed"

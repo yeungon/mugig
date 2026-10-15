@@ -139,46 +139,45 @@ func TestScanCueSongs(t *testing.T) {
 		if want := 2*time.Second - (time.Second + 10*time.Second/75); s.Length != want {
 			t.Errorf("%s: length %v, want %v", when, s.Length, want)
 		}
-		if fileOf(s.Path) != filepath.Join(dir, "Album.wav") || !fromCue(s.Path) {
-			t.Errorf("%s: its file is %q", when, fileOf(s.Path))
+		if FileOf(s.Path) != filepath.Join(dir, "Album.wav") || !FromCue(s.Path) {
+			t.Errorf("%s: its file is %q", when, FileOf(s.Path))
 		}
 	}
 	check("first scan")
-	forgetSpans() // as at the next start
+	ForgetSpans() // as at the next start
 	u.scanLibrary()
 	check("from the cache")
 }
 
 // Each song plays exactly its stretch of the image, and played one after
-// another without a gap they are the image, sample for sample.
+// another they are the image, sample for sample. (That the player joins
+// songs on the very sample is tested with the player.)
 func TestCueSongsPlayTheImageExactly(t *testing.T) {
 	dir, want := cueImage(t, "Album", nil)
 	u, _, _ := newTestUI(t)
 	u.addFolder(dir)
 	image := filepath.Join(dir, "Album.wav")
 
-	a := openTestDeck(t, cuePath(image, 1))
-	b := openTestDeck(t, cuePath(image, 2))
-	c := openTestDeck(t, cuePath(image, 3))
-	if n := a.stream.Len(); n != 44100+5880 {
-		t.Errorf("the first song has %d samples, want %d", n, 44100+5880)
-	}
-	ds := &decks{cur: a, next: b, switched: func(old *deck) {}}
-	ds.switched = func(*deck) {
-		if ds.cur == b {
-			ds.next = c
-		}
-	}
 	var got []float64
 	buf := make([][2]float64, 3000)
-	for {
-		n, ok := ds.Stream(buf)
-		for _, s := range buf[:n] {
-			got = append(got, s[0])
+	for n := 1; n <= 3; n++ {
+		s, _, err := Decode(cuePath(image, n))
+		if err != nil {
+			t.Fatal(err)
 		}
-		if !ok {
-			break
+		if n == 1 && s.Len() != 44100+5880 {
+			t.Errorf("the first song has %d samples, want %d", s.Len(), 44100+5880)
 		}
+		for {
+			k, ok := s.Stream(buf)
+			for _, x := range buf[:k] {
+				got = append(got, x[0])
+			}
+			if !ok {
+				break
+			}
+		}
+		s.Close()
 	}
 	if len(got) != len(want) {
 		t.Fatalf("%d samples, want %d", len(got), len(want))
@@ -190,9 +189,14 @@ func TestCueSongsPlayTheImageExactly(t *testing.T) {
 	}
 
 	// Seeking is within the song.
-	b.stream.Seek(100)
+	b, _, err := Decode(cuePath(image, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+	b.Seek(100)
 	one := make([][2]float64, 1)
-	b.stream.Stream(one)
+	b.Stream(one)
 	if v := one[0][0] * 32768; v != float64(want[49980+100]) {
 		t.Errorf("after seeking: %v, want %v", v, want[49980+100])
 	}

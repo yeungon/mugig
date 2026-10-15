@@ -18,10 +18,9 @@ const nullBackend = malgo.BackendNull + 1
 
 // testPlayer plays through miniaudio's null device, which takes audio in
 // real time but makes no sound. It never switches a real device's rate.
-func testPlayer(t *testing.T) *player {
+func testPlayer(t *testing.T) *Player {
 	t.Helper()
-	newTestApp(t)
-	p := newPlayer()
+	p := NewPlayer(func(f func()) { f() }) // as the test app's UI thread does
 	p.out.backends = []malgo.Backend{nullBackend}
 	p.matchRate = false
 	t.Cleanup(p.Close)
@@ -117,7 +116,7 @@ func TestFullVolumeIsBitExact(t *testing.T) {
 		in[i] = [2]float64{v, -v}
 	}
 	src := beep.StreamerFunc(func(s [][2]float64) (int, bool) { return copy(s, in), true })
-	p := newPlayer() // the volume stage as Play builds it, at full volume
+	p := NewPlayer(nil) // the volume stage as Play builds it, at full volume
 	p.vol = &fader{s: newTap(src, 1024)}
 	p.vol.setRate(44100)
 	p.SetVolume(1)

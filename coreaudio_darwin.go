@@ -45,7 +45,7 @@ func setNominalRate(uid string, rate float64) bool {
 // change the device's rate. The system gives the device back if Mugig
 // quits or crashes.
 
-const canHogDevice = true
+const CanHogDevice = true
 
 // hogDevice takes the device with uid, or the default output for "", for
 // Mugig alone. It returns the device's ID, or 0 if another app has it or it
@@ -62,11 +62,11 @@ func unhogDevice(dev uint32) { C.caUnhog(C.uint(dev)) }
 // hogOwner is the process ID of the app with dev to itself, or -1.
 func hogOwner(dev uint32) int { return int(C.caHogOwner(C.uint(dev))) }
 
-// devicesChanged is called on the UI thread when an output device is added
-// or removed, or the default output changes. Set by watchDevices.
+// devicesChanged is called, on a CoreAudio thread, when an output device is
+// added or removed, or the default output changes. Set by watchDevices.
 var devicesChanged func()
 
-func watchDevices(f func()) {
+func WatchDevices(f func()) {
 	devicesChanged = f
 	C.caWatchDevices()
 }
@@ -74,6 +74,6 @@ func watchDevices(f func()) {
 //export goAudioDevicesChanged
 func goAudioDevicesChanged() {
 	if f := devicesChanged; f != nil {
-		onUI(f)
+		f()
 	}
 }

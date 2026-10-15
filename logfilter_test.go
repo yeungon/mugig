@@ -29,7 +29,7 @@ func TestQuietLogWhileDecoding(t *testing.T) {
 	const rate = 176400
 	path := filepath.Join(t.TempDir(), "x.flac")
 	audiotest.WriteFLAC(t, path, rate, 24, audiotest.Quantize(audiotest.Noise(rate, rate, audiotest.Pink), 24))
-	info, err := probe(path)
+	info, err := Probe(path)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,7 @@ import (
 // and the switch turns it all off.
 func TestEqualizerWindow(t *testing.T) {
 	u, fp, a := newTestUI(t)
-	if fp.eq.On || !fp.eq.flat() || fp.eq.Bands[5].Freq != 1000 {
+	if fp.eq.On || !fp.eq.Flat() || fp.eq.Bands[5].Freq != 1000 {
 		t.Fatalf("starts %+v, want off and flat", fp.eq)
 	}
 	setLibrary(u, fiveTracks()...)

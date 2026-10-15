@@ -118,7 +118,7 @@ func (u *ui) updateOutputInfo() {
 	}
 	var text string
 	switch {
-	case device == track && u.speed == 1 && u.crossfeed == crossfeedOff && !u.eq.active():
+	case device == track && u.speed == 1 && u.crossfeed == CrossfeedOff && !u.eq.Active():
 		text = fmt.Sprintf("Playing on %s at %s, unconverted", name, humanize.KHz(float64(track)))
 	case device == track:
 		text = fmt.Sprintf("Playing on %s at %s", name, humanize.KHz(float64(track)))
@@ -129,11 +129,11 @@ func (u *ui) updateOutputInfo() {
 	if u.speed != 1 {
 		text += fmt.Sprintf(", at %s speed with the pitch kept", speedLabel(u.speed))
 	}
-	if u.eq.active() {
+	if u.eq.Active() {
 		text += ", with the equalizer"
 	}
-	if u.crossfeed != crossfeedOff {
-		text += fmt.Sprintf(", with %s crossfeed", strings.ToLower(crossfeedNames[u.crossfeed]))
+	if u.crossfeed != CrossfeedOff {
+		text += fmt.Sprintf(", with %s crossfeed", strings.ToLower(CrossfeedNames[u.crossfeed]))
 	}
 	switch {
 	case u.player.Exclusive():
@@ -149,21 +149,21 @@ func (u *ui) updateOutputInfo() {
 // last chosen.
 func (u *ui) buildCrossfeedMenu() *fyne.MenuItem {
 	u.crossfeedItems = nil
-	for i, name := range crossfeedNames {
-		u.crossfeedItems = append(u.crossfeedItems, fyne.NewMenuItem(name, func() { u.setCrossfeed(crossfeedLevel(i)) }))
+	for i, name := range CrossfeedNames {
+		u.crossfeedItems = append(u.crossfeedItems, fyne.NewMenuItem(name, func() { u.setCrossfeed(CrossfeedLevel(i)) }))
 	}
 	sub := fyne.NewMenuItem("Crossfeed (for Headphones)", nil)
 	sub.ChildMenu = fyne.NewMenu("", u.crossfeedItems...)
-	u.crossfeed = crossfeedLevel(u.prefs.Int(prefCrossfeed))
-	if u.crossfeed < crossfeedOff || u.crossfeed > crossfeedStrong {
-		u.crossfeed = crossfeedOff
+	u.crossfeed = CrossfeedLevel(u.prefs.Int(prefCrossfeed))
+	if u.crossfeed < CrossfeedOff || u.crossfeed > CrossfeedStrong {
+		u.crossfeed = CrossfeedOff
 	}
 	u.showCrossfeed()
 	return sub
 }
 
 // setCrossfeed changes the crossfeed level and remembers it.
-func (u *ui) setCrossfeed(level crossfeedLevel) {
+func (u *ui) setCrossfeed(level CrossfeedLevel) {
 	u.crossfeed = level
 	u.prefs.SetInt(prefCrossfeed, int(level))
 	u.showCrossfeed()
@@ -174,7 +174,7 @@ func (u *ui) setCrossfeed(level crossfeedLevel) {
 func (u *ui) showCrossfeed() {
 	u.player.SetCrossfeed(u.crossfeed)
 	for i, it := range u.crossfeedItems {
-		it.Checked = crossfeedLevel(i) == u.crossfeed
+		it.Checked = CrossfeedLevel(i) == u.crossfeed
 	}
 	if u.mainMenu != nil {
 		u.mainMenu.Refresh()
@@ -197,3 +197,5 @@ func (u *ui) buildFadeInItem() *fyne.MenuItem {
 	u.player.SetFadeIn(u.fadeInItem.Checked)
 	return u.fadeInItem
 }
+
+const prefCrossfeed = "crossfeed"

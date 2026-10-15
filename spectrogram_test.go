@@ -36,7 +36,7 @@ func TestSpectrogramShowsShelf(t *testing.T) {
 	const rate = 44100
 	path := filepath.Join(t.TempDir(), "x.flac")
 	audiotest.WriteFLAC(t, path, rate, 16, audiotest.Quantize(audiotest.Noise(4*rate, rate, audiotest.Lowpass(audiotest.Pink, 16000, 300)), 16))
-	info, _ := probe(path)
+	info, _ := Probe(path)
 	_, img, err := analyse(context.Background(), path, info, true, nil)
 	if err != nil || img == nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestSpectrogramShowsShelf(t *testing.T) {
 func TestAnalyseReportsProgress(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
 	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(3*44100, 44100, audiotest.Pink), 16))
-	info, _ := probe(path)
+	info, _ := Probe(path)
 	var got []float64
 	analyse(context.Background(), path, info, true, func(f float64) { got = append(got, f) })
 	if len(got) < 10 || got[len(got)-1] != 1 {

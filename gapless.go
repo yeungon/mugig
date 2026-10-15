@@ -16,7 +16,7 @@ import (
 )
 
 // gaplessLead is how long before a song ends the one after it is readied.
-const gaplessLead = 20 * time.Second
+const GaplessLead = 20 * time.Second
 
 // deck is a song readied to play: its decoder, reading ahead, and the
 // stretcher that changes its speed.
@@ -28,7 +28,7 @@ type deck struct {
 }
 
 func openDeck(path string, speed float64) (*deck, error) {
-	s, format, err := decode(path)
+	s, format, err := Decode(path)
 	if err != nil {
 		return nil, err
 	}

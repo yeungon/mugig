@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -302,5 +304,22 @@ func TestCustomIconsRender(t *testing.T) {
 		if drawn < 100 {
 			t.Errorf("%s icon drew only %d pixels", name, drawn)
 		}
+	}
+}
+
+// When a song stops because it can't be read, that is said, and the next
+// song doesn't start as if it had finished.
+func TestStoppedEarlySays(t *testing.T) {
+	u, fp, _ := newTestUI(t)
+	setLibrary(u, fiveTracks()...)
+	u.jump(u.tracks[0])
+	fp.fail(t, errors.New("the file couldn't be read: input/output error"))
+	if len(fp.played) != 1 || u.playing.Path != "" {
+		t.Errorf("played %q, playing %q", fp.played, u.playing.Path)
+	}
+	if top := u.win.Canvas().Overlays().Top(); top == nil {
+		t.Error("no message shown")
+	} else if text := allText(top); !strings.Contains(text, "Stopped playing Come Together") {
+		t.Errorf("message %q", text)
 	}
 }

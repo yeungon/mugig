@@ -12,18 +12,18 @@ import (
 )
 
 // fileLength opens path and returns how long its audio lasts, or 0.
-func fileLength(path string) time.Duration {
+func FileLength(path string) time.Duration {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0
 	}
 	defer f.Close()
-	return trackLength(f)
+	return TrackLength(f)
 }
 
 // trackLength returns how long the audio in f lasts, or 0 if its headers
 // don't say. It reads with ReadAt, so it leaves f's offset where it was.
-func trackLength(f *os.File) time.Duration {
+func TrackLength(f *os.File) time.Duration {
 	st, err := f.Stat()
 	if err != nil {
 		return 0
@@ -31,19 +31,19 @@ func trackLength(f *os.File) time.Duration {
 	size := st.Size()
 	kind, start := sniffFile(f)
 	switch kind {
-	case flacFile:
+	case FLAC:
 		// A damaged metadata block further on doesn't matter here: the
 		// length is in the first.
 		info, _ := probeFLAC(f, start, size)
 		if info.SampleRate == 0 {
 			return 0
 		}
-		return time.Duration(info.samples) * time.Second / time.Duration(info.SampleRate)
-	case wavFile:
+		return time.Duration(info.Samples) * time.Second / time.Duration(info.SampleRate)
+	case WAV:
 		return wavLength(f, size)
-	case oggFile:
+	case Ogg:
 		return oggLength(f, size)
-	case mp3File:
+	case MP3:
 		return mp3Length(f, start, size)
 	}
 	return 0
@@ -53,11 +53,11 @@ func trackLength(f *os.File) time.Duration {
 // a recording that was cut short, or written as a stream, can claim more.
 func wavLength(f *os.File, size int64) time.Duration {
 	info, err := probeWAV(f, size)
-	if err != nil || !info.Lossless || info.sampleBytes == 0 {
+	if err != nil || !info.Lossless || info.SampleBytes == 0 {
 		return 0
 	}
-	bytes := min(info.dataSize, size-info.dataStart)
-	samples := bytes / int64(info.sampleBytes*info.Channels)
+	bytes := min(info.DataSize, size-info.DataStart)
+	samples := bytes / int64(info.SampleBytes*info.Channels)
 	return time.Duration(samples) * time.Second / time.Duration(info.SampleRate)
 }
 

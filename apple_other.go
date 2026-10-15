@@ -10,20 +10,20 @@ import (
 )
 
 // Other systems have no second FLAC decoder to fall back on.
-const appleDecoding = false
+const AppleDecoding = false
 
-type appleFile struct {
-	rate     float64
-	channels int
-	bits     int
-	frames   int64
+type AppleFile struct {
+	Rate     float64
+	Channels int
+	Bits     int
+	Frames   int64
 }
 
 var errNoApple = errors.New("no other decoder on this system")
 
-func appleOpen(string, bool) (*appleFile, error)           { return nil, errNoApple }
-func (f *appleFile) read(unsafe.Pointer, int) (int, error) { return 0, errNoApple }
-func (f *appleFile) close()                                {}
+func OpenApple(string, bool) (*AppleFile, error)           { return nil, errNoApple }
+func (f *AppleFile) Read(unsafe.Pointer, int) (int, error) { return 0, errNoApple }
+func (f *AppleFile) Close()                                {}
 
 func appleDecode(string) (beep.StreamSeekCloser, beep.Format, error) {
 	return nil, beep.Format{}, errNoApple

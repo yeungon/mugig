@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,9 +14,9 @@ import (
 func TestWalkFindsOnlyAudio(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"a.mp3", "b.FLAC", "c.txt", "sub/d.ogg", "sub/deeper/e.wav", "f.m4a"} {
-		writeFile(t, filepath.Join(dir, name), []byte("x"))
+		audiotest.WriteFile(t, filepath.Join(dir, name), []byte("x"))
 	}
-	writeFile(t, filepath.Join(dir, "empty.mp3"), nil) // an interrupted download: nothing to play
+	audiotest.WriteFile(t, filepath.Join(dir, "empty.mp3"), nil) // an interrupted download: nothing to play
 
 	paths := make(chan string)
 	go walk(context.Background(), dir, paths)
@@ -59,7 +60,7 @@ func TestWalkSkipsFoldersThatArentMusic(t *testing.T) {
 		"System Volume Information/x.wav",
 		"Apps I Like/song.flac",
 	} {
-		writeFile(t, filepath.Join(dir, name), []byte("x"))
+		audiotest.WriteFile(t, filepath.Join(dir, name), []byte("x"))
 	}
 	want := []string{"Album/song.mp3", "Apps I Like/song.flac", "Synth.component/Contents/x.mp3"}
 	if got := walkAll(dir, dir); !slices.Equal(got, want) {
@@ -77,7 +78,7 @@ func TestReadTrackTags(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "file name.mp3")
 	tag := id3v23(map[string]string{"TIT2": "Song", "TPE1": "Artist", "TALB": "Album", "TYER": "1999"})
-	writeFile(t, path, append(tag, audio...))
+	audiotest.WriteFile(t, path, append(tag, audio...))
 
 	got := readTrack(path)
 	want := Track{Path: path, Title: "Song", Artist: "Artist", Album: "Album", Year: 1999, Format: "MP3"}
@@ -89,9 +90,9 @@ func TestReadTrackTags(t *testing.T) {
 func TestReadTrackFallsBackToFileName(t *testing.T) {
 	dir := t.TempDir()
 	garbage := filepath.Join(dir, "My Song.flac")
-	writeFile(t, garbage, []byte("not really audio"))
+	audiotest.WriteFile(t, garbage, []byte("not really audio"))
 	untitled := filepath.Join(dir, "Untitled.mp3")
-	writeFile(t, untitled, id3v23(map[string]string{"TPE1": "Someone"}))
+	audiotest.WriteFile(t, untitled, id3v23(map[string]string{"TPE1": "Someone"}))
 
 	if got := readTrack(garbage); got.Title != "My Song" || !got.NoTags || got.Format != "FLAC" {
 		t.Errorf("unreadable file: %+v", got)
@@ -101,49 +102,6 @@ func TestReadTrackFallsBackToFileName(t *testing.T) {
 	}
 	if got := readTrack(filepath.Join(dir, "missing.mp3")); got.Title != "missing" || !got.NoTags {
 		t.Errorf("missing file: %+v", got)
-	}
-}
-
-func TestDecodeEveryFormat(t *testing.T) {
-	for _, name := range []string{"sample.mp3", "sample.flac", "sample.wav", "sample.ogg"} {
-		t.Run(name, func(t *testing.T) {
-			s, format, err := decode(filepath.Join("testdata", name))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer s.Close()
-			if format.SampleRate <= 0 || s.Len() <= 0 {
-				t.Fatalf("rate %d, length %d", format.SampleRate, s.Len())
-			}
-			buf := make([][2]float64, 512)
-			if n, ok := s.Stream(buf); n == 0 || !ok {
-				t.Errorf("streamed %d samples, ok=%v", n, ok)
-			}
-			if err := s.Seek(s.Len() / 2); err != nil {
-				t.Errorf("seek: %v", err)
-			}
-		})
-	}
-}
-
-func TestDecodeErrors(t *testing.T) {
-	dir := t.TempDir()
-	bad := filepath.Join(dir, "broken.mp3")
-	writeFile(t, bad, []byte("garbage"))
-	for _, path := range []string{bad, filepath.Join(dir, "missing.flac"), "testdata/README.md"} {
-		if _, _, err := decode(path); err == nil {
-			t.Errorf("decode(%s) should fail", filepath.Base(path))
-		}
-	}
-}
-
-func writeFile(t *testing.T, path string, data []byte) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
 	}
 }
 

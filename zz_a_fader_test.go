@@ -85,20 +85,3 @@ func TestPlayerFadesIn(t *testing.T) {
 		t.Error("with Fade In off, playing starts at full")
 	}
 }
-
-// Controls > Fade In When Playing is on unless turned off, and remembered.
-func TestFadeInMenu(t *testing.T) {
-	u, fp, a := newTestUI(t)
-	if !u.fadeInItem.Checked || !fp.fade {
-		t.Fatal("fading in should be on by default")
-	}
-	u.fadeInItem.Action()
-	if u.fadeInItem.Checked || fp.fade {
-		t.Error("not turned off")
-	}
-	fp2 := &fakePlayer{}
-	newUI(u.win, a.Preferences(), uiDeps{player: fp2, cache: u.cache})
-	if fp2.fade {
-		t.Error("not remembered")
-	}
-}

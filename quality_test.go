@@ -16,9 +16,9 @@ import (
 )
 
 // checkFile probes and verifies path.
-func checkFile(t *testing.T, path string) (audioInfo, qualityReport) {
+func checkFile(t *testing.T, path string) (Info, qualityReport) {
 	t.Helper()
-	info, err := probe(path)
+	info, err := Probe(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,30 +31,6 @@ func checkFile(t *testing.T, path string) (audioInfo, qualityReport) {
 
 func near(got, want, tol float64) bool { return math.Abs(got-want) <= tol }
 
-func TestProbeSamples(t *testing.T) {
-	for _, c := range []struct {
-		file, codec string
-		lossless    bool
-	}{
-		{"sample.flac", "FLAC", true},
-		{"sample.wav", "WAV", true},
-		{"sample.mp3", "MP3", false},
-		{"sample.ogg", "Ogg Vorbis", false},
-	} {
-		info, err := probe(filepath.Join("testdata", c.file))
-		if err != nil {
-			t.Errorf("%s: %v", c.file, err)
-			continue
-		}
-		if info.Codec != c.codec || info.Lossless != c.lossless || info.SampleRate == 0 || info.Channels == 0 || info.Mismatch != "" {
-			t.Errorf("%s: got %+v", c.file, info)
-		}
-		if c.lossless && info.Bits == 0 {
-			t.Errorf("%s: no bit depth", c.file)
-		}
-	}
-}
-
 // A file's contents decide its format, not its name: an MP3 renamed .flac
 // is reported as MP3, and still plays.
 func TestMisnamedFile(t *testing.T) {
@@ -64,14 +40,14 @@ func TestMisnamedFile(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "song.flac")
 	os.WriteFile(path, data, 0o644)
-	info, err := probe(path)
+	info, err := Probe(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Codec != "MP3" || info.Lossless || info.Mismatch != ".flac" {
 		t.Errorf("got %+v", info)
 	}
-	s, _, err := decode(path)
+	s, _, err := Decode(path)
 	if err != nil {
 		t.Fatalf("misnamed file doesn't play: %v", err)
 	}
@@ -235,7 +211,7 @@ func TestDamageDetected(t *testing.T) {
 func TestVerifyStopsWhenCancelled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
 	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(44100, 44100, audiotest.Pink), 16))
-	info, _ := probe(path)
+	info, _ := Probe(path)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := verify(ctx, path, info); err != context.Canceled {

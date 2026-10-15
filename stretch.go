@@ -16,7 +16,7 @@ import (
 )
 
 // speeds offered, as multiples of normal.
-var speeds = []float64{0.5, 0.75, 1, 1.25, 1.5, 1.75, 2}
+var Speeds = []float64{0.5, 0.75, 1, 1.25, 1.5, 1.75, 2}
 
 // Piece lengths, in milliseconds. Longer pieces suit slowing down, shorter
 // ones speeding up, as the pieces repeat or skip more of the sound.
