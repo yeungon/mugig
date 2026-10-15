@@ -12,6 +12,39 @@ Written in Go with [Fyne](https://fyne.io).
   <img src="docs/images/songs-light.png" alt="The song list, with music folders and playlists in the sidebar, and each song's time, format, size and quality verdict">
 </picture>
 
+## Download
+
+| System | Download |
+|---|---|
+| macOS 11 or newer, Apple silicon and Intel | [Mugig-macOS.zip](https://github.com/yeungon/mugig/releases/latest/download/Mugig-macOS.zip) |
+| Windows 10 or 11 (64-bit, Intel/AMD) | [Mugig-Windows.zip](https://github.com/yeungon/mugig/releases/latest/download/Mugig-Windows.zip) |
+| Linux (64-bit, Intel/AMD): Ubuntu 22.04, Debian 12 or newer | [Mugig-Linux.tar.xz](https://github.com/yeungon/mugig/releases/latest/download/Mugig-Linux.tar.xz) |
+
+These are always the latest version; older ones, and checksums, are on the
+[releases page](https://github.com/yeungon/mugig/releases).
+
+Mugig isn't signed with a paid Apple or Microsoft certificate, so each system
+warns about it the first time:
+
+- **macOS:** unzip, move Mugig to Applications, and double-click it. macOS says
+  it can't verify the app: click **Done**. Then, straight away, open **System
+  Settings → Privacy & Security**, scroll to the very bottom, and click **Open
+  Anyway** next to "Mugig was blocked to protect your Mac". Confirm with your
+  password, and click **Open Anyway** once more. The button only shows for a
+  while after you try to open Mugig; if it isn't there, double-click Mugig
+  again. From then on, it opens like any other app.
+
+  Or install it from Terminal, which skips the warning:
+
+  ```sh
+  curl -fL https://github.com/yeungon/mugig/releases/latest/download/Mugig-macOS.zip -o /tmp/Mugig.zip && ditto -x -k /tmp/Mugig.zip /Applications
+  ```
+- **Windows:** unzip and run Mugig.exe. If SmartScreen says "Windows protected
+  your PC", click **More info**, then **Run anyway**.
+- **Linux:** `tar -xf Mugig-Linux.tar.xz`, then in the `mugig` folder run
+  `make user-install` to add it to your apps menu (or `sudo make install` for
+  every user).
+
 ## Features
 
 ### Playing
@@ -202,6 +235,18 @@ make all-platforms   # mac, windows and linux
 The Windows and Linux builds use [fyne-cross](https://github.com/fyne-io/fyne-cross),
 which needs **Docker** running; the first build of each downloads a build image
 of 1–2 GB.
+
+### Releases
+
+Pushing a version tag publishes a release: `.github/workflows/release.yml`
+builds Mugig on macOS, Windows and Linux and attaches the three files above,
+with the same names every time, so the download links always fetch the
+newest. A tag with a suffix makes a pre-release, for trying one out first.
+
+```sh
+git tag -a v0.2.0 -m "Mugig 0.2.0" && git push origin v0.2.0
+git tag -a v0.2.0-rc.1 -m "Mugig 0.2.0, release candidate 1"   # a pre-release
+```
 
 ### Platform notes
 

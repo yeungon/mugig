@@ -171,7 +171,7 @@
       <a href="#quality">Quality check</a>
       <a href="#playback">Playback</a>
       <a href="#library">Library</a>
-      <a href="#build">Build</a>
+      <a href="#download">Download</a>
       <a href="https://github.com/yeungon/mugig">GitHub</a>
     </nav>
   </div>
@@ -183,10 +183,10 @@
   <h1>A music player that checks your files.</h1>
   <p class="lead">Mugig plays FLAC, MP3, WAV and Ogg Vorbis, and on macOS Apple Lossless and AAC, unconverted and without gaps between songs. It can also tell you whether a FLAC is really lossless or was made from an MP3, whether it is damaged, and how loud it is.</p>
   <div class="actions">
-    <a class="button" href="#build">Build Mugig</a>
+    <a class="button" href="#download">Download Mugig</a>
     <a href="https://github.com/yeungon/mugig">Source code on GitHub</a>
   </div>
-  <p class="meta" style="margin-top:18px">Version 0.1 · macOS, Windows and Linux · Written in Go</p>
+  <p class="meta" style="margin-top:18px">Free · macOS, Windows and Linux · Written in Go</p>
 </div>
 
 <div class="page">
@@ -335,11 +335,36 @@
   </div>
 </section>
 
+<section id="download">
+  <div class="page">
+    <div class="prose">
+      <h2>Download</h2>
+      <p>These links always fetch the latest version. Older versions and checksums are on the <a href="https://github.com/yeungon/mugig/releases">releases page</a>.</p>
+    </div>
+
+    <table class="reqs">
+      <tr><th>macOS</th><td><a href="https://github.com/yeungon/mugig/releases/latest/download/Mugig-macOS.zip">Mugig-macOS.zip</a></td><td>macOS 11 or newer, Apple silicon and Intel</td></tr>
+      <tr><th>Windows</th><td><a href="https://github.com/yeungon/mugig/releases/latest/download/Mugig-Windows.zip">Mugig-Windows.zip</a></td><td>Windows 10 or 11, 64-bit Intel or AMD</td></tr>
+      <tr><th>Linux</th><td><a href="https://github.com/yeungon/mugig/releases/latest/download/Mugig-Linux.tar.xz">Mugig-Linux.tar.xz</a></td><td>64-bit Intel or AMD: Ubuntu 22.04, Debian 12 or newer</td></tr>
+    </table>
+
+    <div class="prose" style="margin-top:32px">
+      <h3>Opening it the first time</h3>
+      <p>Mugig isn’t signed with a paid Apple or Microsoft certificate, so each system warns about it once.</p>
+      <p><strong>macOS:</strong> unzip, move Mugig to Applications, and double-click it. macOS says it can’t verify the app: click <strong>Done</strong>. Then, straight away, open <strong>System Settings → Privacy &amp; Security</strong>, scroll to the very bottom, and click <strong>Open Anyway</strong> next to “Mugig was blocked to protect your Mac”. Confirm with your password, and click <strong>Open Anyway</strong> once more. The button only shows for a while after you try to open Mugig; if it isn’t there, double-click Mugig again. From then on, it opens like any other app.</p>
+      <p>Or install it from Terminal, which skips the warning:</p>
+<pre>curl -fL https://github.com/yeungon/mugig/releases/latest/download/Mugig-macOS.zip -o /tmp/Mugig.zip &amp;&amp; ditto -x -k /tmp/Mugig.zip /Applications</pre>
+      <p><strong>Windows:</strong> unzip and run Mugig.exe. If SmartScreen says “Windows protected your PC”, click <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+      <p><strong>Linux:</strong> unpack with <code>tar -xf Mugig-Linux.tar.xz</code>, then in the <code>mugig</code> folder run <code>make user-install</code> to add it to your apps menu.</p>
+    </div>
+  </div>
+</section>
+
 <section id="build">
   <div class="page">
     <div class="prose">
       <h2>Building Mugig</h2>
-      <p>There are no ready-made downloads yet, so Mugig is built from source. It needs Go 1.24 or later and a C compiler.</p>
+      <p>To build Mugig from source, you need Go 1.24 or later and a C compiler.</p>
     </div>
 
     <ol class="build">
