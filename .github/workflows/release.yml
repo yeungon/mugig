@@ -1,0 +1,105 @@
+# Builds Mugig for macOS, Windows and Linux when a version tag such as
+# v0.1.0 is pushed, and publishes them as a GitHub release. A tag with a
+# suffix, such as v0.1.0-rc.1, makes a pre-release, for trying a release
+# out first.
+#
+# The file names are the same for every version, so links to
+# https://github.com/yeungon/mugig/releases/latest/download/<file> always
+# fetch the newest.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # to publish the release
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24"
+
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
+
+      # fyne takes a version of the form 1.2.3, so a suffix such as -rc.1 is
+      # dropped; the build number counts this workflow's runs.
+      - name: Version
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          echo "APP_VERSION=${v%%-*}" >> "$GITHUB_ENV"
+          echo "APP_BUILD=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      # One app for Apple silicon and Intel Macs, signed ad hoc (see the
+      # Makefile). ditto keeps the app's signature and permissions intact.
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          make mac APP_VERSION="$APP_VERSION" APP_BUILD="$APP_BUILD"
+          mkdir -p out
+          ditto -c -k --keepParent dist/macos/Mugig.app out/Mugig-macOS.zip
+
+      # Windows and Linux show the icon as it is, so they get the rounded one.
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          go run fyne.io/tools/cmd/fyne@v1.7.3 package --release --icon IconRounded.png \
+            --app-version "$APP_VERSION" --app-build "$APP_BUILD"
+          # The DLLs it needs, which must all come with Windows.
+          (objdump -p Mugig.exe | grep 'DLL Name' | sort -u) || echo "objdump unavailable"
+          mkdir -p out
+          7z a out/Mugig-Windows.zip Mugig.exe
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          go run fyne.io/tools/cmd/fyne@v1.7.3 package --release --icon IconRounded.png \
+            --app-version "$APP_VERSION" --app-build "$APP_BUILD"
+          mkdir -p out
+          mv Mugig.tar.xz out/Mugig-Linux.tar.xz
+          tar -tJf out/Mugig-Linux.tar.xz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mugig-${{ runner.os }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd out
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+          pre=""
+          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" * $pre \
+            --title "Mugig ${GITHUB_REF_NAME#v}" \
+            --notes-file ../.github/release-notes.md

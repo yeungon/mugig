@@ -63,6 +63,23 @@ FYNE_CROSS := go run github.com/fyne-io/fyne-cross@v1.6.3
 DIST       := dist
 SRC        := $(CURDIR)
 
+# The release workflow stamps the version and build number with these, as
+# in `make mac APP_VERSION=0.1.0 APP_BUILD=7`. Otherwise FyneApp.toml's are
+# used.
+VERSION_FLAGS := $(if $(APP_VERSION),--app-version $(APP_VERSION)) $(if $(APP_BUILD),--app-build $(APP_BUILD))
+
+# mac-finish APP: Go programs need macOS 11, though fyne writes 10.11, so an
+# older Mac would crash rather than say why. Then the whole app is signed ad
+# hoc: fyne leaves only the program inside signed, and a downloaded app with
+# an unsigned bundle is called "damaged" by macOS, with no way to open it.
+# Signed, it gets the usual warning for apps without an Apple developer ID,
+# which Privacy & Security's Open Anyway gets past.
+define mac-finish
+	/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion 11.0" "$(1)/Contents/Info.plist"
+	codesign --force --deep --sign - --identifier org.kiwipanel.musicscan "$(1)"
+	codesign --verify --deep --strict "$(1)"
+endef
+
 # fyne package uses an existing binary only when given its full path;
 # otherwise it builds one for this Mac.
 #
@@ -71,7 +88,8 @@ SRC        := $(CURDIR)
 define mac-build
 	rm -rf "$(DIST)/macos-$(1)" && mkdir -p "$(DIST)/macos-$(1)"
 	GOOS=darwin GOARCH=$(1) CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$(DIST)/macos-$(1)/mugig" .
-	cd "$(DIST)/macos-$(1)" && $(FYNE) package --release --src "$(SRC)" --exe "$(CURDIR)/$(DIST)/macos-$(1)/mugig" --name Mugig --icon "$(SRC)/Icon.png" && rm mugig
+	cd "$(DIST)/macos-$(1)" && $(FYNE) package --release --src "$(SRC)" --exe "$(CURDIR)/$(DIST)/macos-$(1)/mugig" --name Mugig --icon "$(SRC)/Icon.png" $(VERSION_FLAGS) && rm mugig
+	$(call mac-finish,$(DIST)/macos-$(1)/Mugig.app)
 endef
 
 # One app for both Apple silicon and Intel Macs.
@@ -80,8 +98,9 @@ mac:
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$(DIST)/macos-tmp/arm64" .
 	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$(DIST)/macos-tmp/amd64" .
 	lipo -create -output "$(DIST)/macos/mugig" "$(DIST)/macos-tmp/arm64" "$(DIST)/macos-tmp/amd64"
-	cd "$(DIST)/macos" && $(FYNE) package --release --src "$(SRC)" --exe "$(CURDIR)/$(DIST)/macos/mugig" --name Mugig --icon "$(SRC)/Icon.png" && rm mugig
+	cd "$(DIST)/macos" && $(FYNE) package --release --src "$(SRC)" --exe "$(CURDIR)/$(DIST)/macos/mugig" --name Mugig --icon "$(SRC)/Icon.png" $(VERSION_FLAGS) && rm mugig
 	rm -rf "$(DIST)/macos-tmp"
+	$(call mac-finish,$(DIST)/macos/Mugig.app)
 	@echo "Built $(DIST)/macos/Mugig.app (Apple silicon and Intel)"
 
 mac-arm64:
