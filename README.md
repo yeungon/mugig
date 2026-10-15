@@ -5,8 +5,8 @@ a "lossless" FLAC really is lossless, whether it is intact, and how loud it is.
 Written in Go with [Fyne](https://fyne.io).
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-songs-dark.png">
-  <img src="docs/screenshot-songs-light.png" alt="The song list, with each file's format, size and quality verdict">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/songs-dark.png">
+  <img src="docs/images/songs-light.png" alt="The song list, with music folders and playlists in the sidebar, and each song's time, format, size and quality verdict">
 </picture>
 
 ## Features
@@ -106,8 +106,8 @@ Written in Go with [Fyne](https://fyne.io).
 ### Audio quality check
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-quality-dark.png">
-  <img src="docs/screenshot-quality-light.png" alt="The Audio Quality window, showing a FLAC made from an MP3">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/quality-dark.png">
+  <img src="docs/images/quality-light.png" alt="The Audio Quality window, showing a FLAC made from an MP3">
 </picture>
 
 Right-click a song and choose **Check Audio Quality…** (⌘I for the playing
