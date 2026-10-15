@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"slices"
 	"time"
 
@@ -133,7 +134,7 @@ func (u *ui) buildTransport() fyne.CanvasObject {
 
 // jump plays t as a step forward, remembering the current track so
 // "previous" can return to it in shuffle mode.
-func (u *ui) jump(t Track) {
+func (u *ui) jump(t library.Track) {
 	u.remember()
 	u.play(t)
 }
@@ -151,13 +152,13 @@ func (u *ui) remember() {
 
 // play starts t, from the list or a file opened, replacing whatever was
 // playing. Called on the UI thread.
-func (u *ui) play(t Track) {
+func (u *ui) play(t library.Track) {
 	u.start(t, false)
 }
 
 // start plays t. queued says it comes from Up Next, so the list carries on
 // afterwards from where it was rather than from t.
-func (u *ui) start(t Track, queued bool) {
+func (u *ui) start(t library.Track, queued bool) {
 	if err := u.player.Play(t.Path, u.trackEnded); err != nil {
 		u.setStopped()
 		dialog.ShowError(err, u.win)
@@ -203,7 +204,7 @@ func (u *ui) start(t Track, queued bool) {
 
 	u.showArt(nil)
 	u.async(func() { // reading art can be slow on a spinning disk
-		data := coverArt(t.Path)
+		data := library.CoverArt(t.Path)
 		onUI(func() {
 			if u.playing.Path == t.Path { // still the same track
 				u.showArt(data)
@@ -292,7 +293,7 @@ func (u *ui) advance() bool {
 
 // upNext picks the list's track after the current one, following shuffle
 // and repeat. ok is false when playback should stop.
-func (u *ui) upNext() (t Track, ok bool) {
+func (u *ui) upNext() (t library.Track, ok bool) {
 	if u.shuffle && len(u.tracks) > 0 {
 		return u.nextShuffled()
 	}
@@ -300,9 +301,9 @@ func (u *ui) upNext() (t Track, ok bool) {
 }
 
 // listNext is the track after the current one in list order.
-func (u *ui) listNext() (t Track, ok bool) {
+func (u *ui) listNext() (t library.Track, ok bool) {
 	if len(u.tracks) == 0 {
-		return Track{}, false
+		return library.Track{}, false
 	}
 	i := u.listIndex() // -1 if nothing is playing, so this starts at the top
 	switch {
@@ -311,23 +312,23 @@ func (u *ui) listNext() (t Track, ok bool) {
 	case u.repeat == repeatAll:
 		return u.tracks[0], true
 	}
-	return Track{}, false
+	return library.Track{}, false
 }
 
 // nextShuffled plays the list in random order, each track once per round.
 // A new round starts only in repeat-all mode.
-func (u *ui) nextShuffled() (Track, bool) {
+func (u *ui) nextShuffled() (library.Track, bool) {
 	if !u.queueValid {
 		u.refillQueue(false)
 	}
 	for {
 		if len(u.queue) == 0 {
 			if u.repeat != repeatAll {
-				return Track{}, false
+				return library.Track{}, false
 			}
 			u.refillQueue(true)
 			if len(u.queue) == 0 {
-				return Track{}, false
+				return library.Track{}, false
 			}
 		}
 		p := u.queue[0]
@@ -342,7 +343,7 @@ func (u *ui) nextShuffled() (Track, bool) {
 // trackEnded would choose it, without taking it from Up Next or the
 // shuffle round. ok is false if playback would stop, or the song can't be
 // known yet.
-func (u *ui) following() (t Track, ok bool) {
+func (u *ui) following() (t library.Track, ok bool) {
 	if u.repeat == repeatOne {
 		return u.playing, true
 	}
@@ -363,11 +364,11 @@ func (u *ui) following() (t Track, ok bool) {
 		}
 	}
 	if u.repeat != repeatAll {
-		return Track{}, false
+		return library.Track{}, false
 	}
 	u.refillQueue(true) // the round is over: shuffle the next now, as nextShuffled would
 	if len(u.queue) == 0 {
-		return Track{}, false
+		return library.Track{}, false
 	}
 	return u.tracks[u.indexOf(u.queue[0])], true
 }
@@ -537,7 +538,7 @@ func (u *ui) toggleMute() {
 // selection, since Fyne doesn't fire OnSelected for an already-selected
 // cell and the user should be able to click the same row to play it again.
 func (u *ui) setStopped() {
-	u.playing = Track{}
+	u.playing = library.Track{}
 	u.paused = false
 	u.cued = nil
 	u.fromQueue = false
@@ -556,7 +557,7 @@ func (u *ui) setStopped() {
 	u.sizeTimes(0)
 	u.table.UnselectAll()
 	u.updateVisHeader()
-	u.loadQuality(Track{})
+	u.loadQuality(library.Track{})
 	u.updateOutputInfo()
 	u.showArt(nil)
 	u.publishNowPlaying()
@@ -619,7 +620,7 @@ func (u *ui) indexOf(path string) int {
 	return -1
 }
 
-func trackLabel(t Track) string {
+func trackLabel(t library.Track) string {
 	if t.Artist == "" {
 		return t.Title
 	}

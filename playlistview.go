@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"slices"
 	"strings"
 	"time"
@@ -48,6 +49,7 @@ func (u *ui) rebuildPlaylistList() {
 		return // not built yet
 	}
 	u.playlistList.RemoveAll()
+	u.playlistRows = make(map[*library.Playlist]*folderRow, len(u.playlists))
 	if len(u.playlists) == 0 {
 		hint := secondaryLabel("Right-click songs and choose Add to Playlist, or use the +.")
 		hint.Wrapping = fyne.TextWrapWord
@@ -55,10 +57,11 @@ func (u *ui) rebuildPlaylistList() {
 		u.playlistList.Add(hint)
 	}
 	for _, p := range u.playlists {
-		p.row = newFolderRow(func() { u.showPlaylist(p) }, func(at fyne.Position) {
+		row := newFolderRow(func() { u.showPlaylist(p) }, func(at fyne.Position) {
 			widget.ShowPopUpMenuAtPosition(u.playlistMenu(p), u.win.Canvas(), at)
 		})
-		u.playlistList.Add(p.row)
+		u.playlistRows[p] = row
+		u.playlistList.Add(row)
 	}
 	u.refreshPlaylists()
 }
@@ -70,12 +73,13 @@ func (u *ui) refreshPlaylists() {
 		return
 	}
 	page := u.visView == nil || !u.visView.Visible()
-	byPath, facts := tracksByPath(u.all), u.songFacts()
+	byPath, facts := library.TracksByPath(u.all), u.songFacts()
 	for _, p := range u.playlists {
-		if p.row == nil {
+		row := u.playlistRows[p]
+		if row == nil {
 			continue
 		}
-		ts := p.tracks(u.all, byPath, facts)
+		ts := p.Tracks(u.all, byPath, facts)
 		var length time.Duration
 		for _, t := range ts {
 			length += t.Length
@@ -93,17 +97,17 @@ func (u *ui) refreshPlaylists() {
 				detail = "Smart playlist"
 			}
 		}
-		p.row.show(icon, p.Name, detail, humanize.Thousands(len(ts)), true, page && u.playlist == p)
+		row.show(icon, p.Name, detail, humanize.Thousands(len(ts)), true, page && u.playlist == p)
 	}
 }
 
 // songFacts is what smart playlists' rules need beyond a song's tags.
-func (u *ui) songFacts() songFacts {
-	return songFacts{level: u.levelOf, modTime: u.cache.modTime, now: time.Now()}
+func (u *ui) songFacts() library.SongFacts {
+	return library.SongFacts{Level: u.levelOf, ModTime: u.cache.ModTime, Now: time.Now()}
 }
 
 // showPlaylist shows p's songs in the song list.
-func (u *ui) showPlaylist(p *playlist) {
+func (u *ui) showPlaylist(p *library.Playlist) {
 	u.filter, u.playlist = "", p
 	u.table.UnselectAll()
 	u.table.ScrollToTop()
@@ -113,7 +117,7 @@ func (u *ui) showPlaylist(p *playlist) {
 
 // playlistsChanged saves the playlists and shows the change.
 func (u *ui) playlistsChanged() {
-	if err := savePlaylists(u.playlistsPath, u.playlists); err != nil {
+	if err := library.SavePlaylists(u.playlistsPath, u.playlists); err != nil {
 		fyne.LogError("saving playlists", err)
 	}
 	if u.playlist != nil {
@@ -125,7 +129,7 @@ func (u *ui) playlistsChanged() {
 }
 
 // playlistMenu is a playlist's right-click menu in the sidebar.
-func (u *ui) playlistMenu(p *playlist) *fyne.Menu {
+func (u *ui) playlistMenu(p *library.Playlist) *fyne.Menu {
 	items := []*fyne.MenuItem{
 		fyne.NewMenuItem("Play", func() { u.playPlaylist(p) }),
 		fyne.NewMenuItemSeparator(),
@@ -143,7 +147,7 @@ func (u *ui) playlistMenu(p *playlist) *fyne.Menu {
 }
 
 // playPlaylist shows p and plays it from the top.
-func (u *ui) playPlaylist(p *playlist) {
+func (u *ui) playPlaylist(p *library.Playlist) {
 	u.showPlaylist(p)
 	if len(u.tracks) > 0 {
 		u.jump(u.tracks[0])
@@ -174,11 +178,11 @@ func (u *ui) askName(title, confirm, name string, done func(string)) {
 // newPlaylist asks for a name and makes a playlist of songs, which may be
 // none. Made from the + button, it is then shown; made from songs, the
 // list stays where it is.
-func (u *ui) newPlaylist(songs []Track) {
-	u.askName("New Playlist", "Create", uniqueName(u.playlists, "New Playlist"), func(name string) {
-		p := &playlist{Name: uniqueName(u.playlists, name)}
+func (u *ui) newPlaylist(songs []library.Track) {
+	u.askName("New Playlist", "Create", library.UniqueName(u.playlists, "New Playlist"), func(name string) {
+		p := &library.Playlist{Name: library.UniqueName(u.playlists, name)}
 		for _, t := range songs {
-			p.add(t.Path)
+			p.Add(t.Path)
 		}
 		u.playlists = append(u.playlists, p)
 		u.rebuildPlaylistList()
@@ -192,12 +196,12 @@ func (u *ui) newPlaylist(songs []Track) {
 }
 
 // addToPlaylist adds songs to the end of p, leaving out any already in it.
-func (u *ui) addToPlaylist(p *playlist, songs []Track) {
+func (u *ui) addToPlaylist(p *library.Playlist, songs []library.Track) {
 	paths := make([]string, len(songs))
 	for i, t := range songs {
 		paths[i] = t.Path
 	}
-	added := p.add(paths...)
+	added := p.Add(paths...)
 	u.playlistsChanged()
 	msg := fmt.Sprintf("Added %s to %s", humanize.Plural(added, "song"), p.Name)
 	if added < len(songs) {
@@ -208,7 +212,7 @@ func (u *ui) addToPlaylist(p *playlist, songs []Track) {
 
 // addToPlaylistItem is the songs' "Add to Playlist" submenu: the ordinary
 // playlists, and a new one.
-func (u *ui) addToPlaylistItem(songs []Track) *fyne.MenuItem {
+func (u *ui) addToPlaylistItem(songs []library.Track) *fyne.MenuItem {
 	var items []*fyne.MenuItem
 	for _, p := range u.playlists {
 		if p.Smart == nil {
@@ -227,14 +231,14 @@ func (u *ui) addToPlaylistItem(songs []Track) *fyne.MenuItem {
 // playlistSongItems are the extra right-click items for songs shown in an
 // ordinary playlist: taking them out, and for one song, moving it, while
 // the list is in the playlist's own order.
-func (u *ui) playlistSongItems(songs []Track) []*fyne.MenuItem {
+func (u *ui) playlistSongItems(songs []library.Track) []*fyne.MenuItem {
 	p := u.playlist
 	if p == nil || p.Smart != nil {
 		return nil
 	}
 	remove := fyne.NewMenuItem("Remove from Playlist", func() {
 		for _, t := range songs {
-			p.remove(t.Path)
+			p.Remove(t.Path)
 		}
 		u.playlistsChanged()
 	})
@@ -243,7 +247,7 @@ func (u *ui) playlistSongItems(songs []Track) []*fyne.MenuItem {
 		i := u.indexOf(songs[0].Path)
 		move := func(by int) func() {
 			return func() {
-				p.move(songs[0].Path, by, u.tracks)
+				p.Move(songs[0].Path, by, u.tracks)
 				u.playlistsChanged()
 			}
 		}
@@ -254,20 +258,20 @@ func (u *ui) playlistSongItems(songs []Track) []*fyne.MenuItem {
 	return items
 }
 
-func (u *ui) renamePlaylist(p *playlist) {
+func (u *ui) renamePlaylist(p *library.Playlist) {
 	u.askName("Rename Playlist", "Rename", p.Name, func(name string) {
 		if !strings.EqualFold(name, p.Name) {
-			name = uniqueName(u.playlists, name)
+			name = library.UniqueName(u.playlists, name)
 		}
 		p.Name = name
 		u.playlistsChanged()
 	})
 }
 
-func (u *ui) duplicatePlaylist(p *playlist) {
-	c := &playlist{Name: uniqueName(u.playlists, p.Name+" copy"), Songs: slices.Clone(p.Songs)}
+func (u *ui) duplicatePlaylist(p *library.Playlist) {
+	c := &library.Playlist{Name: library.UniqueName(u.playlists, p.Name+" copy"), Songs: slices.Clone(p.Songs)}
 	if p.Smart != nil {
-		c.Smart = &smartRules{Any: p.Smart.Any, Rules: slices.Clone(p.Smart.Rules)}
+		c.Smart = &library.SmartRules{Any: p.Smart.Any, Rules: slices.Clone(p.Smart.Rules)}
 	}
 	i := slices.Index(u.playlists, p)
 	u.playlists = slices.Insert(u.playlists, i+1, c)
@@ -275,7 +279,7 @@ func (u *ui) duplicatePlaylist(p *playlist) {
 	u.playlistsChanged()
 }
 
-func (u *ui) confirmDeletePlaylist(p *playlist) {
+func (u *ui) confirmDeletePlaylist(p *library.Playlist) {
 	msg := widget.NewLabel("The songs stay in the library.")
 	d := dialog.NewCustomConfirm(fmt.Sprintf("Delete “%s”?", p.Name), "Delete", "Cancel", msg, func(ok bool) {
 		if ok {
@@ -286,8 +290,8 @@ func (u *ui) confirmDeletePlaylist(p *playlist) {
 	d.Show()
 }
 
-func (u *ui) deletePlaylist(p *playlist) {
-	u.playlists = slices.DeleteFunc(u.playlists, func(q *playlist) bool { return q == p })
+func (u *ui) deletePlaylist(p *library.Playlist) {
+	u.playlists = slices.DeleteFunc(u.playlists, func(q *library.Playlist) bool { return q == p })
 	if u.playlist == p {
 		u.setFilter("")
 	}
@@ -301,7 +305,7 @@ func (u *ui) forgetInPlaylists(paths []string) {
 	changed := false
 	for _, p := range u.playlists {
 		n := len(p.Songs)
-		p.remove(paths...)
+		p.Remove(paths...)
 		changed = changed || len(p.Songs) != n
 	}
 	if changed {
@@ -318,12 +322,12 @@ func (u *ui) saveQueueAsPlaylist() {
 
 // editSmartPlaylist opens the rules of p, or of a new smart playlist for
 // nil, in a dialog that counts the songs matching as the rules change.
-func (u *ui) editSmartPlaylist(p *playlist) {
-	rules := smartRules{Rules: []smartRule{{Field: "Artist", Op: opContains}}}
-	name := uniqueName(u.playlists, "New Smart Playlist")
+func (u *ui) editSmartPlaylist(p *library.Playlist) {
+	rules := library.SmartRules{Rules: []library.SmartRule{{Field: "Artist", Op: library.OpContains}}}
+	name := library.UniqueName(u.playlists, "New Smart Playlist")
 	title, confirm := "New Smart Playlist", "Create"
 	if p != nil {
-		rules = smartRules{Any: p.Smart.Any, Rules: slices.Clone(p.Smart.Rules)}
+		rules = library.SmartRules{Any: p.Smart.Any, Rules: slices.Clone(p.Smart.Rules)}
 		name, title, confirm = p.Name, "Edit Smart Playlist", "Save"
 	}
 	e := u.newRulesEditor(&rules)
@@ -342,7 +346,7 @@ func (u *ui) editSmartPlaylist(p *playlist) {
 			name = "Smart Playlist"
 		}
 		if p == nil {
-			p = &playlist{Name: uniqueName(u.playlists, name), Smart: &rules}
+			p = &library.Playlist{Name: library.UniqueName(u.playlists, name), Smart: &rules}
 			u.playlists = append(u.playlists, p)
 			u.rebuildPlaylistList()
 			u.playlistsChanged()
@@ -350,7 +354,7 @@ func (u *ui) editSmartPlaylist(p *playlist) {
 			return
 		}
 		if !strings.EqualFold(name, p.Name) {
-			name = uniqueName(u.playlists, name)
+			name = library.UniqueName(u.playlists, name)
 		}
 		p.Name, p.Smart = name, &rules
 		u.playlistsChanged()
@@ -365,7 +369,7 @@ func (u *ui) editSmartPlaylist(p *playlist) {
 // how many songs they match.
 type rulesEditor struct {
 	u        *ui
-	rules    *smartRules
+	rules    *library.SmartRules
 	box      *fyne.Container
 	rows     *fyne.Container
 	any      *widget.Select
@@ -373,7 +377,7 @@ type rulesEditor struct {
 	onResize func()
 }
 
-func (u *ui) newRulesEditor(rules *smartRules) *rulesEditor {
+func (u *ui) newRulesEditor(rules *library.SmartRules) *rulesEditor {
 	e := &rulesEditor{u: u, rules: rules, rows: container.NewVBox(), count: secondaryLabel("")}
 	e.count.Truncation = fyne.TextTruncateOff
 	e.any = widget.NewSelect([]string{"all", "any"}, func(s string) {
@@ -386,7 +390,7 @@ func (u *ui) newRulesEditor(rules *smartRules) *rulesEditor {
 		e.any.SetSelected("all")
 	}
 	add := widget.NewButtonWithIcon("Add Rule", theme.ContentAddIcon(), func() {
-		e.rules.Rules = append(e.rules.Rules, smartRule{Field: "Artist", Op: opContains})
+		e.rules.Rules = append(e.rules.Rules, library.SmartRule{Field: "Artist", Op: library.OpContains})
 		e.build()
 	})
 	add.Importance = widget.LowImportance
@@ -415,29 +419,29 @@ func (e *rulesEditor) build() {
 // take it away.
 func (e *rulesEditor) ruleRow(i int) fyne.CanvasObject {
 	r := &e.rules.Rules[i]
-	kind, _ := fieldKindOf(r.Field)
+	kind, _ := library.FieldKindOf(r.Field)
 	var names []string
-	for _, f := range smartFields {
-		names = append(names, f.name)
+	for _, f := range library.SmartFields {
+		names = append(names, f.Name)
 	}
 	field := widget.NewSelect(names, nil)
 	field.SetSelected(r.Field)
 	field.OnChanged = func(name string) {
-		newKind, _ := fieldKindOf(name)
+		newKind, _ := library.FieldKindOf(name)
 		r.Field = name
 		if newKind != kind { // the comparisons and value no longer fit
-			r.Op, r.Value = kindOps[newKind][0], ""
-			if newKind == qualityField {
-				r.Value = qualityChoices()[0]
+			r.Op, r.Value = library.KindOps[newKind][0], ""
+			if newKind == library.QualityField {
+				r.Value = library.QualityChoices()[0]
 			}
 		}
 		e.build()
 	}
-	op := widget.NewSelect(kindOps[kind], func(s string) { r.Op = s; e.update() })
+	op := widget.NewSelect(library.KindOps[kind], func(s string) { r.Op = s; e.update() })
 	op.SetSelected(r.Op)
 	var value fyne.CanvasObject
-	if kind == qualityField {
-		v := widget.NewSelect(qualityChoices(), func(s string) { r.Value = s; e.update() })
+	if kind == library.QualityField {
+		v := widget.NewSelect(library.QualityChoices(), func(s string) { r.Value = s; e.update() })
 		v.SetSelected(r.Value)
 		value = v
 	} else {
@@ -446,7 +450,7 @@ func (e *rulesEditor) ruleRow(i int) fyne.CanvasObject {
 		v.OnChanged = func(s string) { r.Value = s; e.update() }
 		value = v
 	}
-	if unit := kindUnits[kind]; unit != "" {
+	if unit := library.KindUnits[kind]; unit != "" {
 		value = container.NewBorder(nil, nil, nil, secondaryLabel(unit), value)
 	}
 	remove := iconButton(theme.ContentRemoveIcon(), func() {
@@ -466,7 +470,7 @@ func (e *rulesEditor) update() {
 	n := 0
 	facts := e.u.songFacts()
 	for _, t := range e.u.all {
-		if e.rules.matches(t, facts) {
+		if e.rules.Matches(t, facts) {
 			n++
 		}
 	}

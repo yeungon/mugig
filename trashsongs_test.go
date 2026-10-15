@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"slices"
 	"strings"
@@ -23,7 +24,7 @@ func TestMoveSongsToTrash(t *testing.T) {
 	u.levels[u.tracks[3].Path] = quality.Suspect
 	u.selectAll()
 
-	ts := []Track{u.tracks[1], u.tracks[3]}
+	ts := []library.Track{u.tracks[1], u.tracks[3]}
 	u.confirmTrash(ts)
 	if len(moved) != 0 {
 		t.Fatal("nothing should move before it is confirmed")
@@ -61,13 +62,13 @@ func TestTrashCancelledOrRefused(t *testing.T) {
 		}
 		return nil
 	}
-	u.confirmTrash([]Track{u.tracks[0]})
+	u.confirmTrash([]library.Track{u.tracks[0]})
 	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Cancel"))
 	if len(u.all) != 5 {
 		t.Fatal("Cancel should move nothing")
 	}
 
-	u.trashSongs([]Track{u.tracks[0], u.tracks[4]})
+	u.trashSongs([]library.Track{u.tracks[0], u.tracks[4]})
 	if got := titles(u.tracks); !slices.Equal(got, []string{"Help", "Hey Jude", "Bohemian Rhapsody", "Zebra"}) {
 		t.Errorf("listed %v", got)
 	}

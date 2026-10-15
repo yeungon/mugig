@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"os"
 	"path/filepath"
@@ -22,7 +23,7 @@ import (
 
 // revealTrack shows t's file in the file manager, or says it can't be
 // found, as when its disk is unplugged.
-func (u *ui) revealTrack(t Track) {
+func (u *ui) revealTrack(t library.Track) {
 	file := audio.FileOf(t.Path) // a song from a CUE sheet: its disc image
 	if _, err := os.Stat(file); err != nil {
 		u.missingFile(t)
@@ -35,7 +36,7 @@ func (u *ui) revealTrack(t Track) {
 	})
 }
 
-func (u *ui) missingFile(t Track) {
+func (u *ui) missingFile(t library.Track) {
 	dialog.ShowInformation("File Not Found",
 		fmt.Sprintf("Can't find %s.\nIf it's on a removable disk, connect it and try again.", filepath.Base(audio.FileOf(t.Path))), u.win)
 }
@@ -45,7 +46,7 @@ func (u *ui) missingFile(t Track) {
 //
 // For a song from a CUE sheet, the file is its disc image, and the dialog
 // says where in it the song is.
-func (u *ui) showInfo(t Track) dialog.Dialog {
+func (u *ui) showInfo(t library.Track) dialog.Dialog {
 	file := audio.FileOf(t.Path)
 	st, err := os.Stat(file)
 	if err != nil {

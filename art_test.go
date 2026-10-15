@@ -5,53 +5,16 @@ import (
 	"image"
 	"image/png"
 	"mugig/internal/audiotest"
+	"mugig/internal/library"
 	"path/filepath"
 	"testing"
 )
 
-func TestCoverArtEmbedded(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "song.mp3")
-	audiotest.WriteFile(t, path, id3v23(map[string]string{"TIT2": "Song", "APIC": "embedded-image"}))
-	audiotest.WriteFile(t, filepath.Join(filepath.Dir(path), "cover.jpg"), []byte("folder-image"))
-
-	if got := coverArt(path); string(got) != "embedded-image" {
-		t.Errorf("coverArt = %q, want the embedded picture over the folder one", got)
-	}
-}
-
-func TestCoverArtFromFolder(t *testing.T) {
-	for _, name := range []string{"cover.jpg", "Folder.PNG", "front.jpeg", "AlbumArt.jpg"} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			song := filepath.Join(dir, "song.flac")
-			audiotest.WriteFile(t, song, []byte("untagged"))
-			audiotest.WriteFile(t, filepath.Join(dir, "scan of booklet.jpg"), []byte("not a cover"))
-			audiotest.WriteFile(t, filepath.Join(dir, name), []byte("cover-image"))
-			if got := coverArt(song); string(got) != "cover-image" {
-				t.Errorf("coverArt = %q", got)
-			}
-		})
-	}
-}
-
-func TestCoverArtNone(t *testing.T) {
-	dir := t.TempDir()
-	song := filepath.Join(dir, "song.mp3")
-	audiotest.WriteFile(t, song, id3v23(map[string]string{"TIT2": "No art"}))
-	audiotest.WriteFile(t, filepath.Join(dir, "cover.txt"), []byte("not an image"))
-	if got := coverArt(song); got != nil {
-		t.Errorf("coverArt = %q, want nil", got)
-	}
-	if got := coverArt(filepath.Join(dir, "gone", "missing.mp3")); got != nil {
-		t.Errorf("missing file: coverArt = %q, want nil", got)
-	}
-}
-
 func TestPlayingShowsArt(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	dir := t.TempDir()
-	withArt := Track{Path: filepath.Join(dir, "a", "song.mp3"), Title: "With art"}
-	without := Track{Path: filepath.Join(dir, "b", "song.mp3"), Title: "Without"}
+	withArt := library.Track{Path: filepath.Join(dir, "a", "song.mp3"), Title: "With art"}
+	without := library.Track{Path: filepath.Join(dir, "b", "song.mp3"), Title: "Without"}
 	audiotest.WriteFile(t, withArt.Path, nil)
 	audiotest.WriteFile(t, filepath.Join(dir, "a", "cover.png"), tinyPNG(t))
 	audiotest.WriteFile(t, without.Path, nil)

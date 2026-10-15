@@ -2,6 +2,7 @@ package main
 
 import (
 	"mugig/internal/audiotest"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"os"
 	"path/filepath"
@@ -15,11 +16,11 @@ import (
 )
 
 // genuineFLAC writes a short, clean FLAC file and returns a track for it.
-func genuineFLAC(t *testing.T, name string) Track {
+func genuineFLAC(t *testing.T, name string) library.Track {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), name+".flac")
 	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(2*44100, 44100, audiotest.Pink), 16))
-	return Track{Path: path, Title: name, Format: "FLAC"}
+	return library.Track{Path: path, Title: name, Format: "FLAC"}
 }
 
 func checkTexts(u *ui) []string { return u.np.texts() }
@@ -28,7 +29,7 @@ func TestQualityShownWhilePlaying(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	flacTrack := genuineFLAC(t, "song")
 	mp3, _ := filepath.Abs("testdata/sample.mp3")
-	setLibrary(u, flacTrack, Track{Path: mp3, Title: "mp3"})
+	setLibrary(u, flacTrack, library.Track{Path: mp3, Title: "mp3"})
 
 	// The format shows at once; the audio isn't checked until asked.
 	u.jump(flacTrack)
@@ -86,11 +87,11 @@ func TestUnreadableFileExplained(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	path := filepath.Join(t.TempDir(), "junk.flac")
 	os.WriteFile(path, []byte("this is not audio at all"), 0o644)
-	u.jump(Track{Path: path, Title: "junk"})
+	u.jump(library.Track{Path: path, Title: "junk"})
 	if u.barBadge.Visible() || !strings.Contains(strings.Join(checkTexts(u), ""), "Can't read") || !u.checkItem.Disabled {
 		t.Errorf("badge visible %v, checks %q", u.barBadge.Visible(), checkTexts(u))
 	}
-	p, spec, _ := u.checkTrack(Track{Path: path, Title: "junk"})
+	p, spec, _ := u.checkTrack(library.Track{Path: path, Title: "junk"})
 	if !strings.Contains(strings.Join(p.texts(), ""), "Can't read") || spec.levels != nil || spec.note == "" {
 		t.Errorf("dialog: %q, note %q", p.texts(), spec.note)
 	}
@@ -224,7 +225,7 @@ func TestCheckAnyTrack(t *testing.T) {
 	other := filepath.Join(t.TempDir(), "other.flac")
 	s := audiotest.Noise(4*44100, 44100, audiotest.Lowpass(audiotest.Pink, 16000, 300))
 	audiotest.WriteFLAC(t, other, 44100, 16, audiotest.Quantize(s, 16))
-	otherTrack := Track{Path: other, Title: "Other", Artist: "Someone"}
+	otherTrack := library.Track{Path: other, Title: "Other", Artist: "Someone"}
 	setLibrary(u, playing, otherTrack)
 	u.jump(playing)
 
@@ -250,7 +251,7 @@ func TestCheckAnyTrack(t *testing.T) {
 func TestLossySpectrogram(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	mp3, _ := filepath.Abs("testdata/sample.mp3")
-	p, spec, _ := u.checkTrack(Track{Path: mp3, Title: "mp3"})
+	p, spec, _ := u.checkTrack(library.Track{Path: mp3, Title: "mp3"})
 	if p.badge.level != quality.Lossy || spec.levels == nil || spec.rate != 44100 {
 		t.Errorf("badge %v, img %v", p.badge.level, spec.levels != nil)
 	}

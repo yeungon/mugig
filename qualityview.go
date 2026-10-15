@@ -11,6 +11,7 @@ import (
 	"image/color"
 	"math"
 	"mugig/internal/audio"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"slices"
 	"strings"
@@ -50,7 +51,7 @@ type trackQuality struct {
 
 // loadQuality reads t's format and any saved check result. A zero t clears
 // the display.
-func (u *ui) loadQuality(t Track) {
+func (u *ui) loadQuality(t library.Track) {
 	if u.quality.cancel != nil {
 		u.quality.cancel()
 	}
@@ -373,15 +374,15 @@ func (r *badgeRenderer) Destroy() {}
 // ---------------------------------------------------------------------------
 
 // trackMenu is the right-click menu for a track in the list.
-func (u *ui) trackMenu(t Track) *fyne.Menu {
+func (u *ui) trackMenu(t library.Track) *fyne.Menu {
 	items := []*fyne.MenuItem{
 		fyne.NewMenuItem("Play", func() { u.jump(t) }),
 		fyne.NewMenuItem("Play Next", func() { u.playNext(t) }),
 		fyne.NewMenuItem("Play Later", func() { u.playLater(t) }),
 		fyne.NewMenuItemSeparator(),
-		u.addToPlaylistItem([]Track{t}),
+		u.addToPlaylistItem([]library.Track{t}),
 	}
-	items = append(items, u.playlistSongItems([]Track{t})...)
+	items = append(items, u.playlistSongItems([]library.Track{t})...)
 	return fyne.NewMenu("", append(items,
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Get Info…", func() { u.showInfo(t) }),
@@ -390,7 +391,7 @@ func (u *ui) trackMenu(t Track) *fyne.Menu {
 		fyne.NewMenuItem(revealLabel, func() { u.revealTrack(t) }),
 		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(audio.FileOf(t.Path)) }),
 		fyne.NewMenuItemSeparator(),
-		u.trashItem([]Track{t}),
+		u.trashItem([]library.Track{t}),
 	)...)
 }
 
@@ -398,7 +399,7 @@ func (u *ui) trackMenu(t Track) *fyne.Menu {
 // spectrogram, from the saved result or by analysing it now. Closing the
 // dialog stops the analysis. It returns the dialog's panel and spectrogram,
 // for tests.
-func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog) {
+func (u *ui) checkTrack(t library.Track) (*qualityPanel, *spectrogramView, dialog.Dialog) {
 	p := newQualityPanel()
 	spec := newSpectrogramView()
 	bar := widget.NewProgressBar()

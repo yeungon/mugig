@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"mugig/internal/library"
 	"os"
 	"path/filepath"
 	"slices"
@@ -56,7 +57,7 @@ func (u *ui) openPaths(paths []string) {
 			return
 		case fi.IsDir():
 			folders = append(folders, p)
-		case isAudioFile(p) && fi.Size() > 0:
+		case library.IsAudioFile(p) && fi.Size() > 0:
 			files = append(files, p)
 		}
 	}
@@ -76,13 +77,13 @@ func (u *ui) openPaths(paths []string) {
 // quits.
 func (u *ui) openFiles(paths []string) {
 	u.async(func() {
-		tracks := make([]Track, len(paths))
+		tracks := make([]library.Track, len(paths))
 		for i, p := range paths {
-			tracks[i] = scanFile(u.cache, p).track
+			tracks[i] = library.ScanFile(u.cache, p).Track
 		}
 		onUI(func() {
 			for _, t := range tracks {
-				if !slices.ContainsFunc(u.all, func(o Track) bool { return o.Path == t.Path }) {
+				if !slices.ContainsFunc(u.all, func(o library.Track) bool { return o.Path == t.Path }) {
 					u.all = append(u.all, t)
 				}
 			}

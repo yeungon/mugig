@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"mugig/internal/audio"
+	"mugig/internal/library"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -124,7 +125,7 @@ func newTestUI(t *testing.T) (*ui, *fakePlayer, fyne.App) {
 	fp := &fakePlayer{bad: map[string]bool{}}
 	u := newUI(test.NewTempWindow(t, nil), a.Preferences(), uiDeps{
 		player: fp,
-		cache:  loadCache(filepath.Join(t.TempDir(), "library.gob")),
+		cache:  library.LoadCache(filepath.Join(t.TempDir(), "library.gob")),
 		media:  &fakeMedia{},
 		async:  func(f func()) { f() }, // the test driver runs fyne.Do inline anyway
 		pick: func(fyne.Window, pickOptions, func([]string)) {
@@ -165,8 +166,8 @@ func lastMedia(u *ui) nowPlayingInfo {
 }
 
 // track makes a Track whose path is derived from its title.
-func track(title, artist, album string, year int) Track {
-	t := Track{
+func track(title, artist, album string, year int) library.Track {
+	t := library.Track{
 		Path:   "/music/" + title + ".mp3",
 		Title:  title,
 		Artist: artist,
@@ -174,7 +175,6 @@ func track(title, artist, album string, year int) Track {
 		Year:   year,
 		Format: "MP3",
 	}
-	t.search = searchKey(t)
 	return t
 }
 
@@ -184,12 +184,12 @@ func titleOf(path string) string {
 }
 
 // setLibrary loads tracks as if a scan had just finished.
-func setLibrary(u *ui, tracks ...Track) {
+func setLibrary(u *ui, tracks ...library.Track) {
 	u.all = tracks
 	u.applyView()
 }
 
-func titles(ts []Track) []string {
+func titles(ts []library.Track) []string {
 	var s []string
 	for _, t := range ts {
 		s = append(s, t.Title)
@@ -198,8 +198,8 @@ func titles(ts []Track) []string {
 }
 
 // fiveTracks is a small library already in library (artist) order.
-func fiveTracks() []Track {
-	return []Track{
+func fiveTracks() []library.Track {
+	return []library.Track{
 		track("Come Together", "Beatles", "Abbey Road", 1969),
 		track("Help", "Beatles", "Help!", 1965),
 		track("Hey Jude", "Beatles", "Hey Jude", 1968),

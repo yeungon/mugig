@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"mugig/internal/audiotest"
+	"mugig/internal/library"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -70,7 +71,7 @@ func TestFolderNarrowsList(t *testing.T) {
 	u.scanLibrary()
 
 	test.Tap(u.folders[1].row)
-	if u.filter != b || len(u.tracks) != 4 || slices.ContainsFunc(u.tracks, func(t Track) bool { return within(t.Path, a) }) {
+	if u.filter != b || len(u.tracks) != 4 || slices.ContainsFunc(u.tracks, func(t library.Track) bool { return library.Within(t.Path, a) }) {
 		t.Errorf("filter %q, %d shown", u.filter, len(u.tracks))
 	}
 	if u.pageTitle.Text != filepath.Base(b) || !strings.HasPrefix(u.count.Text, "4 tracks") {
@@ -161,7 +162,7 @@ func TestRemoveFolder(t *testing.T) {
 	if got := u.prefs.StringList(prefFolders); !slices.Equal(got, []string{b}) {
 		t.Errorf("saved folders %q", got)
 	}
-	if _, ok := u.cache.lookup(file, sizeOnDisk(t, file), fileModTime(t, file)); ok {
+	if _, ok := u.cache.Lookup(file, sizeOnDisk(t, file), fileModTime(t, file)); ok {
 		t.Error("removed folder still cached")
 	}
 	if _, err := os.Stat(file); err != nil {
@@ -248,11 +249,11 @@ func TestRemoveFolderDuringScan(t *testing.T) {
 		t.Fatalf("scanning %q, %d tracks", u.scanning, len(u.all))
 	}
 	u.removeFolder(b)
-	u.flush(b, []Track{{Path: filepath.Join(b, "sample.mp3"), Title: "late"}})
+	u.flush(b, []library.Track{{Path: filepath.Join(b, "sample.mp3"), Title: "late"}})
 	for len(later) > 0 {
 		step() // b's scan, cancelled; then c's
 	}
-	if u.scanning != "" || len(u.all) != 6 || slices.ContainsFunc(u.all, func(t Track) bool { return within(t.Path, b) }) {
+	if u.scanning != "" || len(u.all) != 6 || slices.ContainsFunc(u.all, func(t library.Track) bool { return library.Within(t.Path, b) }) {
 		t.Errorf("scanning %q, %d tracks", u.scanning, len(u.all))
 	}
 	if !strings.HasPrefix(u.status.Text, "Scanned") {
@@ -353,7 +354,7 @@ func TestFolderRowMakesRoomForCount(t *testing.T) {
 	u.win.Resize(fyne.NewSize(1200, 740))
 	r := u.folders[0].row
 	for i := range 2728 {
-		u.all = append(u.all, Track{Path: filepath.Join(u.folders[0].path, fmt.Sprint(i, ".mp3"))})
+		u.all = append(u.all, library.Track{Path: filepath.Join(u.folders[0].path, fmt.Sprint(i, ".mp3"))})
 	}
 	u.refreshFolders()
 	if r.count.Text != "2,731" {

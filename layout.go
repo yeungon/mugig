@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"image/color"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"strings"
 	"time"
 
@@ -102,7 +103,7 @@ func (u *ui) buildSongsPage() fyne.CanvasObject {
 
 // libraryStats summarises the library, e.g. "1,234 tracks · 120 artists ·
 // 87 albums".
-func libraryStats(tracks []Track) string {
+func libraryStats(tracks []library.Track) string {
 	if len(tracks) == 0 {
 		return "No music yet. Add a folder with the + beside Folders."
 	}
@@ -131,7 +132,7 @@ func libraryStats(tracks []Track) string {
 }
 
 // selectionStats totals the selected songs, for the line under the title.
-func selectionStats(ts []Track) string {
+func selectionStats(ts []library.Track) string {
 	var size int64
 	var length time.Duration
 	for _, t := range ts {

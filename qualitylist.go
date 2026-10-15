@@ -4,6 +4,7 @@ package main
 
 import (
 	"mugig/internal/audio"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 
 	"fyne.io/fyne/v2"
@@ -16,7 +17,7 @@ var lossyFormats = map[string]bool{"MP3": true, "OGG": true}
 // levelOf returns t's verdict: saved from a check, or Lossy by its format.
 //
 // Verdicts are kept by file, so the songs of a disc image share its one.
-func (u *ui) levelOf(t Track) quality.Level {
+func (u *ui) levelOf(t library.Track) quality.Level {
 	if l, ok := u.levels[audio.FileOf(t.Path)]; ok {
 		return l
 	}

@@ -1,4 +1,4 @@
-package main
+package library
 
 import "runtime"
 
@@ -10,4 +10,4 @@ import "runtime"
 func parallelWorkers() int { return max(4, runtime.NumCPU()) }
 
 // gentleWorkers is for spinning disks, and drives that may be one.
-const gentleWorkers = 2
+const GentleWorkers = 2

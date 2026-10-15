@@ -8,7 +8,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,37 +28,10 @@ import (
 
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"mugig/internal/trash"
-
-	"github.com/dhowden/tag"
 )
-
-// Track holds what we report to the GUI for one audio file.
-type Track struct {
-	Path   string
-	Title  string
-	Artist string
-	Album  string
-	Year   int
-	Format string
-	Size   int64         // bytes
-	Length time.Duration // 0 if unknown
-	NoTags bool          // true if tags were missing or unreadable
-	// A song from a CUE sheet is a stretch of a disc image: File is the
-	// image, and the song runs from Start to End in it (see cue.go).
-	File       string
-	Start, End time.Duration
-	search     string // lower-cased title, artist and album for the search box
-}
-
-// audioExts maps lower-case extensions to a display format name.
-var audioExts = map[string]string{
-	".mp3":  "MP3",
-	".flac": "FLAC",
-	".ogg":  "OGG",
-	".wav":  "WAV", // usually has no tags, so the file name is the title
-}
 
 var columns = []string{"Title", "Artist", "Album", "Time", "Year", "Format", "Size", "Quality", "Path"}
 
@@ -97,152 +69,6 @@ const (
 // Scanning (runs entirely off the UI thread)
 // ---------------------------------------------------------------------------
 
-// walk finds audio files and CUE sheets under root and sends their paths
-// to the channel. It closes paths when finished or cancelled.
-func walk(ctx context.Context, root string, paths chan<- string) {
-	defer close(paths)
-	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		if ctx.Err() != nil {
-			return ctx.Err() // stop walking on cancel
-		}
-		if err != nil {
-			return nil // unreadable file or folder: skip it, keep going
-		}
-		if d.IsDir() {
-			if p != root && skipFolder(p) {
-				return filepath.SkipDir // e.g. .Trashes, which holds deleted songs (see skip.go)
-			}
-			return nil
-		}
-		if !isAudioFile(p) && !isCueFile(p) || isEmpty(d) {
-			return nil
-		}
-		select {
-		case paths <- p:
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	})
-}
-
-// scanResult is one scanned file, with what the cache needs to know. For
-// a CUE sheet, track is empty and cue holds its songs.
-type scanResult struct {
-	track   Track
-	cue     []Track
-	images  map[string][2]int64 // a sheet's disc images: their size and modification time
-	path    string              // the file scanned
-	size    int64
-	modTime int64 // 0 if the file couldn't be checked; not cached then
-	cached  bool  // tags came from the cache, not the file
-}
-
-// songs are the songs the file gives the library.
-func (r scanResult) songs() []Track {
-	if r.path != "" && isCueFile(r.path) {
-		return r.cue
-	}
-	return []Track{r.track}
-}
-
-// entry is what the cache keeps of the file.
-func (r scanResult) entry() cacheEntry {
-	return cacheEntry{Size: r.size, ModTime: r.modTime, Track: r.track, Cue: r.cue, Images: r.images}
-}
-
-// worker reads tags for each path, unless the cache has them, and sends the
-// result.
-func worker(ctx context.Context, cache *libraryCache, paths <-chan string, results chan<- scanResult, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for p := range paths {
-		if ctx.Err() != nil {
-			return
-		}
-		select {
-		case results <- scanFile(cache, p):
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func scanFile(cache *libraryCache, path string) scanResult {
-	if isCueFile(path) {
-		return scanCue(cache, path)
-	}
-	r := scanResult{path: path}
-	if fi, err := os.Stat(path); err == nil {
-		r.size, r.modTime = fi.Size(), fi.ModTime().UnixNano()
-		r.track, r.cached = cache.lookup(path, r.size, r.modTime)
-	}
-	if !r.cached {
-		r.track = readTrack(path)
-	} else if r.track.Length == 0 {
-		// Cached before lengths were read, or the disk didn't answer then.
-		r.track.Length = audio.FileLength(path)
-	}
-	r.track.Size = r.size // also for tracks cached before sizes were shown
-	r.track.search = searchKey(r.track)
-	return r
-}
-
-// readTrack opens one file and parses its tags. Files with missing or broken
-// tags fall back to using the file name as the title.
-// isAudioFile reports whether path names a file the app can play. Hidden
-// files are left out: macOS puts a "._" file beside every file it copies
-// to an exFAT or FAT disk, such as most USB drives, and "._song.flac" holds
-// metadata, not audio.
-func isAudioFile(path string) bool {
-	return !hidden(path) && audioExts[strings.ToLower(filepath.Ext(path))] != ""
-}
-
-// isEmpty reports whether a file has no data, as left by an interrupted
-// download or copy. There is nothing to play.
-func isEmpty(d fs.DirEntry) bool {
-	fi, err := d.Info()
-	return err == nil && fi.Size() == 0
-}
-
-// hidden reports whether path's name starts with a dot, or is __MACOSX: the
-// folder macOS adds to zip files, whose copies of the files hold metadata,
-// not audio.
-func hidden(path string) bool {
-	name := filepath.Base(path)
-	return strings.HasPrefix(name, ".") || name == "__MACOSX"
-}
-
-func readTrack(path string) Track {
-	t := Track{
-		Path:   path,
-		Format: audioExts[strings.ToLower(filepath.Ext(path))],
-	}
-	fallbackTitle := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-
-	f, err := os.Open(path)
-	if err != nil {
-		t.Title, t.NoTags = fallbackTitle, true
-		return t
-	}
-	defer f.Close()
-	t.Length = audio.TrackLength(f)
-
-	m, err := tag.ReadFrom(f) // reads only the tag section, not the audio
-	if err != nil {
-		t.Title, t.NoTags = fallbackTitle, true
-		return t
-	}
-
-	t.Title = strings.TrimSpace(m.Title())
-	t.Artist = strings.TrimSpace(m.Artist())
-	t.Album = strings.TrimSpace(m.Album())
-	t.Year = m.Year()
-	if t.Title == "" {
-		t.Title = fallbackTitle
-	}
-	return t
-}
-
 // ---------------------------------------------------------------------------
 // GUI
 // ---------------------------------------------------------------------------
@@ -250,7 +76,7 @@ func readTrack(path string) Track {
 type ui struct {
 	win       fyne.Window
 	prefs     fyne.Preferences
-	cache     *libraryCache
+	cache     *library.Cache
 	media     mediaCenter
 	async     func(func())            // runs slow work off the UI thread
 	pick      picker                  // shows an Open panel (see open.go)
@@ -276,7 +102,7 @@ type ui struct {
 
 	// Playback (see transport.go).
 	player         audioPlayer
-	playing        Track // zero when stopped
+	playing        library.Track // zero when stopped
 	prevBtn        *widget.Button
 	playBtn        *roundButton
 	nextBtn        *widget.Button
@@ -329,10 +155,11 @@ type ui struct {
 	eqView         *eqView          // the Equalizer window, while open
 	crossfeedItems []*fyne.MenuItem // one per level, in the Controls menu
 
-	playlists       []*playlist
-	playlistsPath   string    // where they are saved; "" for nowhere
-	playlist        *playlist // the playlist shown in the song list, or nil
+	playlists       []*library.Playlist
+	playlistsPath   string            // where they are saved; "" for nowhere
+	playlist        *library.Playlist // the playlist shown in the song list, or nil
 	playlistList    *fyne.Container
+	playlistRows    map[*library.Playlist]*folderRow // each playlist's row in the sidebar
 	newPlaylistBtn  *widget.Button
 	rulesDialog     *rulesEditor     // the smart playlist dialog last opened, for tests
 	appearanceItems []*fyne.MenuItem // View > Appearance (see appearance.go)
@@ -342,12 +169,12 @@ type ui struct {
 	settingSeek     bool // the seek bar is being moved by code, not the user
 	shuffle         bool
 	repeat          repeatMode
-	queue           []string // shuffle: paths still to play this round
-	queueValid      bool     // false means queue must be rebuilt before use
-	history         []string // paths played before the current one, for "previous"
-	queued          []Track  // Up Next: chosen to play before the list carries on (see upnext.go)
-	fromQueue       bool     // the playing track came from Up Next
-	listPath        string   // the last track played from the list, where it carries on from
+	queue           []string        // shuffle: paths still to play this round
+	queueValid      bool            // false means queue must be rebuilt before use
+	history         []string        // paths played before the current one, for "previous"
+	queued          []library.Track // Up Next: chosen to play before the list carries on (see upnext.go)
+	fromQueue       bool            // the playing track came from Up Next
+	listPath        string          // the last track played from the list, where it carries on from
 	queueBtn        *widget.Button
 	queuePop        *widget.PopUp
 	cued            *cuedSong       // the last session's song, waiting for Play (see resume.go)
@@ -361,11 +188,11 @@ type ui struct {
 
 	// The fields below are only read or modified on the UI thread (inside
 	// fyne.Do or widget callbacks), so they need no mutex.
-	all      []Track // everything scanned (see library.go)
-	tracks   []Track // what the table shows: all, filtered and sorted
-	sortCol  int     // column the list is sorted by, or -1 for library order
-	stats    string  // library summary shown under the title
-	statsFor string  // the folder and number of tracks stats was worked out for
+	all      []library.Track // everything scanned (see library.go)
+	tracks   []library.Track // what the table shows: all, filtered and sorted
+	sortCol  int             // column the list is sorted by, or -1 for library order
+	stats    string          // library summary shown under the title
+	statsFor string          // the folder and number of tracks stats was worked out for
 	sortDesc bool
 	cancel   context.CancelFunc // stops the running scan; nil if none
 
@@ -432,7 +259,7 @@ func main() {
 	pl := audio.NewPlayer(onUI)
 	u := newUI(w, a.Preferences(), uiDeps{
 		player:    pl,
-		cache:     loadCache(filepath.Join(a.Storage().RootURI().Path(), "library.gob")),
+		cache:     library.LoadCache(filepath.Join(a.Storage().RootURI().Path(), "library.gob")),
 		saved:     quality.LoadStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
 		media:     media,
 		playlists: filepath.Join(a.Storage().RootURI().Path(), "playlists.json"),
@@ -483,7 +310,7 @@ func main() {
 // replace them.
 type uiDeps struct {
 	player audioPlayer
-	cache  *libraryCache
+	cache  *library.Cache
 	saved  *quality.Store // optional; defaults to memory only
 	media  mediaCenter    // optional
 	async  func(func())   // optional; defaults to a new goroutine
@@ -498,11 +325,11 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 		u.qualityStore = quality.LoadStore("")
 	}
 	u.levels = u.qualityStore.Levels()
-	u.watchFolder, u.settle, u.reconnectEvery = watchFolder, settleTime, reconnectPoll
+	u.watchFolder, u.settle, u.reconnectEvery = library.WatchFolder, settleTime, reconnectPoll
 	u.reveal, u.modifiers, u.trash = reveal, keyModifiers, trash.Move
 	u.canHog = audio.CanHogDevice
 	u.playlistsPath = d.playlists
-	u.playlists = loadPlaylists(d.playlists)
+	u.playlists = library.LoadPlaylists(d.playlists)
 	u.selected = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker
@@ -612,7 +439,7 @@ func (u *ui) tapTable(at fyne.Position) {
 	u.table.Tapped(&fyne.PointEvent{AbsolutePosition: at, Position: at.Subtract(origin)})
 }
 
-func cellText(t Track, col int) string {
+func cellText(t library.Track, col int) string {
 	switch col {
 	case titleCol:
 		return t.Title
@@ -686,21 +513,21 @@ func (u *ui) startScan(root string) {
 		u.startWatching(f) // changes during the scan are applied when it ends
 	}
 	u.refreshFolders()
-	u.async(func() { u.runScan(ctx, root, scanWorkers(root)) })
+	u.async(func() { u.runScan(ctx, root, library.ScanWorkers(root)) })
 }
 
 // runScan walks root with a pool of workers, reporting to the UI through
 // flush and finish. It runs off the UI thread and returns when done.
 func (u *ui) runScan(ctx context.Context, root string, workers int) {
 	paths := make(chan string, 1024)
-	results := make(chan scanResult, 1024)
+	results := make(chan library.ScanResult, 1024)
 
-	go walk(ctx, root, paths)
+	go library.Walk(ctx, root, paths)
 
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
-		go worker(ctx, u.cache, paths, results, &wg)
+		go library.Worker(ctx, u.cache, paths, results, &wg)
 	}
 	go func() {
 		wg.Wait()
@@ -723,13 +550,13 @@ type scanTally struct {
 // batches, so the interface stays responsive even with many files. At the
 // end it updates and saves the cache; the workers have stopped by then, so
 // nothing else is using it.
-func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult) {
+func (u *ui) collect(ctx context.Context, root string, results <-chan library.ScanResult) {
 	ticker := time.NewTicker(150 * time.Millisecond)
 	defer ticker.Stop()
 
-	seen := map[string]cacheEntry{}
+	seen := map[string]library.CacheEntry{}
 	tally := scanTally{found: map[string]bool{}}
-	var batch []Track
+	var batch []library.Track
 	for {
 		select {
 		case r, ok := <-results:
@@ -740,23 +567,23 @@ func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult
 				_, err := os.Stat(root)
 				tally.cancelled = ctx.Err() != nil
 				tally.complete = !tally.cancelled && err == nil
-				u.cache.update(root, seen, tally.complete)
-				if err := u.cache.save(); err != nil {
+				u.cache.Update(root, seen, tally.complete)
+				if err := u.cache.Save(); err != nil {
 					fyne.LogError("saving library cache", err)
 				}
 				u.finish(root, tally)
 				return
 			}
-			if r.modTime != 0 {
-				seen[r.path] = r.entry()
+			if r.ModTime != 0 {
+				seen[r.Path] = r.Entry()
 			}
-			if r.cached {
+			if r.Cached {
 				tally.fromCache++
 			}
-			if r.track.NoTags {
+			if r.Track.NoTags {
 				tally.noTags++
 			}
-			for _, t := range r.songs() {
+			for _, t := range r.Songs() {
 				tally.found[t.Path] = true
 				batch = append(batch, t)
 			}
@@ -771,7 +598,7 @@ func (u *ui) collect(ctx context.Context, root string, results <-chan scanResult
 
 // flush adds a batch of scanned tracks to the list, or updates them if
 // listed already.
-func (u *ui) flush(root string, batch []Track) {
+func (u *ui) flush(root string, batch []library.Track) {
 	if len(batch) == 0 {
 		return
 	}
@@ -791,12 +618,12 @@ func (u *ui) flush(root string, batch []Track) {
 				continue
 			}
 			u.all = append(u.all, t)
-			if u.inFilter(t) && matches(t, words) {
+			if u.inFilter(t) && library.Matches(t, words) {
 				u.tracks = append(u.tracks, t)
 			}
 		}
-		if images := cueImages(u.all); len(images) > 0 {
-			u.all, u.tracks = withoutImages(u.all, images), withoutImages(u.tracks, images)
+		if images := library.CueImages(u.all); len(images) > 0 {
+			u.all, u.tracks = library.WithoutImages(u.all, images), library.WithoutImages(u.tracks, images)
 		}
 		u.table.Refresh()
 		u.updateCount()
@@ -817,20 +644,20 @@ func (u *ui) finish(root string, tally scanTally) {
 			if u.folderAt(root) == nil { // removed: what the scan cached is unwanted
 				cache := u.cache
 				u.async(func() {
-					cache.forgetUnder(root)
-					if err := cache.save(); err != nil {
+					cache.ForgetUnder(root)
+					if err := cache.Save(); err != nil {
 						fyne.LogError("saving library cache", err)
 					}
 				})
 			}
 		case tally.complete:
 			// Songs no longer there are taken off the list.
-			u.all = slices.DeleteFunc(u.all, func(t Track) bool { return within(t.Path, root) && !tally.found[t.Path] })
+			u.all = slices.DeleteFunc(u.all, func(t library.Track) bool { return library.Within(t.Path, root) && !tally.found[t.Path] })
 		}
-		u.all = dropImages(u.all)
+		u.all = library.DropImages(u.all)
 		// Sort once at the end rather than on every batch.
 		sort.SliceStable(u.all, func(i, j int) bool {
-			return libraryLess(u.all[i], u.all[j])
+			return library.Less(u.all[i], u.all[j])
 		})
 		u.applyView() // also redraws the playing marker, which may have moved
 
@@ -883,7 +710,7 @@ func (u *ui) finish(root string, tally scanTally) {
 func (u *ui) countIn(dir string) int {
 	n := 0
 	for _, t := range u.all {
-		if within(t.Path, dir) {
+		if library.Within(t.Path, dir) {
 			n++
 		}
 	}

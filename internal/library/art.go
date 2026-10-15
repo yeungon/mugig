@@ -1,4 +1,4 @@
-package main
+package library
 
 import (
 	"mugig/internal/audio"
@@ -17,7 +17,7 @@ var coverNames = map[string]bool{
 
 // coverArt finds a picture for the track at path: one embedded in its tags,
 // or else a cover image in its folder. It returns nil if there is none.
-func coverArt(path string) []byte {
+func CoverArt(path string) []byte {
 	path = audio.FileOf(path) // a song from a CUE sheet: its disc image
 	if f, err := os.Open(path); err == nil {
 		m, err := tag.ReadFrom(f)

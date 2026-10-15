@@ -1,4 +1,4 @@
-package main
+package library
 
 // Playlists. An ordinary playlist is songs in the order they were added.
 // A smart playlist is rules instead, such as "Format is FLAC and Quality
@@ -19,23 +19,21 @@ import (
 )
 
 // playlist is one playlist.
-type playlist struct {
+type Playlist struct {
 	Name  string
 	Songs []string    `json:",omitempty"` // paths, in order, for an ordinary playlist
-	Smart *smartRules `json:",omitempty"` // the rules, for a smart playlist
-
-	row *folderRow // in the sidebar
+	Smart *SmartRules `json:",omitempty"` // the rules, for a smart playlist
 }
 
 // smartRules are a smart playlist's rules: the songs matching all of them,
 // or with Any, at least one.
-type smartRules struct {
+type SmartRules struct {
 	Any   bool
-	Rules []smartRule
+	Rules []SmartRule
 }
 
 // smartRule is one rule, such as Year / is less than / 1980.
-type smartRule struct {
+type SmartRule struct {
 	Field string
 	Op    string
 	Value string
@@ -43,27 +41,30 @@ type smartRule struct {
 
 // A rule's field is one of these, and each kind of field has its own
 // comparisons.
-type fieldKind int
+type FieldKind int
 
 const (
-	textField     fieldKind = iota
+	textField     FieldKind = iota
 	numberField             // the value is a number
 	minutesField            // the song's length, in minutes
 	megabyteField           // the file's size, in MB
-	qualityField            // one of the Quality column's verdicts
+	QualityField            // one of the Quality column's verdicts
 	daysField               // the file's date, within the last so many days
 )
 
-var smartFields = []struct {
-	name string
-	kind fieldKind
-}{
+// smartField is a field a rule can test, and what kind of value it holds.
+type SmartField struct {
+	Name string
+	Kind FieldKind
+}
+
+var SmartFields = []SmartField{
 	{"Title", textField},
 	{"Artist", textField},
 	{"Album", textField},
 	{"Year", numberField},
 	{"Format", textField},
-	{"Quality", qualityField},
+	{"Quality", QualityField},
 	{"Time", minutesField},
 	{"Size", megabyteField},
 	{"Folder", textField},
@@ -71,58 +72,58 @@ var smartFields = []struct {
 }
 
 const (
-	opContains    = "contains"
-	opNotContains = "does not contain"
-	opIs          = "is"
-	opIsNot       = "is not"
-	opStartsWith  = "starts with"
-	opMore        = "is more than"
-	opLess        = "is less than"
-	opWithin      = "is in the last"
-	opNotWithin   = "is not in the last"
+	OpContains    = "contains"
+	OpNotContains = "does not contain"
+	OpIs          = "is"
+	OpIsNot       = "is not"
+	OpStartsWith  = "starts with"
+	OpMore        = "is more than"
+	OpLess        = "is less than"
+	OpWithin      = "is in the last"
+	OpNotWithin   = "is not in the last"
 )
 
-var kindOps = map[fieldKind][]string{
-	textField:     {opContains, opNotContains, opIs, opIsNot, opStartsWith},
-	numberField:   {opIs, opIsNot, opMore, opLess},
-	minutesField:  {opMore, opLess},
-	megabyteField: {opMore, opLess},
-	qualityField:  {opIs, opIsNot},
-	daysField:     {opWithin, opNotWithin},
+var KindOps = map[FieldKind][]string{
+	textField:     {OpContains, OpNotContains, OpIs, OpIsNot, OpStartsWith},
+	numberField:   {OpIs, OpIsNot, OpMore, OpLess},
+	minutesField:  {OpMore, OpLess},
+	megabyteField: {OpMore, OpLess},
+	QualityField:  {OpIs, OpIsNot},
+	daysField:     {OpWithin, OpNotWithin},
 }
 
 // kindUnits are shown after a rule's value.
-var kindUnits = map[fieldKind]string{minutesField: "minutes", megabyteField: "MB", daysField: "days"}
+var KindUnits = map[FieldKind]string{minutesField: "minutes", megabyteField: "MB", daysField: "days"}
 
 // notCheckedChoice is the Quality rule's value for songs with no verdict.
 const notCheckedChoice = "Not checked"
 
 // qualityChoices are the Quality rule's values, in the column's order.
-func qualityChoices() []string {
+func QualityChoices() []string {
 	return []string{quality.LevelNames[quality.Damaged], quality.LevelNames[quality.Suspect], quality.LevelNames[quality.Lossy],
 		quality.LevelNames[quality.Lossless], quality.LevelNames[quality.HiRes], notCheckedChoice}
 }
 
-func fieldKindOf(name string) (fieldKind, bool) {
-	for _, f := range smartFields {
-		if f.name == name {
-			return f.kind, true
+func FieldKindOf(name string) (FieldKind, bool) {
+	for _, f := range SmartFields {
+		if f.Name == name {
+			return f.Kind, true
 		}
 	}
 	return 0, false
 }
 
 // songFacts is what rules need to know about a song beyond its tags.
-type songFacts struct {
-	level   func(Track) quality.Level
-	modTime func(path string) time.Time // zero if unknown
-	now     time.Time
+type SongFacts struct {
+	Level   func(Track) quality.Level
+	ModTime func(path string) time.Time // zero if unknown
+	Now     time.Time
 }
 
 // matches reports whether t passes the rule. A rule that can't be read,
 // such as a number that isn't one, matches nothing.
-func (r smartRule) matches(t Track, f songFacts) bool {
-	kind, ok := fieldKindOf(r.Field)
+func (r SmartRule) Matches(t Track, f SongFacts) bool {
+	kind, ok := FieldKindOf(r.Field)
 	if !ok {
 		return false
 	}
@@ -133,39 +134,39 @@ func (r smartRule) matches(t Track, f songFacts) bool {
 			"Format": t.Format, "Folder": filepath.Dir(t.Path)}[r.Field]
 		have, want := strings.ToLower(have), strings.ToLower(value)
 		switch r.Op {
-		case opContains:
+		case OpContains:
 			return strings.Contains(have, want)
-		case opNotContains:
+		case OpNotContains:
 			return !strings.Contains(have, want)
-		case opIs:
+		case OpIs:
 			return have == want
-		case opIsNot:
+		case OpIsNot:
 			return have != want
-		case opStartsWith:
+		case OpStartsWith:
 			return strings.HasPrefix(have, want)
 		}
-	case qualityField:
-		name := quality.LevelNames[f.level(t)]
+	case QualityField:
+		name := quality.LevelNames[f.Level(t)]
 		if name == "" {
 			name = notCheckedChoice
 		}
 		switch r.Op {
-		case opIs:
+		case OpIs:
 			return strings.EqualFold(name, value)
-		case opIsNot:
+		case OpIsNot:
 			return !strings.EqualFold(name, value)
 		}
 	case daysField:
 		days, err := strconv.ParseFloat(value, 64)
-		mod := f.modTime(t.Path)
+		mod := f.ModTime(t.Path)
 		if err != nil || mod.IsZero() {
 			return false
 		}
-		within := f.now.Sub(mod) <= time.Duration(days*24*float64(time.Hour))
+		within := f.Now.Sub(mod) <= time.Duration(days*24*float64(time.Hour))
 		switch r.Op {
-		case opWithin:
+		case OpWithin:
 			return within
-		case opNotWithin:
+		case OpNotWithin:
 			return !within
 		}
 	default:
@@ -189,13 +190,13 @@ func (r smartRule) matches(t Track, f songFacts) bool {
 			have = float64(t.Size) / 1e6
 		}
 		switch r.Op {
-		case opIs:
+		case OpIs:
 			return have == want
-		case opIsNot:
+		case OpIsNot:
 			return have != want
-		case opMore:
+		case OpMore:
 			return have > want
-		case opLess:
+		case OpLess:
 			return have < want
 		}
 	}
@@ -203,12 +204,12 @@ func (r smartRule) matches(t Track, f songFacts) bool {
 }
 
 // matches reports whether t passes the rules. No rules match every song.
-func (s *smartRules) matches(t Track, f songFacts) bool {
+func (s *SmartRules) Matches(t Track, f SongFacts) bool {
 	if len(s.Rules) == 0 {
 		return true
 	}
 	for _, r := range s.Rules {
-		if r.matches(t, f) == s.Any {
+		if r.Matches(t, f) == s.Any {
 			return s.Any
 		}
 	}
@@ -218,18 +219,18 @@ func (s *smartRules) matches(t Track, f songFacts) bool {
 // tracks lists p's songs that are in the library: an ordinary playlist's
 // in its order, a smart one's in library order.
 // byPath maps paths to songs, and is made from all if nil.
-func (p *playlist) tracks(all []Track, byPath map[string]Track, f songFacts) []Track {
+func (p *Playlist) Tracks(all []Track, byPath map[string]Track, f SongFacts) []Track {
 	if p.Smart != nil {
 		var out []Track
 		for _, t := range all {
-			if p.Smart.matches(t, f) {
+			if p.Smart.Matches(t, f) {
 				out = append(out, t)
 			}
 		}
 		return out
 	}
 	if byPath == nil {
-		byPath = tracksByPath(all)
+		byPath = TracksByPath(all)
 	}
 	out := make([]Track, 0, len(p.Songs))
 	for _, path := range p.Songs {
@@ -240,7 +241,7 @@ func (p *playlist) tracks(all []Track, byPath map[string]Track, f songFacts) []T
 	return out
 }
 
-func tracksByPath(all []Track) map[string]Track {
+func TracksByPath(all []Track) map[string]Track {
 	m := make(map[string]Track, len(all))
 	for _, t := range all {
 		m[t.Path] = t
@@ -249,7 +250,7 @@ func tracksByPath(all []Track) map[string]Track {
 }
 
 // add appends songs not already in p.
-func (p *playlist) add(paths ...string) int {
+func (p *Playlist) Add(paths ...string) int {
 	added := 0
 	for _, path := range paths {
 		if !slices.Contains(p.Songs, path) {
@@ -261,13 +262,13 @@ func (p *playlist) add(paths ...string) int {
 }
 
 // remove takes songs out of p.
-func (p *playlist) remove(paths ...string) {
+func (p *Playlist) Remove(paths ...string) {
 	p.Songs = slices.DeleteFunc(p.Songs, func(s string) bool { return slices.Contains(paths, s) })
 }
 
 // move moves the song at path by one place up (-1) or down (+1) among
 // the songs listed, which are the playlist's that are in the library.
-func (p *playlist) move(path string, by int, listed []Track) {
+func (p *Playlist) Move(path string, by int, listed []Track) {
 	i := slices.IndexFunc(listed, func(t Track) bool { return t.Path == path })
 	j := i + by
 	if i < 0 || j < 0 || j >= len(listed) {
@@ -281,12 +282,12 @@ func (p *playlist) move(path string, by int, listed []Track) {
 // playlistFile is the saved form.
 type playlistFile struct {
 	Version   int
-	Playlists []*playlist
+	Playlists []*Playlist
 }
 
 // loadPlaylists reads the playlists saved at path. A missing or unreadable
 // file gives none.
-func loadPlaylists(path string) []*playlist {
+func LoadPlaylists(path string) []*Playlist {
 	if path == "" {
 		return nil
 	}
@@ -303,7 +304,7 @@ func loadPlaylists(path string) []*playlist {
 
 // savePlaylists writes the playlists to path, through a temporary file so
 // a crash can't leave half a file.
-func savePlaylists(path string, ps []*playlist) error {
+func SavePlaylists(path string, ps []*Playlist) error {
 	if path == "" {
 		return nil
 	}
@@ -319,9 +320,9 @@ func savePlaylists(path string, ps []*playlist) error {
 }
 
 // uniqueName returns name, or name 2, name 3… if a playlist has it.
-func uniqueName(ps []*playlist, name string) string {
+func UniqueName(ps []*Playlist, name string) string {
 	taken := func(n string) bool {
-		return slices.ContainsFunc(ps, func(p *playlist) bool { return strings.EqualFold(p.Name, n) })
+		return slices.ContainsFunc(ps, func(p *Playlist) bool { return strings.EqualFold(p.Name, n) })
 	}
 	if !taken(name) {
 		return name

@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package library
 
 import (
 	"os/exec"
@@ -11,11 +11,11 @@ import (
 // scanWorkers asks macOS whether root is on a solid-state drive. USB
 // enclosures and network shares usually don't say, so they are read gently,
 // which costs little: tags are small, and rescans mostly use the cache.
-func scanWorkers(root string) int {
+func ScanWorkers(root string) int {
 	if solidState(root) {
 		return parallelWorkers()
 	}
-	return gentleWorkers
+	return GentleWorkers
 }
 
 // solidState reports whether Disk Utility says path's drive is solid-state.

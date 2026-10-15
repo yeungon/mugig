@@ -3,6 +3,7 @@
 package audiotest
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math"
 	"math/cmplx"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -276,4 +278,66 @@ func WriteFile(t testing.TB, path string, data []byte) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// ID3v23 builds a minimal ID3v2.3 tag with the given text frames, plus an
+// embedded picture if frames["APIC"] holds image bytes.
+func ID3v23(frames map[string]string) []byte {
+	var body bytes.Buffer
+	for _, id := range []string{"TIT2", "TPE1", "TALB", "TYER", "APIC"} {
+		v, ok := frames[id]
+		if !ok {
+			continue
+		}
+		data := append([]byte{0}, v...) // 0 = ISO-8859-1 text
+		if id == "APIC" {
+			// encoding, MIME type, picture type 3 (front cover), empty description
+			data = append([]byte("\x00image/png\x00\x03\x00"), v...)
+		}
+		body.WriteString(id)
+		binary.Write(&body, binary.BigEndian, uint32(len(data)))
+		body.Write([]byte{0, 0}) // flags
+		body.Write(data)
+	}
+	n := body.Len() // tag size is "syncsafe": 7 bits per byte
+	header := []byte{'I', 'D', '3', 3, 0, 0, byte(n >> 21 & 0x7f), byte(n >> 14 & 0x7f), byte(n >> 7 & 0x7f), byte(n & 0x7f)}
+	return append(header, body.Bytes()...)
+}
+
+const CueSheet = `REM GENRE Pop
+REM DATE 2005
+PERFORMER "Some Singer"
+TITLE "An Album"
+FILE "%s" WAVE
+  TRACK 01 AUDIO
+    TITLE "First"
+    INDEX 01 00:00:00
+  TRACK 02 AUDIO
+    TITLE "Second"
+    PERFORMER "A Guest"
+    INDEX 01 00:01:10
+  TRACK 03 AUDIO
+    TITLE "Third"
+    INDEX 00 00:01:70
+    INDEX 01 00:02:00
+`
+
+// CueImage writes a 3-second WAV disc image whose every sample can be
+// told apart, and a sheet for it, encoded by enc (nil for UTF-8), in a
+// folder of its own. It returns the folder and the image's samples.
+func CueImage(t testing.TB, name string, encode func(string) []byte) (string, []int32) {
+	t.Helper()
+	dir := t.TempDir()
+	samples := make([]int32, 3*44100)
+	for i := range samples {
+		samples[i] = int32(i%30000 - 15000)
+	}
+	WriteWAV(t, filepath.Join(dir, name+".wav"), 44100, 16, 2, samples, samples)
+	text := strings.ReplaceAll(CueSheet, "%s", name+".wav")
+	data := []byte(text)
+	if encode != nil {
+		data = encode(text)
+	}
+	os.WriteFile(filepath.Join(dir, name+".cue"), data, 0o644)
+	return dir, samples
 }

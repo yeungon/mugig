@@ -9,6 +9,7 @@ import (
 	"cmp"
 	"fmt"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"path/filepath"
 	"slices"
@@ -20,32 +21,17 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// searchKey is what the search box matches against.
-func searchKey(t Track) string {
-	return strings.ToLower(t.Title + "\x00" + t.Artist + "\x00" + t.Album)
-}
-
 func (u *ui) searchWords() []string {
 	return strings.Fields(strings.ToLower(u.search.Text))
-}
-
-// matches reports whether t contains every search word, in any field.
-func matches(t Track, words []string) bool {
-	for _, w := range words {
-		if !strings.Contains(t.search, w) {
-			return false
-		}
-	}
-	return true
 }
 
 // applyView rebuilds the visible list from the library using the current
 // folder, search and sort. Called on the UI thread.
 func (u *ui) applyView() {
 	words := u.searchWords()
-	view := make([]Track, 0, len(u.all))
+	view := make([]library.Track, 0, len(u.all))
 	for _, t := range u.shownBase() {
-		if matches(t, words) {
+		if library.Matches(t, words) {
 			view = append(view, t)
 		}
 	}
@@ -68,12 +54,12 @@ func (u *ui) applyView() {
 
 // shownBase is what the song list shows before a search: a playlist's
 // songs, a folder's, or the whole library.
-func (u *ui) shownBase() []Track {
+func (u *ui) shownBase() []library.Track {
 	switch {
 	case u.playlist != nil:
-		return u.playlist.tracks(u.all, nil, u.songFacts())
+		return u.playlist.Tracks(u.all, nil, u.songFacts())
 	case u.filter != "":
-		return slices.DeleteFunc(slices.Clone(u.all), func(t Track) bool { return !u.inFilter(t) })
+		return slices.DeleteFunc(slices.Clone(u.all), func(t library.Track) bool { return !u.inFilter(t) })
 	}
 	return u.all
 }
@@ -111,7 +97,7 @@ func (u *ui) updateCount() {
 }
 
 // folderStats summarises the songs shown, or says why there are none.
-func (u *ui) folderStats(shown []Track) string {
+func (u *ui) folderStats(shown []library.Track) string {
 	f := u.folderAt(u.filter)
 	switch {
 	case len(shown) > 0:
@@ -175,7 +161,7 @@ func (u *ui) updateHeader(id widget.TableCellID, o fyne.CanvasObject) {
 	b.OnTapped = func() { u.sortBy(col) }
 }
 
-func (u *ui) compareColumn(a, b Track, col int) int {
+func (u *ui) compareColumn(a, b library.Track, col int) int {
 	switch col {
 	case timeCol:
 		return cmp.Compare(a.Length, b.Length)
@@ -186,22 +172,7 @@ func (u *ui) compareColumn(a, b Track, col int) int {
 	case qualityCol:
 		return cmp.Compare(quality.LevelRank[u.levelOf(a)], quality.LevelRank[u.levelOf(b)])
 	}
-	return compareFold(cellText(a, col), cellText(b, col))
-}
-
-// libraryLess is the default order: artist, then album, then title.
-func libraryLess(a, b Track) bool {
-	if c := compareFold(a.Artist, b.Artist); c != 0 {
-		return c < 0
-	}
-	if c := compareFold(a.Album, b.Album); c != 0 {
-		return c < 0
-	}
-	return compareFold(a.Title, b.Title) < 0
-}
-
-func compareFold(a, b string) int {
-	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+	return library.CompareFold(cellText(a, col), cellText(b, col))
 }
 
 // oldColumns is the column order before Size was added, when the sorting

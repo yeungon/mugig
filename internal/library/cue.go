@@ -1,4 +1,4 @@
-package main
+package library
 
 // CUE sheets. A CD is often ripped to one big file, a disc image, with a
 // .cue file beside it saying where each song starts. Each song in the
@@ -106,7 +106,7 @@ func allFound(sheets []cueSheet) bool {
 func keep(sheets []cueSheet) []cueSheet {
 	var out []cueSheet
 	for _, s := range sheets {
-		if len(s.tracks) >= 2 && isAudioFile(s.file) {
+		if len(s.tracks) >= 2 && IsAudioFile(s.file) {
 			out = append(out, s)
 		}
 	}
@@ -257,7 +257,7 @@ func cueSongs(s cueSheet, image Track) []Track {
 			end = s.tracks[i+1].start
 		}
 		t := Track{
-			Path:   cuePath(s.file, ct.number),
+			Path:   CuePath(s.file, ct.number),
 			File:   s.file,
 			Start:  ct.start,
 			End:    end,
@@ -293,7 +293,7 @@ func cueSongs(s cueSheet, image Track) []Track {
 
 // cuePath names a song of an image: the image's path and the song's
 // number.
-func cuePath(image string, number int) string {
+func CuePath(image string, number int) string {
 	return fmt.Sprintf("%s#%02d", image, number)
 }
 
@@ -306,25 +306,25 @@ func rememberCue(t Track) {
 
 // scanCue reads the sheet at path, or takes its songs from the cache if
 // neither it nor its images have changed.
-func scanCue(cache *libraryCache, path string) scanResult {
-	r := scanResult{path: path}
+func scanCue(cache *Cache, path string) ScanResult {
+	r := ScanResult{Path: path}
 	fi, err := os.Stat(path)
 	if err != nil {
 		return r
 	}
-	r.size, r.modTime = fi.Size(), fi.ModTime().UnixNano()
-	if e, ok := cache.entry(path, r.size, r.modTime); ok && imagesUnchanged(e.Images) {
-		r.cue, r.images, r.cached = e.Cue, e.Images, true
+	r.size, r.ModTime = fi.Size(), fi.ModTime().UnixNano()
+	if e, ok := cache.entry(path, r.size, r.ModTime); ok && imagesUnchanged(e.Images) {
+		r.cue, r.images, r.Cached = e.Cue, e.Images, true
 	} else {
 		sheets, _ := readCue(path)
 		r.images = map[string][2]int64{}
 		for _, s := range sheets {
-			image := scanFile(cache, s.file)
-			if image.modTime == 0 {
+			image := ScanFile(cache, s.file)
+			if image.ModTime == 0 {
 				continue
 			}
-			r.images[s.file] = [2]int64{image.size, image.modTime}
-			r.cue = append(r.cue, cueSongs(s, image.track)...)
+			r.images[s.file] = [2]int64{image.size, image.ModTime}
+			r.cue = append(r.cue, cueSongs(s, image.Track)...)
 		}
 	}
 	for _, t := range r.cue {
@@ -347,15 +347,15 @@ func imagesUnchanged(images map[string][2]int64) bool {
 
 // dropImages leaves out of songs the disc images whose songs, from their
 // CUE sheets, are listed instead.
-func dropImages(songs []Track) []Track {
-	if images := cueImages(songs); len(images) > 0 {
-		return withoutImages(songs, images)
+func DropImages(songs []Track) []Track {
+	if images := CueImages(songs); len(images) > 0 {
+		return WithoutImages(songs, images)
 	}
 	return songs
 }
 
 // cueImages are the disc images that songs from CUE sheets are in.
-func cueImages(songs []Track) map[string]bool {
+func CueImages(songs []Track) map[string]bool {
 	images := map[string]bool{}
 	for _, t := range songs {
 		if t.File != "" {
@@ -365,12 +365,12 @@ func cueImages(songs []Track) map[string]bool {
 	return images
 }
 
-func withoutImages(songs []Track, images map[string]bool) []Track {
+func WithoutImages(songs []Track, images map[string]bool) []Track {
 	return slices.DeleteFunc(songs, func(t Track) bool { return t.File == "" && images[t.Path] })
 }
 
 // songFile is the file t is in: its own, or its disc image.
-func songFile(t Track) string {
+func SongFile(t Track) string {
 	if t.File != "" {
 		return t.File
 	}

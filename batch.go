@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"runtime"
 	"strings"
@@ -68,11 +69,11 @@ func (u *ui) batchWorkers() int {
 	n, known := max(1, runtime.NumCPU()-1), false
 	for _, f := range u.folders {
 		if f.connected {
-			n, known = min(n, scanWorkers(f.path)), true
+			n, known = min(n, library.ScanWorkers(f.path)), true
 		}
 	}
 	if !known {
-		n = min(n, gentleWorkers) // songs opened on their own: the disk is unknown
+		n = min(n, library.GentleWorkers) // songs opened on their own: the disk is unknown
 	}
 	return max(1, n)
 }
@@ -83,12 +84,12 @@ func (u *ui) checkAllSongs() {
 }
 
 // checkSongs starts checking the lossless songs among songs.
-func (u *ui) checkSongs(songs []Track) {
+func (u *ui) checkSongs(songs []library.Track) {
 	if u.batch != nil && !u.batch.finished {
 		return // already running
 	}
 	// The songs of a disc image share its file, which is checked once.
-	var todo []Track
+	var todo []library.Track
 	files := map[string]bool{}
 	for _, t := range songs {
 		if f := audio.FileOf(t.Path); !lossyFormats[t.Format] && !files[f] {
@@ -126,8 +127,8 @@ func (u *ui) stopBatch() {
 
 // runBatch checks the songs with a pool of workers, handing results to the
 // UI in batches. It runs off the UI thread and returns when done.
-func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers int) {
-	jobs := make(chan Track)
+func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []library.Track, workers int) {
+	jobs := make(chan library.Track)
 	results := make(chan batchResult, workers)
 	var wg sync.WaitGroup
 	for range workers {

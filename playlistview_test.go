@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/library"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -60,7 +61,7 @@ func TestAddSongsToPlaylists(t *testing.T) {
 
 	// Two songs selected, into a new playlist.
 	u.selectAll()
-	sel := []Track{u.tracks[3], u.tracks[1]}
+	sel := []library.Track{u.tracks[3], u.tracks[1]}
 	itemIn(t, u.addToPlaylistItem(sel).ChildMenu, "New Playlist…").Action()
 	answerName(t, u, "Road Trip", "Create")
 	if len(u.playlists) != 1 || u.playlists[0].Name != "Road Trip" || u.playlist != nil {
@@ -70,18 +71,18 @@ func TestAddSongsToPlaylists(t *testing.T) {
 		t.Errorf("status %q", u.status.Text)
 	}
 	p := u.playlists[0]
-	if p.row == nil || p.row.count.Text != "2" {
+	if row := u.playlistRows[p]; row == nil || row.count.Text != "2" {
 		t.Error("the sidebar should list it with its count")
 	}
 
 	// One more, and one already in it, to the playlist there is.
 	itemIn(t, u.trackMenu(u.tracks[0]), "Add to Playlist").ChildMenu.Items[0].Action()
-	itemIn(t, u.addToPlaylistItem([]Track{u.tracks[1]}).ChildMenu, "Road Trip").Action()
+	itemIn(t, u.addToPlaylistItem([]library.Track{u.tracks[1]}).ChildMenu, "Road Trip").Action()
 	if u.status.Text != "Added 0 songs to Road Trip (1 already in it)" {
 		t.Errorf("status %q", u.status.Text)
 	}
 
-	test.Tap(p.row)
+	test.Tap(u.playlistRows[p])
 	if u.playlist != p || u.pageTitle.Text != "Road Trip" || u.navSongs.Importance != widget.LowImportance {
 		t.Errorf("shown %v, title %q", u.playlist, u.pageTitle.Text)
 	}
@@ -105,11 +106,11 @@ func TestAddSongsToPlaylists(t *testing.T) {
 // order; the songs stay in the library.
 func TestRemoveAndMoveInPlaylist(t *testing.T) {
 	u, _, _, _ := newPlaylistUI(t)
-	p := &playlist{Name: "Mix"}
+	p := &library.Playlist{Name: "Mix"}
 	for _, tr := range u.all[:4] {
-		p.add(tr.Path)
+		p.Add(tr.Path)
 	}
-	u.playlists = []*playlist{p}
+	u.playlists = []*library.Playlist{p}
 	u.rebuildPlaylistList()
 	u.sortCol = -1
 	u.showPlaylist(p)
@@ -134,7 +135,7 @@ func TestRemoveAndMoveInPlaylist(t *testing.T) {
 	}
 
 	u.sortBy(titleCol)
-	p.add(u.all[0].Path, u.all[1].Path)
+	p.Add(u.all[0].Path, u.all[1].Path)
 	u.applyView()
 	if slices.ContainsFunc(u.rowMenu(u.tracks[0]).Items, func(it *fyne.MenuItem) bool { return it.Label == "Move Up" }) {
 		t.Error("moving makes no sense while the list is sorted by a column")
@@ -152,7 +153,7 @@ func TestRenameDuplicateDeletePlaylist(t *testing.T) {
 	itemIn(t, fyne.NewMenu("", u.addToPlaylistItem(nil).ChildMenu.Items...), "New Playlist…").Action()
 	answerName(t, u, "Mix", "Create")
 	p := u.playlists[0]
-	p.add(u.all[0].Path)
+	p.Add(u.all[0].Path)
 
 	itemIn(t, u.playlistMenu(p), "Rename…").Action()
 	answerName(t, u, "Favourites", "Rename")
@@ -167,7 +168,7 @@ func TestRenameDuplicateDeletePlaylist(t *testing.T) {
 	if len(u.playlists) != 1 || u.playlist != nil || u.pageTitle.Text != "Songs" {
 		t.Errorf("after deleting: %d playlists, shown %v, title %q", len(u.playlists), u.playlist, u.pageTitle.Text)
 	}
-	if got := loadPlaylists(path); len(got) != 1 || got[0].Name != "Favourites copy" {
+	if got := library.LoadPlaylists(path); len(got) != 1 || got[0].Name != "Favourites copy" {
 		t.Errorf("saved %+v", got)
 	}
 }
@@ -196,7 +197,7 @@ func TestSmartPlaylist(t *testing.T) {
 		}
 	})
 	selects[2].SetSelected("Year") // the second rule's field
-	if e.rules.Rules[1].Op != opIs || e.rules.Rules[1].Value != "" {
+	if e.rules.Rules[1].Op != library.OpIs || e.rules.Rules[1].Value != "" {
 		t.Errorf("a new field should reset its comparison: %+v", e.rules.Rules[1])
 	}
 	selects = selects[:0]
@@ -205,7 +206,7 @@ func TestSmartPlaylist(t *testing.T) {
 			selects = append(selects, s)
 		}
 	})
-	selects[3].SetSelected(opLess)
+	selects[3].SetSelected(library.OpLess)
 	var entries []*widget.Entry
 	visit(e.rows, func(o fyne.CanvasObject) {
 		if en, ok := o.(*widget.Entry); ok {
@@ -223,8 +224,8 @@ func TestSmartPlaylist(t *testing.T) {
 	if got := titles(u.tracks); !slices.Equal(got, []string{"Help"}) {
 		t.Errorf("listed %v", got)
 	}
-	if !strings.HasPrefix(u.playlists[0].row.detail.Text, "Smart") {
-		t.Errorf("row says %q", u.playlists[0].row.detail.Text)
+	if row := u.playlistRows[u.playlists[0]]; !strings.HasPrefix(row.detail.Text, "Smart") {
+		t.Errorf("row says %q", row.detail.Text)
 	}
 
 	// Edit: any rule rather than all.
@@ -252,7 +253,7 @@ func TestQueueToPlaylistAndTrash(t *testing.T) {
 		t.Errorf("songs %v", p.Songs)
 	}
 	u.trash = func(string) error { return nil }
-	u.trashSongs([]Track{u.all[4]})
+	u.trashSongs([]library.Track{u.all[4]})
 	if !slices.Equal(p.Songs, []string{"/music/Hey Jude.mp3"}) {
 		t.Errorf("after the Trash: %v", p.Songs)
 	}

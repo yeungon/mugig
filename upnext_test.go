@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/library"
 	"slices"
 	"testing"
 
@@ -101,7 +102,7 @@ func TestShuffleWithUpNext(t *testing.T) {
 	u.toggleShuffle()
 	u.togglePlay()
 	first := u.playing
-	var other Track
+	var other library.Track
 	for _, tr := range u.tracks {
 		if tr.Path != first.Path {
 			other = tr
@@ -129,7 +130,7 @@ func TestUpNextSkipsSongsNoLongerInLibrary(t *testing.T) {
 	gone := u.tracks[3]
 	u.playNext(gone)
 	u.playLater(u.tracks[4])
-	setLibrary(u, slices.DeleteFunc(slices.Clone(u.all), func(tr Track) bool { return tr.Path == gone.Path })...)
+	setLibrary(u, slices.DeleteFunc(slices.Clone(u.all), func(tr library.Track) bool { return tr.Path == gone.Path })...)
 	fp.finish(t)
 	if fp.last() != "Zebra" {
 		t.Errorf("played %q, want Zebra (Bohemian Rhapsody is gone)", fp.last())

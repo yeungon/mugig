@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package library
 
 import "testing"
 
@@ -18,11 +18,11 @@ func TestPlistSolidState(t *testing.T) {
 }
 
 func TestScanWorkers(t *testing.T) {
-	if n := scanWorkers("/no/such/folder"); n != gentleWorkers {
-		t.Errorf("unknown drive: %d workers, want %d", n, gentleWorkers)
+	if n := ScanWorkers("/no/such/folder"); n != GentleWorkers {
+		t.Errorf("unknown drive: %d workers, want %d", n, GentleWorkers)
 	}
 	// Whatever this machine's disk is, the answer is one of the two.
-	if n := scanWorkers(t.TempDir()); n != gentleWorkers && n != parallelWorkers() {
+	if n := ScanWorkers(t.TempDir()); n != GentleWorkers && n != parallelWorkers() {
 		t.Errorf("%d workers", n)
 	}
 }

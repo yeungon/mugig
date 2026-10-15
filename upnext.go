@@ -7,6 +7,7 @@ package main
 // shows them.
 
 import (
+	"mugig/internal/library"
 	"slices"
 	"strings"
 
@@ -20,13 +21,13 @@ import (
 var queueIcon = svgIcon("queue_music.svg", "M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z")
 
 // playNext puts songs at the front of Up Next, in the order given.
-func (u *ui) playNext(ts ...Track) {
+func (u *ui) playNext(ts ...library.Track) {
 	u.queued = slices.Insert(u.queued, 0, ts...)
 	u.queueChanged()
 }
 
 // playLater puts songs at the end of Up Next.
-func (u *ui) playLater(ts ...Track) {
+func (u *ui) playLater(ts ...library.Track) {
 	u.queued = append(u.queued, ts...)
 	u.queueChanged()
 }
@@ -40,7 +41,7 @@ func (u *ui) clearQueue() {
 // takeQueued removes the first song from Up Next and returns it, skipping
 // songs no longer in the library (their folder was removed, or the file
 // deleted).
-func (u *ui) takeQueued() (Track, bool) {
+func (u *ui) takeQueued() (library.Track, bool) {
 	defer u.queueChanged()
 	for len(u.queued) > 0 {
 		t := u.queued[0]
@@ -49,12 +50,12 @@ func (u *ui) takeQueued() (Track, bool) {
 			return t, true
 		}
 	}
-	return Track{}, false
+	return library.Track{}, false
 }
 
 // pruneQueue drops songs no longer in the library from Up Next.
 func (u *ui) pruneQueue() {
-	u.queued = slices.DeleteFunc(u.queued, func(t Track) bool {
+	u.queued = slices.DeleteFunc(u.queued, func(t library.Track) bool {
 		_, ok := u.inLibrary(t.Path)
 		return !ok
 	})
@@ -62,13 +63,13 @@ func (u *ui) pruneQueue() {
 
 // inLibrary returns the library's copy of the song at path, which has its
 // latest tags.
-func (u *ui) inLibrary(path string) (Track, bool) {
+func (u *ui) inLibrary(path string) (library.Track, bool) {
 	for _, t := range u.all {
 		if t.Path == path {
 			return t, true
 		}
 	}
-	return Track{}, false
+	return library.Track{}, false
 }
 
 // playQueuedNow plays the i'th song of Up Next straight away, taking it
@@ -203,7 +204,7 @@ func (r *queueRow) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(container.NewBorder(nil, nil, nil, container.NewCenter(r.remove), text))
 }
 
-func (r *queueRow) set(t Track, remove func()) {
+func (r *queueRow) set(t library.Track, remove func()) {
 	r.title.SetText(t.Title)
 	var detail []string
 	for _, s := range []string{t.Artist, cellText(t, timeCol)} {

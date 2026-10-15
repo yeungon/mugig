@@ -7,6 +7,7 @@ package main
 
 import (
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"time"
 
 	"fyne.io/fyne/v2/widget"
@@ -21,7 +22,7 @@ const (
 
 // cuedSong is a song waiting in the player bar to be resumed.
 type cuedSong struct {
-	track Track
+	track library.Track
 	at    time.Duration
 }
 
@@ -58,7 +59,7 @@ func (u *ui) restoreSession() {
 		return
 	}
 	u.resumePending = false
-	var saved []Track
+	var saved []library.Track
 	for _, p := range u.prefs.StringList(prefUpNext) {
 		if t, ok := u.inLibrary(p); ok {
 			saved = append(saved, t)
@@ -79,7 +80,7 @@ func (u *ui) restoreSession() {
 }
 
 // cue shows t in the player bar, paused at at, ready for Play.
-func (u *ui) cue(t Track, at time.Duration) {
+func (u *ui) cue(t library.Track, at time.Duration) {
 	u.cued = &cuedSong{t, at}
 	u.nowTitle.SetText(t.Title)
 	u.nowArtist.SetText(t.Artist)
@@ -94,7 +95,7 @@ func (u *ui) cue(t Track, at time.Duration) {
 		u.table.ScrollTo(widget.TableCellID{Row: i, Col: 0})
 	}
 	u.async(func() {
-		data := coverArt(t.Path)
+		data := library.CoverArt(t.Path)
 		onUI(func() {
 			if u.cued != nil && u.cued.track.Path == t.Path {
 				u.showArt(data)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"mugig/internal/audiotest"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 
 // mixedLibrary writes a genuine FLAC, one made from an MP3, a damaged one,
 // a WAV and an MP3.
-func mixedLibrary(t *testing.T) (dir string, tracks map[string]Track) {
+func mixedLibrary(t *testing.T) (dir string, tracks map[string]library.Track) {
 	t.Helper()
 	dir = t.TempDir()
 	const rate = 44100
@@ -28,21 +29,20 @@ func mixedLibrary(t *testing.T) (dir string, tracks map[string]Track) {
 	audiotest.WriteWAV(t, filepath.Join(dir, "plain.wav"), rate, 16, 2, genuine, genuine)
 	audiotest.CopyFile(t, "testdata/sample.mp3", filepath.Join(dir, "song.mp3"))
 
-	tracks = map[string]Track{}
+	tracks = map[string]library.Track{}
 	for _, name := range []string{"genuine.flac", "fake.flac", "damaged.flac", "plain.wav", "song.mp3"} {
-		tr := readTrack(filepath.Join(dir, name))
-		tr.search = searchKey(tr)
+		tr := library.ReadTrack(filepath.Join(dir, name))
 		tracks[name] = tr
 	}
 	return dir, tracks
 }
 
-func libraryOf(tracks map[string]Track) []Track {
-	var all []Track
+func libraryOf(tracks map[string]library.Track) []library.Track {
+	var all []library.Track
 	for _, t := range tracks {
 		all = append(all, t)
 	}
-	slices.SortFunc(all, func(a, b Track) int { return strings.Compare(a.Path, b.Path) })
+	slices.SortFunc(all, func(a, b library.Track) int { return strings.Compare(a.Path, b.Path) })
 	return all
 }
 

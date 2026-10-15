@@ -6,10 +6,9 @@ package main
 // hidden, and the folder is scanned again when the disk comes back.
 
 import (
-	"io/fs"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -117,7 +116,7 @@ func (u *ui) applyPending(w *folderWatch) {
 	}
 	w.busy = true
 	u.async(func() {
-		ch := readChanges(w.root, paths, u.cache)
+		ch := library.ReadChanges(w.root, paths, u.cache)
 		onUI(func() {
 			w.busy = false
 			if u.watching(w) && u.cancel == nil {
@@ -134,72 +133,9 @@ func (u *ui) watching(w *folderWatch) bool {
 	return f != nil && f.watch == w
 }
 
-// folderChanges is what changed in the music folder.
-type folderChanges struct {
-	rootGone bool
-	tracks   []scanResult               // files added or changed
-	gone     []string                   // files and folders deleted
-	folders  map[string]map[string]bool // folders read again, with the audio files now in them
-}
-
-// readChanges looks at each changed path. It runs off the UI thread.
-func readChanges(root string, paths []string, cache *libraryCache) folderChanges {
-	ch := folderChanges{folders: map[string]map[string]bool{}}
-	if _, err := os.Stat(root); err != nil {
-		ch.rootGone = true // don't mistake a disconnected disk for deleted files
-		return ch
-	}
-	sort.Strings(paths) // folders come before what is in them
-	var read []string   // folders read whole, which cover their contents
-	for _, p := range paths {
-		if !within(p, root) || skippedWithin(p, root) {
-			continue
-		}
-		// A CUE sheet, or a file beside one, changes the songs of the
-		// folder's disc images: read the folder again, whole.
-		if p != root && (isCueFile(p) || isAudioFile(p) && hasCueBeside(p)) {
-			p = filepath.Dir(p)
-		}
-		if slices.ContainsFunc(read, func(d string) bool { return within(p, d) }) {
-			continue
-		}
-		fi, err := os.Stat(p)
-		switch {
-		case err != nil:
-			ch.gone = append(ch.gone, p)
-		case fi.IsDir():
-			read = append(read, p)
-			found := map[string]bool{}
-			filepath.WalkDir(p, func(f string, d fs.DirEntry, err error) error {
-				switch {
-				case err != nil:
-				case d.IsDir() && f != p && skipFolder(f):
-					return filepath.SkipDir
-				case !d.IsDir() && (isAudioFile(f) || isCueFile(f)) && !isEmpty(d):
-					r := scanFile(cache, f)
-					for _, t := range r.songs() {
-						found[t.Path] = true
-					}
-					ch.tracks = append(ch.tracks, r)
-				}
-				return nil
-			})
-			ch.folders[p] = found
-		case isAudioFile(p) && fi.Size() > 0:
-			ch.tracks = append(ch.tracks, scanFile(cache, p))
-		}
-	}
-	return ch
-}
-
-// within reports whether path is dir or inside it.
-func within(path, dir string) bool {
-	return path == dir || strings.HasPrefix(path, dir+string(filepath.Separator))
-}
-
 // applyChanges updates the list, the cache and the status line.
-func (u *ui) applyChanges(root string, ch folderChanges) {
-	if ch.rootGone {
+func (u *ui) applyChanges(root string, ch library.Changes) {
+	if ch.RootGone {
 		u.setConnected(root, false)
 		return
 	}
@@ -208,10 +144,10 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 		had[t.Path] = true
 	}
 	var removed []string
-	u.all = slices.DeleteFunc(u.all, func(t Track) bool {
-		gone := slices.ContainsFunc(ch.gone, func(g string) bool { return within(songFile(t), g) })
-		for dir, found := range ch.folders {
-			if within(t.Path, dir) && !found[t.Path] {
+	u.all = slices.DeleteFunc(u.all, func(t library.Track) bool {
+		gone := slices.ContainsFunc(ch.Gone, func(g string) bool { return library.Within(library.SongFile(t), g) })
+		for dir, found := range ch.Folders {
+			if library.Within(t.Path, dir) && !found[t.Path] {
 				gone = true
 			}
 		}
@@ -224,31 +160,31 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 	for i, t := range u.all {
 		index[t.Path] = i
 	}
-	added, seen := 0, map[string]cacheEntry{}
+	added, seen := 0, map[string]library.CacheEntry{}
 	var changed []string
-	for _, r := range ch.tracks {
-		for _, t := range r.songs() {
+	for _, r := range ch.Scanned {
+		for _, t := range r.Songs() {
 			if i, ok := index[t.Path]; ok {
 				u.all[i] = t
 			} else {
 				index[t.Path] = len(u.all)
 				u.all = append(u.all, t)
 			}
-			if had[t.Path] && !r.cached && t.File == "" {
+			if had[t.Path] && !r.Cached && t.File == "" {
 				changed = append(changed, t.Path) // re-read: the file is different now
 			}
 		}
-		if r.modTime != 0 {
-			seen[r.path] = r.entry()
+		if r.ModTime != 0 {
+			seen[r.Path] = r.Entry()
 		}
 	}
-	u.all = dropImages(u.all)
+	u.all = library.DropImages(u.all)
 	for _, t := range u.all {
 		if !had[t.Path] {
 			added++
 		}
 	}
-	sort.SliceStable(u.all, func(i, j int) bool { return libraryLess(u.all[i], u.all[j]) })
+	sort.SliceStable(u.all, func(i, j int) bool { return library.Less(u.all[i], u.all[j]) })
 	u.applyView()
 
 	if added > 0 || len(removed) > 0 {
@@ -268,9 +204,9 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 	}
 	cache, store := u.cache, u.qualityStore
 	u.async(func() {
-		cache.update(root, seen, false)
-		cache.forget(removed)
-		if err := cache.save(); err != nil {
+		cache.Update(root, seen, false)
+		cache.Forget(removed)
+		if err := cache.Save(); err != nil {
 			fyne.LogError("saving library cache", err)
 		}
 		if len(stale) > 0 {

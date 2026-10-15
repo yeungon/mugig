@@ -1,6 +1,6 @@
 //go:build !darwin
 
-package main
+package library
 
 import (
 	"io/fs"
@@ -13,7 +13,7 @@ import (
 // watchFolder reports changes under root using fsnotify, which watches one
 // folder at a time, so every folder in the tree is added, including new
 // ones as they appear. changed is called on another goroutine.
-func watchFolder(root string, changed func(paths []string)) (stop func(), err error) {
+func WatchFolder(root string, changed func(paths []string)) (stop func(), err error) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err

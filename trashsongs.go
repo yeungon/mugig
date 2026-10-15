@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"mugig/internal/audio"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -32,14 +33,14 @@ func trashName() string {
 
 // trashItem is Move to Trash for songs. It is off for songs from a CUE
 // sheet: their file is the whole disc image, with the album's other songs.
-func (u *ui) trashItem(ts []Track) *fyne.MenuItem {
+func (u *ui) trashItem(ts []library.Track) *fyne.MenuItem {
 	item := fyne.NewMenuItem(trashLabel, func() { u.confirmTrash(ts) })
-	item.Disabled = slices.ContainsFunc(ts, func(t Track) bool { return audio.FromCue(t.Path) })
+	item.Disabled = slices.ContainsFunc(ts, func(t library.Track) bool { return audio.FromCue(t.Path) })
 	return item
 }
 
 // confirmTrash asks before moving songs to the Trash.
-func (u *ui) confirmTrash(ts []Track) {
+func (u *ui) confirmTrash(ts []library.Track) {
 	title := fmt.Sprintf("Move %s to %s?", humanize.Plural(len(ts), "song"), trashName())
 	if len(ts) == 1 {
 		title = fmt.Sprintf("Move “%s” to %s?", ts[0].Title, trashName())
@@ -62,11 +63,11 @@ func (u *ui) confirmTrash(ts []Track) {
 // trashSongs moves the songs' files to the Trash, then takes those that
 // went out of the library. A song playing stops first, so its file isn't
 // held open.
-func (u *ui) trashSongs(ts []Track) {
-	if slices.ContainsFunc(ts, func(t Track) bool { return t.Path == u.playing.Path }) {
+func (u *ui) trashSongs(ts []library.Track) {
+	if slices.ContainsFunc(ts, func(t library.Track) bool { return t.Path == u.playing.Path }) {
 		u.stop()
 	}
-	if u.cued != nil && slices.ContainsFunc(ts, func(t Track) bool { return t.Path == u.cued.track.Path }) {
+	if u.cued != nil && slices.ContainsFunc(ts, func(t library.Track) bool { return t.Path == u.cued.track.Path }) {
 		u.setStopped()
 	}
 	move := u.trash
@@ -102,16 +103,16 @@ func (u *ui) dropSongs(paths []string) {
 		delete(u.selected, p)
 		delete(u.levels, p)
 	}
-	u.all = slices.DeleteFunc(u.all, func(t Track) bool { return gone[t.Path] })
-	u.queued = slices.DeleteFunc(u.queued, func(t Track) bool { return gone[t.Path] })
+	u.all = slices.DeleteFunc(u.all, func(t library.Track) bool { return gone[t.Path] })
+	u.queued = slices.DeleteFunc(u.queued, func(t library.Track) bool { return gone[t.Path] })
 	u.queueChanged()
 	u.forgetInPlaylists(paths)
 	u.applyView()
 	u.status.SetText(fmt.Sprintf("Moved %s to %s", humanize.Plural(len(paths), "song"), trashName()))
 	cache, store := u.cache, u.qualityStore
 	u.async(func() {
-		cache.forget(paths)
-		if err := cache.save(); err != nil {
+		cache.Forget(paths)
+		if err := cache.Save(); err != nil {
 			fyne.LogError("saving library cache", err)
 		}
 		store.Forget(paths)

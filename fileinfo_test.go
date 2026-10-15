@@ -2,6 +2,7 @@ package main
 
 import (
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"mugig/internal/quality"
 	"os"
 	"path/filepath"
@@ -27,19 +28,6 @@ func TestSizeColumn(t *testing.T) {
 	}
 	if !strings.HasSuffix(u.count.Text, " · 45.9 MB") {
 		t.Errorf("count %q", u.count.Text)
-	}
-}
-
-// Sizes come from the scan, for cached tracks too.
-func TestScanRecordsSize(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "a.mp3")
-	os.WriteFile(path, make([]byte, 12345), 0o644)
-	cache := loadCache("")
-	first := scanFile(cache, path)
-	cache.update(filepath.Dir(path), map[string]cacheEntry{path: {Size: first.size, ModTime: first.modTime, Track: Track{Path: path, Title: "a"}}}, true)
-	again := scanFile(cache, path)
-	if first.track.Size != 12345 || !again.cached || again.track.Size != 12345 {
-		t.Errorf("sizes %d, %d (cached %v)", first.track.Size, again.track.Size, again.cached)
 	}
 }
 
@@ -87,7 +75,7 @@ func TestRevealAndCopyPath(t *testing.T) {
 	}
 
 	// A file that has gone, as on an unplugged disk, is explained.
-	gone := Track{Path: filepath.Join(t.TempDir(), "gone.flac"), Title: "gone"}
+	gone := library.Track{Path: filepath.Join(t.TempDir(), "gone.flac"), Title: "gone"}
 	u.revealTrack(gone)
 	if len(revealed) != 1 {
 		t.Error("tried to show a missing file")

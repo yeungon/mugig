@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/library"
 	"slices"
 	"testing"
 
@@ -49,7 +50,7 @@ func TestLibraryStatsWording(t *testing.T) {
 	if got := libraryStats(nil); got != "No music yet. Add a folder with the + beside Folders." {
 		t.Errorf("empty library: %q", got)
 	}
-	one := []Track{track("A", "Solo", "Only", 0)}
+	one := []library.Track{track("A", "Solo", "Only", 0)}
 	if got := libraryStats(one); got != "1 track · 1 artist · 1 album" {
 		t.Errorf("one track: %q", got)
 	}
@@ -116,17 +117,17 @@ func TestHeaderShowsSortArrow(t *testing.T) {
 }
 
 func TestLibraryOrder(t *testing.T) {
-	in := []Track{
+	in := []library.Track{
 		track("b", "Queen", "Z", 0),
 		track("a", "queen", "Z", 0),
 		track("x", "ABBA", "Gold", 0),
 		track("y", "Queen", "A", 0),
 	}
-	slices.SortStableFunc(in, func(a, b Track) int {
+	slices.SortStableFunc(in, func(a, b library.Track) int {
 		switch {
-		case libraryLess(a, b):
+		case library.Less(a, b):
 			return -1
-		case libraryLess(b, a):
+		case library.Less(b, a):
 			return 1
 		}
 		return 0

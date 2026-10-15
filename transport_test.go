@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"mugig/internal/library"
 	"slices"
 	"strings"
 	"testing"
@@ -266,10 +267,10 @@ func TestMuteRestoresVolume(t *testing.T) {
 	}
 }
 
-func tracksFor(u *ui, paths []string) []Track {
-	var ts []Track
+func tracksFor(u *ui, paths []string) []library.Track {
+	var ts []library.Track
 	for _, p := range paths {
-		ts = append(ts, u.all[slices.IndexFunc(u.all, func(t Track) bool { return t.Path == p })])
+		ts = append(ts, u.all[slices.IndexFunc(u.all, func(t library.Track) bool { return t.Path == p })])
 	}
 	return ts
 }

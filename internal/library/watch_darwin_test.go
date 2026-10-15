@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package library
 
 import (
 	"os"
@@ -17,7 +17,7 @@ func TestFSEventsReportsChanges(t *testing.T) {
 	root := t.TempDir()
 	os.MkdirAll(filepath.Join(root, "Artist", "Album"), 0o755)
 	got := make(chan []string, 100)
-	stop, err := watchFolder(root, func(p []string) { got <- p })
+	stop, err := WatchFolder(root, func(p []string) { got <- p })
 	if err != nil {
 		t.Fatal(err)
 	}

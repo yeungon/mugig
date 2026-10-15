@@ -8,6 +8,7 @@ package main
 import (
 	"fmt"
 	"mugig/internal/humanize"
+	"mugig/internal/library"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -92,7 +93,7 @@ func (u *ui) folderAt(path string) *musicFolder {
 // containing returns the library folder that path is in, or nil.
 func (u *ui) containing(path string) *musicFolder {
 	for _, f := range u.folders {
-		if within(path, f.path) {
+		if library.Within(path, f.path) {
 			return f
 		}
 	}
@@ -169,7 +170,7 @@ func (u *ui) addFolder(dir string) {
 	// Folders inside dir make way for it; their songs stay listed, and
 	// are taken over by dir's scan.
 	u.folders = slices.DeleteFunc(u.folders, func(f *musicFolder) bool {
-		if !within(f.path, dir) {
+		if !library.Within(f.path, dir) {
 			return false
 		}
 		u.stopWatching(f)
@@ -189,7 +190,7 @@ func (u *ui) addFolder(dir string) {
 func (u *ui) confirmRemoveFolder(path string) {
 	n := 0
 	for _, t := range u.all {
-		if within(t.Path, path) {
+		if library.Within(t.Path, path) {
 			n++
 		}
 	}
@@ -229,8 +230,8 @@ func (u *ui) removeFolder(path string) {
 	u.rebuildFolderList()
 	cache := u.cache
 	u.async(func() {
-		cache.forgetUnder(path)
-		if err := cache.save(); err != nil {
+		cache.ForgetUnder(path)
+		if err := cache.Save(); err != nil {
 			fyne.LogError("saving library cache", err)
 		}
 	})
@@ -239,7 +240,7 @@ func (u *ui) removeFolder(path string) {
 // dropTracksIn takes the songs in dir off the list.
 func (u *ui) dropTracksIn(dir string) {
 	n := len(u.all)
-	u.all = slices.DeleteFunc(u.all, func(t Track) bool { return within(t.Path, dir) })
+	u.all = slices.DeleteFunc(u.all, func(t library.Track) bool { return library.Within(t.Path, dir) })
 	if len(u.all) != n {
 		u.table.UnselectAll()
 		u.applyView()
@@ -284,8 +285,8 @@ func (u *ui) setFilter(path string) {
 }
 
 // inFilter reports whether the list's folder, if any, holds t.
-func (u *ui) inFilter(t Track) bool {
-	return u.filter == "" || within(t.Path, u.filter)
+func (u *ui) inFilter(t library.Track) bool {
+	return u.filter == "" || library.Within(t.Path, u.filter)
 }
 
 // missingText explains why a folder isn't there: its disk is unplugged if

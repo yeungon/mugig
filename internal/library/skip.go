@@ -1,4 +1,4 @@
-package main
+package library
 
 // Folders the scan leaves out because the audio in them isn't music: the
 // sounds inside apps and plug-ins, code's test files, the system's own

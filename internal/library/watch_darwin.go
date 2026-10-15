@@ -1,6 +1,6 @@
 //go:build darwin
 
-package main
+package library
 
 import (
 	"path/filepath"
@@ -15,7 +15,7 @@ import (
 // needs a file handle for every file and folder, which a big library can
 // run out of.) changed is called on another goroutine with the paths that
 // changed; a folder means "look through this folder again".
-func watchFolder(root string, changed func(paths []string)) (stop func(), err error) {
+func WatchFolder(root string, changed func(paths []string)) (stop func(), err error) {
 	// FSEvents reports real paths, e.g. /private/var for /var, so map them
 	// back onto root as the library knows it.
 	real, err := filepath.EvalSymlinks(root)
