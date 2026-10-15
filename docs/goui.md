@@ -302,6 +302,13 @@ silicon).
   finding a good frame at each step.
 - **Frames whose header says "sample size: see STREAMINFO"** can't be
   decoded by it; those files go to the macOS decoder (ExtAudioFile).
+- **`flac.Open`'s `Close` doesn't close the file.** `Open` wraps the file
+  in a `bufio.Reader`, and `Close` closes the reader only if it is an
+  `io.Closer`, which a `bufio.Reader` isn't. The file stays open until the
+  garbage collector finalizes it. On macOS nothing shows; on Windows the
+  file can't be moved or deleted meanwhile, and checking thousands of
+  files can run out of handles. Open the file yourself, pass it to
+  `flac.New`, and close it yourself (`internal/quality/quality.go`).
 
 ## 8. Files on real disks
 
@@ -422,7 +429,62 @@ silicon).
 - **gob doesn't record type names**, only field names, so renaming types
   keeps saved data readable; renaming fields would not.
 
-## 13. Licences
+## 13. CI on three systems
+
+The first CI run was the first time the code was built and tested on
+Windows and Linux at all. It took eight runs to pass: most failures were
+tests assuming macOS, but four were real bugs that macOS alone never
+showed.
+
+- **GLFW 3.4 builds Wayland support on Linux**, so besides
+  `libgl1-mesa-dev xorg-dev` it needs `libwayland-dev libxkbcommon-dev`,
+  or the build stops at `wayland-client-core.h: No such file`. Keep the
+  build notes in the README in step with CI's install step.
+- **Windows can't delete an open file, and that finds leaks.** A test's
+  `t.TempDir()` fails to clean up while anything still holds a file in
+  it. That is how the `flac.Open` leak above came to light. On macOS and
+  Linux, catch leaks by counting `/dev/fd` (read the names only, with
+  `Readdirnames`), with the garbage collector held off
+  (`debug.SetGCPercent(-1)`), and run the code once before counting:
+  Go opens some files of its own the first time, such as Linux's poller.
+  To prove such a test works, run it against the old code and see it fail.
+- **Cleanups run last first.** A test that registers `player.Close` and
+  only then makes its temporary folder has the folder removed while the
+  player still has the songs in it open. Call `t.TempDir()` before
+  registering the close.
+- **Fyne's `URI.Path()` has forward slashes on Windows** (`C:/Users/…`).
+  Paths from dropped files and Fyne's file dialogs didn't match the
+  library's backslashed ones, so a dropped song was added twice and not
+  played. Convert with `filepath.FromSlash`.
+- **Write test paths in the system's form.** `/music/a.flac` means
+  something else to `filepath` on Windows: use `filepath.Join` or
+  `filepath.FromSlash` to make paths, and `filepath.ToSlash` to compare
+  them. An absolute path on Windows needs a drive letter. Rules users type
+  paths into, such as a smart playlist's Folder rule, should take either
+  slash.
+- **Don't name one system in messages for all.** "macOS hasn't allowed
+  Mugig…" was shown on Windows and Linux too. Tests should use the same
+  helpers as the app for words that differ (`trashLabel`, `trashName`:
+  Windows' Trash is the Recycle Bin) rather than the macOS text.
+- **Some things a test can't do everywhere**: `os.Chmod(dir, 0)` doesn't
+  stop Windows reading a folder; exclusive access is macOS only. Skip
+  those parts on the systems they don't apply to, and say why.
+- **Shared CI machines are slow.** Real-time tests (playing at 2× speed,
+  riding out disk stalls) missed their timing there. Keep the strict
+  bound locally and relax it when `CI` is set, still checking the thing
+  that matters (faster than normal speed; no gap in the sound).
+- **Reading a failure without a token**: GitHub's API gives a run's logs
+  only to a signed-in user, and allows 60 anonymous requests an hour.
+  Annotations are public, though, so the workflow turns a failing log's
+  last lines into one (`::error::`, with newlines written as `%0A`), and
+  the run's web page shows them, outside the API's limit. GitHub runs
+  `bash` with `-eo pipefail`: a `grep` that matches nothing ends the step,
+  so add `|| true`.
+- **Measure coverage across packages** (`-coverpkg=./internal/...`), or
+  code tested through another package counts as untested, and leave test
+  helpers out of it (`codecov.yml`).
+
+## 14. Licences
 
 - Don't copy GPL code (e.g. Spek) into the project; learn from it and write
   your own. Credit ideas taken from permissively licensed projects
