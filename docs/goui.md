@@ -367,8 +367,8 @@ silicon).
 
 ## 11. Testing and fuzzing
 
-- **Fuzz everything that parses file bytes** (`fuzz_test.go` in `audio`, `library` and `quality`), with a time
-  limit per input. The Go fuzzer reports 0 executions per second while it
+- **Fuzz everything that parses file bytes** (`fuzz_test.go` in `audio`,
+  `library` and `quality`), with a time limit per input. The Go fuzzer reports 0 executions per second while it
   minimises a new input; that's not a hang. To find genuinely slow inputs,
   add a watchdog that saves any input taking over a few seconds.
 - **Test DSP against measurable properties**: length ratio, pitch by zero
@@ -380,6 +380,21 @@ silicon).
 - **Bisect order-dependent test failures** by running the failing test with
   halves of the tests before it (a compiled `-race` test binary makes this
   fast).
+- **Put calls that change the system behind a struct of functions**, so
+  tests can give a fake. The player reaches the device's own sample rate
+  and exclusive access through `system`; its tests check that the rate is
+  put back and the device given back, without touching a real device.
+- **Test the shapes real tools write**, not only the textbook format: CUE
+  sheets with `REM DATE "1999"` in quotes, CRLF line endings, lower-case
+  words, unquoted names, several files, a sheet longer than its file.
+  Probing a few such inputs found two bugs that line coverage didn't.
+- **Check a new test by breaking the code it tests**, and see it fail. Keep
+  a copy of the file first: `git checkout` to undo the break also undoes
+  any uncommitted work in that file.
+- **Measure coverage across packages** with
+  `go test -coverpkg=./internal/... ./...`: code exercised only through
+  another package's tests (the library through the UI's) otherwise counts
+  as untested.
 
 ## 12. Organising the code
 

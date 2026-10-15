@@ -75,9 +75,10 @@ Written in Go with [Fyne](https://fyne.io).
 - **CUE sheets**: an album ripped to one big file, with a `.cue` sheet
   beside it, is listed song by song with the sheet's titles and artists,
   and plays without gaps, as on the CD. Sheets in Chinese, Japanese,
-  Korean or Western Windows encodings are read too. The songs share the
-  file's quality check; Move to Trash is off for them, as it would take
-  the whole album.
+  Korean or Western Windows encodings are read too. A sheet that runs
+  past the end of its file, as one kept beside a shorter rip can, lists
+  only the songs that are there. The songs share the file's quality
+  check; Move to Trash is off for them, as it would take the whole album.
 - **Playlists**: right-click songs and choose **Add to Playlist**, or save
   Up Next as one. A playlist plays in its own order; right-click a song in
   it to take it out or move it up or down. **Smart playlists** are rules
@@ -150,6 +151,14 @@ make run        # build and run
 make test       # run the tests (with the race detector)
 make package    # build the app for this computer (Mugig.app on macOS)
 make install    # macOS: package and copy into /Applications
+make fuzz       # feed corrupt files to every file reader, a minute each
+```
+
+A few tests touch the real system, so they only run when asked:
+
+```sh
+MUGIG_HOG_TEST=1 go test ./internal/audio -run 'Hog|Exclusive'   # takes the default output for a moment (macOS)
+MUGIG_TRASH_TEST=1 go test ./internal/trash                      # puts a test file in the Trash
 ```
 
 ### Builds for other systems
