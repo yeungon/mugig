@@ -12,7 +12,7 @@ import (
 )
 
 // lossyFormats need no check to be called lossy: the format says it.
-var lossyFormats = map[string]bool{"MP3": true, "OGG": true}
+var lossyFormats = map[string]bool{"MP3": true, "OGG": true, "AAC": true, "MP2": true}
 
 // levelOf returns t's verdict: saved from a check, or Lossy by its format.
 //

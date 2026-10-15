@@ -22,7 +22,7 @@ void pickShow(uintptr_t window, int id, bool files, bool folders, bool multiple,
 			// Folders stay choosable when allowed; files are limited to audio.
 			#pragma clang diagnostic push
 			#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-			panel.allowedFileTypes = @[ @"mp3", @"flac", @"wav", @"ogg" ];
+			panel.allowedFileTypes = @[ @"mp3", @"flac", @"wav", @"ogg", @"m4a" ];
 			#pragma clang diagnostic pop
 		}
 		if (dir.length > 0) {

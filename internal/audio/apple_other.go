@@ -9,7 +9,8 @@ import (
 	"github.com/gopxl/beep/v2"
 )
 
-// Other systems have no second FLAC decoder to fall back on.
+// Other systems have no second FLAC decoder to fall back on, and nothing
+// here plays M4A files there.
 const AppleDecoding = false
 
 type AppleFile struct {
@@ -17,6 +18,7 @@ type AppleFile struct {
 	Channels int
 	Bits     int
 	Frames   int64
+	Codec    string
 }
 
 var errNoApple = errors.New("no other decoder on this system")

@@ -44,7 +44,14 @@ func TrackLength(f *os.File) time.Duration {
 	case Ogg:
 		return oggLength(f, size)
 	case MP3:
-		return mp3Length(f, start, size)
+		if d := mp3Length(f, start, size); d > 0 || !AppleDecoding {
+			return d
+		}
+		info, _ := probeLossy(f.Name(), MP3, "MP3", size-start) // MP2, read by macOS
+		return info.Duration
+	case M4A:
+		info, _ := probeM4A(f.Name(), size)
+		return info.Duration
 	}
 	return 0
 }

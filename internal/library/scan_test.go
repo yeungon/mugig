@@ -68,6 +68,9 @@ func TestWalkFindsOnlyAudio(t *testing.T) {
 	}
 	slices.Sort(got)
 	want := []string{"a.mp3", "b.FLAC", "sub/d.ogg", "sub/deeper/e.wav"}
+	if audio.AppleDecoding { // M4A files play only on macOS
+		want = []string{"a.mp3", "b.FLAC", "f.m4a", "sub/d.ogg", "sub/deeper/e.wav"}
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("walk found %v, want %v", got, want)
 	}

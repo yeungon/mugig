@@ -13,8 +13,11 @@ Written in Go with [Fyne](https://fyne.io).
 
 ### Playing
 
-- Plays **FLAC, MP3, WAV and Ogg Vorbis**. The format is read from the file's
-  own bytes, so misnamed files still play.
+- Plays **FLAC, MP3, WAV and Ogg Vorbis**, and on macOS **M4A**: Apple
+  Lossless (ALAC) and AAC, through the system's own decoder. The format is
+  read from the file's own bytes, so misnamed files still play. Apple
+  Lossless files get the quality check too, without a checksum to compare,
+  as WAV files.
 - **Bit-perfect playback**: the output is opened at each track's sample rate,
   and on macOS the device itself is switched to that rate (and put back on
   quit), so the audio reaches it unconverted. The Now Playing page says

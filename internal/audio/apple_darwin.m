@@ -4,9 +4,10 @@
 #import <Foundation/Foundation.h>
 
 // appleOpen opens path for reading as interleaved 32-bit samples: floats
-// if asFloat, else signed integers. It fills in the file's own format and
-// returns NULL on failure.
-void *appleOpen(const char *path, int asFloat, double *rate, int *channels, int *bits, long long *frames) {
+// if asFloat, else signed integers. It fills in the file's own format,
+// codec included, and returns NULL on failure.
+void *appleOpen(const char *path, int asFloat, double *rate, int *channels, int *bits, long long *frames,
+	unsigned int *codec) {
 	CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)path, strlen(path), false);
 	ExtAudioFileRef f = NULL;
 	OSStatus st = ExtAudioFileOpenURL(url, &f);
@@ -21,6 +22,7 @@ void *appleOpen(const char *path, int asFloat, double *rate, int *channels, int 
 	ExtAudioFileGetProperty(f, kExtAudioFileProperty_FileLengthFrames, &size, &n);
 	*rate = src.mSampleRate;
 	*channels = (int)src.mChannelsPerFrame;
+	*codec = src.mFormatID; // a four-character code, such as alac for Apple Lossless
 	// Lossless codecs keep the source's bit depth in mFormatFlags.
 	int b = 0;
 	if (src.mFormatID == kAudioFormatFLAC || src.mFormatID == kAudioFormatAppleLossless) {

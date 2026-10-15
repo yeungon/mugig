@@ -7,7 +7,8 @@ package audio
 #cgo LDFLAGS: -framework AudioToolbox -framework Foundation
 #include <stdlib.h>
 
-void *appleOpen(const char *path, int asFloat, double *rate, int *channels, int *bits, long long *frames);
+void *appleOpen(const char *path, int asFloat, double *rate, int *channels, int *bits, long long *frames,
+	unsigned int *codec);
 int appleRead(void *h, void *buf, int frames, int channels);
 int appleSeek(void *h, long long frame);
 void appleClose(void *h);
@@ -21,8 +22,9 @@ import (
 	"github.com/gopxl/beep/v2"
 )
 
-// macOS's own decoders read the occasional FLAC file that Mugig's FLAC
-// library rejects (see verifyFLAC), so those still play and can be checked.
+// macOS's own decoders play M4A files, AAC and Apple Lossless (ALAC), and
+// read the occasional FLAC file that Mugig's FLAC library rejects (see
+// verifyFLAC in package quality), so those still play and can be checked.
 const AppleDecoding = true
 
 // AppleFile is a file open in macOS's decoder.
@@ -30,8 +32,16 @@ type AppleFile struct {
 	h        unsafe.Pointer
 	Rate     float64
 	Channels int
-	Bits     int
+	Bits     int // the source's bit depth, for lossless codecs; else 0
 	Frames   int64
+	Codec    string // "ALAC", "AAC", "FLAC", "MP3", "MP2", or "" for others
+}
+
+// appleCodecs names codecs by their four-character codes: AAC comes as
+// plain AAC, HE-AAC v1 and v2, and low-delay kinds.
+var appleCodecs = map[string]string{
+	"alac": "ALAC", "flac": "FLAC", ".mp3": "MP3", ".mp2": "MP2", ".mp1": "MP1",
+	"aac ": "AAC", "aach": "AAC", "aacp": "AAC", "aacl": "AAC", "aace": "AAC",
 }
 
 func OpenApple(path string, asFloat bool) (*AppleFile, error) {
@@ -40,15 +50,21 @@ func OpenApple(path string, asFloat bool) (*AppleFile, error) {
 	var rate C.double
 	var channels, bits C.int
 	var frames C.longlong
+	var codec C.uint
 	fl := C.int(0)
 	if asFloat {
 		fl = 1
 	}
-	h := C.appleOpen(c, fl, &rate, &channels, &bits, &frames)
+	h := C.appleOpen(c, fl, &rate, &channels, &bits, &frames, &codec)
 	if h == nil {
 		return nil, errors.New("macOS can't decode it either")
 	}
-	return &AppleFile{h: h, Rate: float64(rate), Channels: int(channels), Bits: int(bits), Frames: int64(frames)}, nil
+	id := string([]byte{byte(codec >> 24), byte(codec >> 16), byte(codec >> 8), byte(codec)})
+	f := &AppleFile{h: h, Rate: float64(rate), Channels: int(channels), Bits: int(bits), Frames: int64(frames), Codec: appleCodecs[id]}
+	if f.Codec != "ALAC" && f.Codec != "FLAC" {
+		f.Bits = 0 // a lossy codec's bit depth means nothing
+	}
+	return f, nil
 }
 
 // Read fills buf with interleaved samples (float32 or int32, as opened)

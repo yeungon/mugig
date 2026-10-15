@@ -91,7 +91,12 @@ func Analyse(ctx context.Context, path string, info audio.Info, picture bool, pr
 		rep, spec, err = verifyFLAC(ctx, path, info, report, lv)
 	case info.Kind == audio.WAV && info.Lossless:
 		rep, spec, err = verifyWAV(ctx, path, info, report, lv)
-	case info.Kind == audio.MP3 || info.Codec == "Ogg Vorbis":
+	case info.Kind == audio.M4A && info.Lossless:
+		// Apple Lossless: macOS's decoder is the only one, not a second
+		// opinion, and there is no checksum to compare.
+		rep, spec, err = verifyWithApple(ctx, path, info, report, lv)
+		rep.ReadBy = ""
+	case info.Kind == audio.MP3 || info.Kind == audio.M4A || info.Codec == "Ogg Vorbis":
 		spec, err = decodeLossy(ctx, path, info, report, lv)
 	default:
 		return rep, nil, errors.New("cannot check this format")
@@ -109,7 +114,7 @@ func Analyse(ctx context.Context, path string, info audio.Info, picture bool, pr
 
 // CanAnalyse reports whether analyse can decode the file.
 func CanAnalyse(info audio.Info) bool {
-	return CanVerify(info) || info.Kind == audio.MP3 || info.Codec == "Ogg Vorbis"
+	return CanVerify(info) || info.Kind == audio.MP3 || info.Kind == audio.M4A || info.Codec == "Ogg Vorbis"
 }
 
 // progressReporter turns a count of samples decoded into calls to f, at
@@ -242,9 +247,10 @@ func secondOpinion(ctx context.Context, path string, info audio.Info, report fun
 	return rep, spec2, nil
 }
 
-// verifyWithApple checks a FLAC file with macOS's decoder. Its samples are
-// exact (floats hold 24-bit samples exactly), so the stored checksum can
-// be compared just as with the FLAC library.
+// verifyWithApple checks a FLAC file with macOS's decoder, or an Apple
+// Lossless one, which only it reads. Its samples are exact (floats hold
+// 24-bit samples exactly), so a FLAC file's stored checksum can be
+// compared just as with the FLAC library.
 func verifyWithApple(ctx context.Context, path string, info audio.Info, report func(int64), lv *levels) (Report, *spectrum, error) {
 	spec := newSpectrum(float64(info.SampleRate), info.Samples)
 	f, err := audio.OpenApple(path, true)
@@ -687,7 +693,7 @@ type Assessment struct {
 
 // CanVerify reports whether verify can check the file's audio.
 func CanVerify(info audio.Info) bool {
-	return info.Lossless && (info.Kind == audio.FLAC || info.Kind == audio.WAV)
+	return info.Lossless && (info.Kind == audio.FLAC || info.Kind == audio.WAV || info.Kind == audio.M4A)
 }
 
 // lossyCutoff is below where a cut-off means a lossy source. Higher cut-offs
@@ -741,6 +747,8 @@ func Assess(info audio.Info, rep *Report) Assessment {
 		a.Checks = append(a.Checks, Check{CheckOK, "Intact: the audio matches the checksum stored in the file"})
 	case info.Kind == audio.FLAC:
 		a.Checks = append(a.Checks, Check{CheckOK, "Reads cleanly (this file has no stored checksum to compare)"})
+	case info.Kind == audio.M4A:
+		a.Checks = append(a.Checks, Check{CheckOK, "Complete and readable (Apple Lossless files have no checksum)"})
 	default:
 		a.Checks = append(a.Checks, Check{CheckOK, "Complete and readable (WAV files have no checksum)"})
 	}

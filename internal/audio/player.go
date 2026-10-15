@@ -245,7 +245,7 @@ func Decode(path string) (beep.StreamSeekCloser, beep.Format, error) {
 	path = span.File
 	kind := sniff(path)
 	if kind == Unknown {
-		kind = map[string]Kind{".mp3": MP3, ".flac": FLAC, ".wav": WAV, ".ogg": Ogg}[strings.ToLower(filepath.Ext(path))]
+		kind = map[string]Kind{".mp3": MP3, ".flac": FLAC, ".wav": WAV, ".ogg": Ogg, ".m4a": M4A}[strings.ToLower(filepath.Ext(path))]
 	}
 	s, format, err := DecodeAs(path, kind)
 	if err != nil {
@@ -281,10 +281,25 @@ func DecodeAs(path string, kind Kind) (s beep.StreamSeekCloser, format beep.Form
 		f.Close()
 		return appleDecode(path) // the FLAC library can't read this one; macOS can
 	}
+	if kind == M4A {
+		f.Close()
+		if s, format, err = appleDecode(path); err != nil {
+			return nil, format, fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
+		}
+		return s, format, nil
+	}
 	switch kind {
 	case MP3:
 		if s, format, err = mp3.Decode(f); err == nil {
 			s = newMP3Stream(s, f)
+		} else if AppleDecoding {
+			// MPEG audio the MP3 library can't read, such as MP2 or an MP3
+			// it trips over, which macOS plays.
+			f.Close()
+			if s, format, err = appleDecode(path); err == nil {
+				return s, format, nil
+			}
+			return nil, beep.Format{}, fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
 		}
 	case FLAC:
 		var fs *flacStream

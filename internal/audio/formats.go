@@ -66,6 +66,8 @@ func sniffFile(f *os.File) (Kind, int64) {
 		return WAV, start
 	case string(magic[:4]) == "OggS":
 		return Ogg, start
+	case string(magic[4:8]) == "ftyp": // an MPEG-4 file's first box
+		return M4A, start
 	case magic[0] == 0xFF && magic[1]&0xE0 == 0xE0: // MPEG audio frame sync
 		return MP3, start
 	}
@@ -94,6 +96,8 @@ func Probe(path string) (Info, error) {
 		info, err = probeOgg(f, path, st.Size())
 	case MP3:
 		info, err = probeLossy(path, MP3, "MP3", st.Size()-start)
+	case M4A:
+		info, err = probeM4A(path, st.Size())
 	default:
 		return Info{}, errors.New("not a recognised audio format")
 	}
@@ -101,7 +105,7 @@ func Probe(path string) (Info, error) {
 		return Info{}, err
 	}
 	ext := strings.ToLower(filepath.Ext(path))
-	named := map[string]Kind{".flac": FLAC, ".wav": WAV, ".mp3": MP3, ".ogg": Ogg}
+	named := map[string]Kind{".flac": FLAC, ".wav": WAV, ".mp3": MP3, ".ogg": Ogg, ".m4a": M4A}
 	if k, ok := named[ext]; ok && k != kind {
 		info.Mismatch = ext
 	}
@@ -274,6 +278,16 @@ func probeOgg(f *os.File, path string, size int64) (Info, error) {
 // its decoder, and works out the average bitrate from the audio's size.
 func probeLossy(path string, kind Kind, codec string, audioBytes int64) (Info, error) {
 	info := Info{Codec: codec, Kind: kind}
+	if kind == MP3 && AppleDecoding {
+		// MPEG audio other than layer III (MP2, which some recorders write)
+		// is beyond the MP3 library; macOS reads it.
+		if f, err := OpenApple(path, true); err == nil {
+			defer f.Close()
+			if f.Codec == "MP2" || f.Codec == "MP1" {
+				return appleInfo(f, kind, audioBytes), nil
+			}
+		}
+	}
 	s, format, err := DecodeAs(path, kind)
 	if err != nil {
 		return info, err
@@ -301,4 +315,35 @@ const (
 	WAV
 	MP3
 	Ogg
+	M4A // an MPEG-4 audio file, AAC or Apple Lossless, which macOS plays
 )
+
+// probeM4A reads an M4A file's format through macOS's decoder: AAC, which
+// is lossy, or Apple Lossless. Other systems can't read it.
+func probeM4A(path string, size int64) (Info, error) {
+	if !AppleDecoding {
+		return Info{}, errors.New("M4A files play only on macOS")
+	}
+	f, err := OpenApple(path, true)
+	if err != nil {
+		return Info{}, err
+	}
+	defer f.Close()
+	if f.Codec != "AAC" && f.Codec != "ALAC" {
+		return Info{}, errors.New("an MPEG-4 file without AAC or Apple Lossless audio")
+	}
+	return appleInfo(f, M4A, size), nil
+}
+
+// appleInfo describes a file open in macOS's decoder, of audioBytes.
+func appleInfo(f *AppleFile, kind Kind, audioBytes int64) Info {
+	info := Info{
+		Codec: f.Codec, Lossless: f.Codec == "ALAC", Kind: kind,
+		SampleRate: int(f.Rate), Bits: f.Bits, Channels: f.Channels, Samples: f.Frames,
+	}
+	if f.Rate > 0 {
+		info.Duration = time.Duration(float64(f.Frames) / f.Rate * float64(time.Second))
+		info.Kbps = kbps(audioBytes, info.Duration)
+	}
+	return info
+}

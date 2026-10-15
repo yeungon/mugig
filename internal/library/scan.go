@@ -31,13 +31,21 @@ type Track struct {
 	search     string // lower-cased title, artist and album for the search box
 }
 
-// audioExts maps lower-case extensions to a display format name.
-var audioExts = map[string]string{
-	".mp3":  "MP3",
-	".flac": "FLAC",
-	".ogg":  "OGG",
-	".wav":  "WAV", // usually has no tags, so the file name is the title
-}
+// audioExts maps lower-case extensions to a display format name. M4A
+// files play through macOS's decoder, so only there; their format is
+// their codec, ALAC or AAC, once read.
+var audioExts = func() map[string]string {
+	exts := map[string]string{
+		".mp3":  "MP3",
+		".flac": "FLAC",
+		".ogg":  "OGG",
+		".wav":  "WAV", // usually has no tags, so the file name is the title
+	}
+	if audio.AppleDecoding {
+		exts[".m4a"] = "M4A"
+	}
+	return exts
+}()
 
 // Walk finds audio files and CUE sheets under root and sends their paths
 // to the channel. It closes paths when finished or cancelled.
@@ -168,6 +176,11 @@ func ReadTrack(path string) Track {
 	}
 	defer f.Close()
 	t.Length = audio.TrackLength(f)
+	if t.Format == "M4A" {
+		if info, err := audio.Probe(path); err == nil {
+			t.Format = info.Codec // Apple Lossless or AAC
+		}
+	}
 
 	m, err := tag.ReadFrom(f) // reads only the tag section, not the audio
 	if err != nil {
