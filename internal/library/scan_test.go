@@ -79,14 +79,15 @@ func TestWalkFindsOnlyAudio(t *testing.T) {
 	}
 }
 
-// walkAll lists what walk finds under root, relative to dir.
+// walkAll lists what walk finds under root, relative to dir, with forward
+// slashes on any system.
 func walkAll(dir, root string) []string {
 	paths := make(chan string)
 	go Walk(context.Background(), root, paths)
 	var got []string
 	for p := range paths {
 		rel, _ := filepath.Rel(dir, p)
-		got = append(got, rel)
+		got = append(got, filepath.ToSlash(rel))
 	}
 	slices.Sort(got)
 	return got

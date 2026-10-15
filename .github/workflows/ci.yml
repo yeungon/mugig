@@ -58,7 +58,7 @@ jobs:
         run: |
           for f in vet.log test.log; do
             [ -f "$f" ] || continue
-            out=$(grep -v -e '^ok ' -e 'no test files' "$f" | tail -n 120)
+            out=$(grep -v -e '^ok ' -e 'no test files' -e '^go: downloading' "$f" | tail -n 120)
             out=${out//'%'/'%25'}
             out=${out//$'\r'/}
             out=${out//$'\n'/'%0A'}

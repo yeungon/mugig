@@ -167,11 +167,17 @@ func decodeLossy(ctx context.Context, path string, info audio.Info, report func(
 func verifyFLAC(ctx context.Context, path string, info audio.Info, report func(int64), lv *levels) (Report, *spectrum, error) {
 	var rep Report
 	spec := newSpectrum(float64(info.SampleRate), info.Samples)
-	stream, err := flac.Open(path)
+	// Not flac.Open: its Close leaves the file open (it closes only the
+	// buffer wrapped around it), so the file is opened and closed here.
+	f, err := os.Open(path)
 	if err != nil {
 		return secondOpinion(ctx, path, info, report, lv, Report{Damaged: err.Error()}, spec)
 	}
-	defer stream.Close()
+	defer f.Close()
+	stream, err := flac.New(f)
+	if err != nil {
+		return secondOpinion(ctx, path, info, report, lv, Report{Damaged: err.Error()}, spec)
+	}
 
 	sum := md5.New()
 	scale := 1 / float64(int64(1)<<(info.Bits-1))
