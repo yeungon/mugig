@@ -11,6 +11,7 @@ import (
 	"mugig/internal/library"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 
 	"fyne.io/fyne/v2"
@@ -103,13 +104,22 @@ func (u *ui) showOpenError(path string, err error) {
 	dialog.ShowError(fmt.Errorf("Can't open %s: %s", filepath.Base(path), friendlyError(err)), u.win)
 }
 
+// localPath is a file URI's path in the system's own form: Fyne gives
+// Windows paths with forward slashes, as C:/Users/…, which the library's
+// paths, with backslashes, wouldn't match.
+func localPath(uri fyne.URI) string {
+	return filepath.FromSlash(uri.Path())
+}
+
 // friendlyError explains the usual reasons a file or folder can't be read.
 func friendlyError(err error) string {
 	switch {
-	case errors.Is(err, fs.ErrPermission):
+	case errors.Is(err, fs.ErrPermission) && runtime.GOOS == "darwin":
 		return "macOS hasn't allowed Mugig to read it. " +
 			"Open System Settings → Privacy & Security → Files and Folders, " +
 			"and turn on access for Mugig (\"Removable Volumes\" for USB disks)."
+	case errors.Is(err, fs.ErrPermission):
+		return "Mugig isn't allowed to read it. Check the folder's permissions, or choose another."
 	case errors.Is(err, fs.ErrNotExist):
 		return "it isn't there. If it's on a removable disk, connect the disk and try again."
 	}
@@ -121,7 +131,7 @@ func (u *ui) dropped(_ fyne.Position, uris []fyne.URI) {
 	var paths []string
 	for _, uri := range uris {
 		if uri.Scheme() == "file" {
-			paths = append(paths, uri.Path())
+			paths = append(paths, localPath(uri))
 		}
 	}
 	u.openPaths(paths)
@@ -132,7 +142,7 @@ func fynePicker(w fyne.Window, opts pickOptions, done func([]string)) {
 	if opts.folders && !opts.files {
 		dialog.ShowFolderOpen(func(uri fyne.ListableURI, err error) {
 			if err == nil && uri != nil {
-				done([]string{uri.Path()})
+				done([]string{localPath(uri)})
 			}
 		}, w)
 		return
@@ -140,7 +150,7 @@ func fynePicker(w fyne.Window, opts pickOptions, done func([]string)) {
 	dialog.ShowFileOpen(func(r fyne.URIReadCloser, err error) {
 		if err == nil && r != nil {
 			r.Close()
-			done([]string{r.URI().Path()})
+			done([]string{localPath(r.URI())})
 		}
 	}, w)
 }
@@ -153,7 +163,7 @@ func fyneSaver(w fyne.Window, name string, done func(string)) {
 			return
 		}
 		wc.Close()
-		done(wc.URI().Path())
+		done(localPath(wc.URI()))
 	}, w)
 	d.SetFileName(name)
 	d.Show()

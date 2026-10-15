@@ -4,6 +4,7 @@ import (
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -117,6 +118,9 @@ func TestDroppingFilesAndFolders(t *testing.T) {
 // A folder that can't be read, such as a disk macOS hasn't given access
 // to, is explained rather than scanned as empty.
 func TestUnreadableFolderExplained(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows ignores the permissions this test takes away")
+	}
 	u, _, _ := newTestUI(t)
 	dir := sampleFolder(t)
 	setLibrary(u, fiveTracks()...)
@@ -124,7 +128,11 @@ func TestUnreadableFolderExplained(t *testing.T) {
 	defer os.Chmod(dir, 0o755)
 
 	u.addFolder(dir)
-	if top := u.win.Canvas().Overlays().Top(); top == nil || !strings.Contains(allText(top), "Privacy & Security") {
+	explanation := "isn't allowed to read it"
+	if runtime.GOOS == "darwin" {
+		explanation = "Privacy & Security"
+	}
+	if top := u.win.Canvas().Overlays().Top(); top == nil || !strings.Contains(allText(top), explanation) {
 		t.Error("no explanation shown")
 	}
 	if len(u.all) != 5 || len(u.folders) != 0 {

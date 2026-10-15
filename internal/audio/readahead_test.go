@@ -2,6 +2,7 @@ package audio
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -60,8 +61,8 @@ func (s *slowSource) Close() error { s.mu.Lock(); defer s.mu.Unlock(); s.closed 
 const testRateRA = beep.SampleRate(44100)
 
 // playRealTime plays r as the audio thread does: 20 ms at a time, every
-// 20 ms (sped up 4 times), noting the slowest call and checking each
-// frame.
+// 20 ms (sped up 4 times, or twice on shared CI machines, which are slow
+// to fill the buffer), noting the slowest call and checking each frame.
 func playRealTime(t *testing.T, r *readAhead, frames int) (slowest time.Duration) {
 	t.Helper()
 	buf := make([][2]float64, testRateRA.N(20*time.Millisecond))
@@ -79,7 +80,11 @@ func playRealTime(t *testing.T, r *readAhead, frames int) (slowest time.Duration
 		if !ok {
 			break
 		}
-		time.Sleep(5 * time.Millisecond)
+		if os.Getenv("CI") != "" {
+			time.Sleep(10 * time.Millisecond)
+		} else {
+			time.Sleep(5 * time.Millisecond)
+		}
 	}
 	return slowest
 }

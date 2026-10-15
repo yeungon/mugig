@@ -90,6 +90,9 @@ func TestExclusiveAccess(t *testing.T) {
 	if got := controls[len(controls)-1]; u.canHog != (got == u.exclusiveItem) {
 		t.Errorf("the item should be offered only where the system has it: last item %q", got.Label)
 	}
+	if !u.canHog {
+		return // the rest is for macOS, which has exclusive access
+	}
 	setLibrary(u, fiveTracks()...)
 	u.togglePlay()
 	u.exclusiveItem.Action()
