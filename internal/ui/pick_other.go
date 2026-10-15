@@ -2,4 +2,7 @@
 
 package ui
 
-var defaultPicker picker = fynePicker
+var (
+	defaultPicker picker = fynePicker
+	defaultSaver  saver  = fyneSaver
+)

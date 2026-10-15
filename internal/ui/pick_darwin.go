@@ -11,10 +11,12 @@ package ui
 
 void pickShow(uintptr_t window, int id, bool files, bool folders, bool multiple,
 	const char *message, const char *start);
+void saveShow(uintptr_t window, int id, const char *name, const char *type);
 */
 import "C"
 
 import (
+	"path/filepath"
 	"strings"
 	"sync"
 	"unsafe"
@@ -33,8 +35,8 @@ var (
 	pickDone = map[C.int]func([]string){}
 )
 
-// nativePicker shows the Open panel as a sheet on w.
-func nativePicker(w fyne.Window, opts pickOptions, done func([]string)) {
+// nsWindow is w's NSWindow, for a panel to show as a sheet on, or 0.
+func nsWindow(w fyne.Window) uintptr {
 	var window uintptr
 	if nw, ok := w.(driver.NativeWindow); ok {
 		nw.RunNative(func(ctx any) {
@@ -43,11 +45,21 @@ func nativePicker(w fyne.Window, opts pickOptions, done func([]string)) {
 			}
 		})
 	}
+	return window
+}
+
+// awaitPanel files done under a new ID, for goPickDone to call.
+func awaitPanel(done func([]string)) C.int {
 	pickMu.Lock()
+	defer pickMu.Unlock()
 	pickNext++
-	id := pickNext
-	pickDone[id] = done
-	pickMu.Unlock()
+	pickDone[pickNext] = done
+	return pickNext
+}
+
+// nativePicker shows the Open panel as a sheet on w.
+func nativePicker(w fyne.Window, opts pickOptions, done func([]string)) {
+	window, id := nsWindow(w), awaitPanel(done)
 
 	message, start := C.CString(opts.title), C.CString(opts.start)
 	defer C.free(unsafe.Pointer(message))
@@ -70,4 +82,25 @@ func goPickDone(id C.int, paths *C.char) {
 	}
 }
 
-var defaultPicker picker = nativePicker
+// nativeSaver shows the Save panel as a sheet on w, for a file named
+// name, of the type its extension gives.
+func nativeSaver(w fyne.Window, name string, done func(string)) {
+	window := nsWindow(w)
+	id := awaitPanel(func(paths []string) {
+		if len(paths) == 0 {
+			done("")
+			return
+		}
+		done(paths[0])
+	})
+	cname := C.CString(name)
+	ctype := C.CString(strings.TrimPrefix(filepath.Ext(name), "."))
+	defer C.free(unsafe.Pointer(cname))
+	defer C.free(unsafe.Pointer(ctype))
+	C.saveShow(C.uintptr_t(window), id, cname, ctype)
+}
+
+var (
+	defaultPicker picker = nativePicker
+	defaultSaver  saver  = nativeSaver
+)

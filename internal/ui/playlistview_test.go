@@ -2,6 +2,7 @@ package ui
 
 import (
 	"mugig/internal/library"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -256,5 +257,46 @@ func TestQueueToPlaylistAndTrash(t *testing.T) {
 	u.trashSongs([]library.Track{u.all[4]})
 	if !slices.Equal(p.Songs, []string{"/music/Hey Jude.mp3"}) {
 		t.Errorf("after the Trash: %v", p.Songs)
+	}
+}
+
+// A playlist's menu exports it as M3U through the Save panel, offering the
+// playlist's name; the status says how many songs went in, and any left
+// out. Cancelling saves nothing.
+func TestExportPlaylist(t *testing.T) {
+	u, _, _, _ := newPlaylistUI(t)
+	sheetSong := track("From a Sheet", "Someone", "Disc", 2000)
+	sheetSong.Path, sheetSong.File = "/music/Disc.wav#01", "/music/Disc.wav"
+	setLibrary(u, append(fiveTracks(), sheetSong)...)
+	p := &library.Playlist{Name: "Road/Trip"}
+	p.Add(u.all[1].Path, sheetSong.Path, u.all[0].Path)
+	u.playlists = []*library.Playlist{p}
+
+	dir := t.TempDir()
+	var offered string
+	u.save = func(_ fyne.Window, name string, done func(string)) {
+		offered = name
+		done(filepath.Join(dir, name))
+	}
+	itemIn(t, u.playlistMenu(p), "Export as M3U…").Action()
+	if offered != "Road-Trip.m3u8" {
+		t.Errorf("offered the name %q", offered)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, offered))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lines := strings.Split(strings.TrimSpace(string(data)), "\n"); len(lines) != 6 || lines[3] != u.all[1].Path || lines[5] != u.all[0].Path {
+		t.Errorf("wrote:\n%s", data)
+	}
+	if want := "Exported 2 songs to Road-Trip.m3u8, leaving out 1 song from CUE sheets, which M3U can't point into."; u.status.Text != want {
+		t.Errorf("status %q", u.status.Text)
+	}
+
+	u.status.SetText("")
+	u.save = func(_ fyne.Window, _ string, done func(string)) { done("") }
+	u.exportPlaylist(p)
+	if u.status.Text != "" {
+		t.Errorf("cancelled, but status %q", u.status.Text)
 	}
 }

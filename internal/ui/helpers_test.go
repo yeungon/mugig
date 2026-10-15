@@ -142,6 +142,9 @@ func newTestUI(t *testing.T) (*ui, *fakePlayer, fyne.App) {
 			t.Error("unexpected Open panel") // tests that expect one set u.pick
 		},
 	})
+	u.save = func(fyne.Window, string, func(string)) {
+		t.Error("unexpected Save panel") // tests that expect one set u.save
+	}
 	u.vis.tick, u.miniVis.tick = 0, 0 // tests draw frames by calling frame, not on a timer
 	u.reveal = func(string) error {
 		t.Error("unexpected Finder window") // tests that expect one set u.reveal

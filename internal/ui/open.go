@@ -30,6 +30,10 @@ type pickOptions struct {
 // chosen paths, or none if cancelled.
 type picker func(w fyne.Window, opts pickOptions, done func(paths []string))
 
+// saver shows a Save panel for a file named name, and calls done on the UI
+// thread with the path chosen, or "" if cancelled.
+type saver func(w fyne.Window, name string, done func(path string))
+
 // openItems asks for audio files or a folder, and opens them.
 func (u *ui) openItems() {
 	start := ""
@@ -139,4 +143,18 @@ func fynePicker(w fyne.Window, opts pickOptions, done func([]string)) {
 			done([]string{r.URI().Path()})
 		}
 	}, w)
+}
+
+// fyneSaver is Fyne's Save dialog, for systems without a native one here.
+func fyneSaver(w fyne.Window, name string, done func(string)) {
+	d := dialog.NewFileSave(func(wc fyne.URIWriteCloser, err error) {
+		if err != nil || wc == nil {
+			done("")
+			return
+		}
+		wc.Close()
+		done(wc.URI().Path())
+	}, w)
+	d.SetFileName(name)
+	d.Show()
 }

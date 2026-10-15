@@ -87,7 +87,11 @@ Written in Go with [Fyne](https://fyne.io).
   is in the last 30 days", by title, artist, album, year, format, quality,
   time, size, folder or file date, and keep themselves up to date. The +
   beside Playlists makes either kind; right-click one to play, edit, rename,
-  duplicate or delete it. Songs moved to the Trash leave the playlists.
+  duplicate or delete it, or **Export as M3U** for other players (songs
+  beside the playlist file are saved relative to it, so a playlist kept on
+  a USB disk works wherever the disk goes; songs from CUE sheets are left
+  out, as M3U can only name whole files). Songs moved to the Trash leave
+  the playlists.
 - Add folders with the **+** beside Folders, the Open panel, or by dropping
   them on the window. Audio files opened or dropped are played.
 - Search, and sort by any column: title, artist, album, **time**, year,

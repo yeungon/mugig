@@ -84,6 +84,7 @@ type ui struct {
 	media     mediaCenter
 	async     func(func())            // runs slow work off the UI thread
 	pick      picker                  // shows an Open panel (see open.go)
+	save      saver                   // shows a Save panel
 	reveal    func(path string) error // shows a file in Finder or Explorer; tests replace it
 	modifiers func() fyne.KeyModifier // the modifier keys held down; tests replace it
 	trash     func(path string) error // moves a file to the Trash; tests replace it
@@ -341,6 +342,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker
 	}
+	u.save = defaultSaver
 	if u.async == nil {
 		u.async = func(f func()) { go f() }
 	}

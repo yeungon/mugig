@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"mugig/internal/humanize"
 	"mugig/internal/library"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -140,10 +141,33 @@ func (u *ui) playlistMenu(p *library.Playlist) *fyne.Menu {
 	items = append(items,
 		fyne.NewMenuItem("Rename…", func() { u.renamePlaylist(p) }),
 		fyne.NewMenuItem("Duplicate", func() { u.duplicatePlaylist(p) }),
+		fyne.NewMenuItem("Export as M3U…", func() { u.exportPlaylist(p) }),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Delete Playlist…", func() { u.confirmDeletePlaylist(p) }),
 	)
 	return fyne.NewMenu("", items...)
+}
+
+// exportPlaylist saves p's songs as an M3U playlist, for other players.
+func (u *ui) exportPlaylist(p *library.Playlist) {
+	songs := p.Tracks(u.all, nil, u.songFacts())
+	name := strings.NewReplacer("/", "-", ":", "-", "\\", "-").Replace(p.Name) + ".m3u8"
+	u.save(u.win, name, func(path string) {
+		if path == "" {
+			return // cancelled
+		}
+		skipped, err := library.SaveM3U(path, p.Name, songs)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("couldn't save the playlist: %w", err), u.win)
+			return
+		}
+		msg := fmt.Sprintf("Exported %s to %s", humanize.Plural(len(songs)-skipped, "song"), filepath.Base(path))
+		if skipped > 0 {
+			msg += fmt.Sprintf(", leaving out %s from CUE sheets, which M3U can't point into",
+				humanize.Plural(skipped, "song"))
+		}
+		u.status.SetText(msg + ".")
+	})
 }
 
 // playPlaylist shows p and plays it from the top.
