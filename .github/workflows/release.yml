@@ -21,7 +21,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
+        # Linux programs run only on systems with at least the C library
+        # (glibc) they were built with: built on Ubuntu 22.04, Mugig needs
+        # glibc 2.35, so it runs on Ubuntu 22.04, Debian 12 and newer. Built
+        # on 24.04 it would need 2.38.
+        os: [macos-latest, windows-latest, ubuntu-22.04]
     defaults:
       run:
         shell: bash
@@ -75,6 +79,9 @@ jobs:
           mkdir -p out
           mv Mugig.tar.xz out/Mugig-Linux.tar.xz
           tar -tJf out/Mugig-Linux.tar.xz
+          # The newest glibc it needs.
+          tar -xJf out/Mugig-Linux.tar.xz -O mugig/usr/local/bin/mugig > /tmp/mugig
+          objdump -T /tmp/mugig | grep -o 'GLIBC_[0-9.]*' | sort -V | tail -1
 
       - uses: actions/upload-artifact@v7
         with:
