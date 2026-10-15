@@ -229,6 +229,12 @@ none of them.
 | `tools/mkicon` | Draws the app icon (`make icon`) |
 | `docs/goui.md` | Lessons learned building a Go and Fyne app |
 
+## License
+
+Mugig is free software under the [MIT License](LICENSE): use it, change it
+and share it as you like, keeping the copyright notice. The bundled Inter
+font has its own licence, the SIL Open Font License.
+
 ## Credits
 
 - The UI font is [Inter](https://rsms.me/inter/), under the SIL Open Font
