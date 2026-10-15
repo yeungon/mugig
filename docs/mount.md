@@ -71,7 +71,7 @@ The `nfsmount` crash and read-only rows were tried on this Mac (section
 | `rclone nfsmount` without macFUSE | Mounts as the user; files read back byte for byte. |
 | Mugig scan, tags, decoding to the end, full quality check (FLAC and MP3) through the mount | Same results as from the local disk. |
 | A file added on the remote side while Mugig watches the folder | **No file event**, after 20 s. Mugig's live watching doesn't see remote changes. |
-| Folder listing after a file is added or deleted on the remote | **Stale**: still the old list after minutes (rclone caches folders for 5 min by default). |
+| Folder listing after a file is added or deleted on the remote | **Stale**: still the old list when looked at again (rclone keeps folder lists for up to 5 min by default). |
 | Reading a file deleted on the remote but still listed | Fails with "Error reading". Mugig would show the song but not play it. |
 | `rclone rc vfs/refresh recursive=true` after a remote change | The new file shows in a listing within about 5 s (macOS's NFS cache). |
 | rclone killed (`kill -9`) with the default *hard* mount | A `stat` on the folder **hung for over 40 s** and only returned, with "Input/output error", after `umount -f`. |
