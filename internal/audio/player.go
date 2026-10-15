@@ -26,6 +26,7 @@ import (
 type Player struct {
 	out    output
 	onMain func(func()) // runs a function on the UI thread
+	sys    system       // the output device's own rate and exclusive access
 
 	decks *decks // the song playing and the one readied to follow; nil if stopped
 	eq    *equalizer
@@ -52,10 +53,22 @@ type Player struct {
 	hogged    uint32             // the device Mugig has to itself, 0 for none
 }
 
+// system is what the player asks of the operating system about the output
+// device itself: its own sample rate, and having it for Mugig alone. Tests
+// put in a fake, so they never change a real device.
+type system struct {
+	rate    func(uid string) float64 // 0 if unknown
+	setRate func(uid string, rate float64) bool
+	hog     func(uid string) uint32 // the device, or 0 if it can't be had
+	unhog   func(dev uint32)
+}
+
+var realSystem = system{nominalRate, setNominalRate, hogDevice, unhogDevice}
+
 // NewPlayer makes a player whose callbacks, such as a song's end, are run
 // by onMain on the UI thread.
 func NewPlayer(onMain func(func())) *Player {
-	return &Player{onMain: onMain, level: 1, speed: 1, matchRate: true, original: map[string]float64{}}
+	return &Player{onMain: onMain, sys: realSystem, level: 1, speed: 1, matchRate: true, original: map[string]float64{}}
 }
 
 // Play stops any current track and starts the one at path. onEnd is called
@@ -204,20 +217,20 @@ func (p *Player) setNext(d *deck) {
 func (p *Player) openOutput(rate int) error {
 	if p.exclusive {
 		// Taken first, so no other app can change the rate back.
-		dev := hogDevice(deviceUID(p.device))
+		dev := p.sys.hog(deviceUID(p.device))
 		if dev != p.hogged {
-			unhogDevice(p.hogged) // moving to another device
+			p.sys.unhog(p.hogged) // moving to another device
 		}
 		p.hogged = dev
 	}
 	if p.matchRate {
 		uid := deviceUID(p.device)
 		if _, saved := p.original[uid]; !saved {
-			if r := nominalRate(uid); r > 0 {
+			if r := p.sys.rate(uid); r > 0 {
 				p.original[uid] = r
 			}
 		}
-		setNominalRate(uid, float64(rate))
+		p.sys.setRate(uid, float64(rate))
 	}
 	return p.out.open(rate, p.device)
 }
@@ -470,7 +483,7 @@ func (p *Player) SetExclusive(on bool) {
 	if !on {
 		p.letGo()
 	} else if p.decks != nil {
-		p.hogged = hogDevice(deviceUID(p.device))
+		p.hogged = p.sys.hog(deviceUID(p.device))
 	}
 }
 
@@ -478,7 +491,7 @@ func (p *Player) Exclusive() bool { return p.hogged != 0 }
 
 // letGo gives the device back to every app.
 func (p *Player) letGo() {
-	unhogDevice(p.hogged)
+	p.sys.unhog(p.hogged)
 	p.hogged = 0
 }
 
@@ -536,7 +549,7 @@ func (p *Player) Close() {
 
 func (p *Player) restoreRates() {
 	for uid, rate := range p.original {
-		setNominalRate(uid, rate)
+		p.sys.setRate(uid, rate)
 	}
 	clear(p.original)
 }
