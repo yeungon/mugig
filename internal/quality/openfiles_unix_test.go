@@ -47,19 +47,25 @@ func TestCheckClosesFiles(t *testing.T) {
 		paths = append(paths, path)
 	}
 	paths = append(paths, audiotest.Sample("sample.mp3"), audiotest.Sample("sample.ogg"))
-	before := openFiles(t)
-	for _, path := range paths {
-		info, err := audio.Probe(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := Analyse(context.Background(), path, info, true, nil); err != nil {
-			t.Fatalf("%s: %v", path, err)
-		}
-		if _, err := MeasureLoudness(context.Background(), path); err != nil {
-			t.Fatalf("%s: %v", path, err)
+	check := func() {
+		for _, path := range paths {
+			info, err := audio.Probe(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := Analyse(context.Background(), path, info, true, nil); err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
+			if _, err := MeasureLoudness(context.Background(), path); err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
 		}
 	}
+	// Once first: Go itself opens a few files the first time it is asked
+	// to, such as Linux's file poller, which aren't the check's.
+	check()
+	before := openFiles(t)
+	check()
 	if after := openFiles(t); after != before {
 		t.Errorf("%d files open before checking, %d after: checking leaves files open", before, after)
 	}
