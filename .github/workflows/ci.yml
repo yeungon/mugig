@@ -1,0 +1,55 @@
+# Builds Mugig and runs its tests on macOS, Linux and Windows on every push
+# and pull request. The macOS run measures coverage, across all the
+# packages together, and sends it to Codecov.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    env:
+      # Fyne drops cached drawing objects after a minute; the tests run
+      # longer than that (see the Makefile).
+      FYNE_CACHE: 1h
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      # Fyne draws with OpenGL through GLFW, which needs these to build.
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with coverage (macOS)
+        if: runner.os == 'macOS'
+        run: go test -race -coverpkg=./internal/... -coverprofile=coverage.out ./...
+
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        run: go test ./...
+
+      - name: Upload coverage reports to Codecov
+        if: runner.os == 'macOS'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.out

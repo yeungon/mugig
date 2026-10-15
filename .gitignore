@@ -8,3 +8,6 @@
 # Builds for other systems (make mac, windows, linux…)
 /dist/
 /fyne-cross/
+
+# Test coverage (CI uploads it to Codecov)
+coverage.out

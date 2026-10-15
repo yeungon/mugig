@@ -1,0 +1,5 @@
+# Coverage counts Mugig's own code: not the helpers that make test audio,
+# nor the tool that draws the icon.
+ignore:
+  - "internal/audiotest"
+  - "tools"

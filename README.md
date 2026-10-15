@@ -1,5 +1,8 @@
 # Mugig
 
+[![CI](https://github.com/yeungon/mugig/actions/workflows/ci.yml/badge.svg)](https://github.com/yeungon/mugig/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/yeungon/mugig/graph/badge.svg)](https://codecov.io/gh/yeungon/mugig)
+
 A desktop music player that also tells you the truth about your files: whether
 a "lossless" FLAC really is lossless, whether it is intact, and how loud it is.
 Written in Go with [Fyne](https://fyne.io).
