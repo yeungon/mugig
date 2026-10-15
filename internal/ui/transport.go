@@ -159,6 +159,7 @@ func (u *ui) play(t library.Track) {
 // start plays t. queued says it comes from Up Next, so the list carries on
 // afterwards from where it was rather than from t.
 func (u *ui) start(t library.Track, queued bool) {
+	u.levelSong(t.Path)
 	if err := u.player.Play(t.Path, u.trackEnded); err != nil {
 		u.setStopped()
 		dialog.ShowError(err, u.win)
@@ -384,6 +385,7 @@ func (u *ui) prepareNext() {
 		return
 	}
 	t, _ := u.following()
+	u.levelSong(t.Path)
 	u.player.Prepare(t.Path)
 }
 
@@ -679,6 +681,10 @@ type audioPlayer interface {
 	// SetFade turns fading in from near silence, when playing starts or
 	// resumes, and fading out when pausing, on or off.
 	SetFade(on bool)
+	// SetLevelling turns volume levelling on, with gainOf giving each
+	// song's gain in dB, or off with nil; Relevel asks again for a song's.
+	SetLevelling(gainOf func(path string) float64)
+	Relevel(path string)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
 	SetCrossfeed(level audio.CrossfeedLevel)
 	SetEQ(s audio.EQSettings)

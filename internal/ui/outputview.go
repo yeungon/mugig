@@ -118,8 +118,9 @@ func (u *ui) updateOutputInfo() {
 		}
 	}
 	var text string
+	levelled := u.levellingNote()
 	switch {
-	case device == track && u.speed == 1 && u.crossfeed == audio.CrossfeedOff && !u.eq.Active():
+	case device == track && u.speed == 1 && u.crossfeed == audio.CrossfeedOff && !u.eq.Active() && !strings.HasPrefix(levelled, ", levelled"):
 		text = fmt.Sprintf("Playing on %s at %s, unconverted", name, humanize.KHz(float64(track)))
 	case device == track:
 		text = fmt.Sprintf("Playing on %s at %s", name, humanize.KHz(float64(track)))
@@ -136,6 +137,7 @@ func (u *ui) updateOutputInfo() {
 	if u.crossfeed != audio.CrossfeedOff {
 		text += fmt.Sprintf(", with %s crossfeed", strings.ToLower(audio.CrossfeedNames[u.crossfeed]))
 	}
+	text += levelled
 	switch {
 	case u.player.Exclusive():
 		text += ". Exclusive access: no other sound is mixed in"

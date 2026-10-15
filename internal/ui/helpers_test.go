@@ -39,10 +39,12 @@ type fakePlayer struct {
 	bad    map[string]bool // paths that fail to play
 	next   string          // the path readied to follow, by Prepare
 
-	device    string
-	matchRate bool
-	exclusive bool
-	hogFails  bool // another app has the device to itself
+	device     string
+	matchRate  bool
+	exclusive  bool
+	hogFails   bool                      // another app has the device to itself
+	levelling  func(path string) float64 // nil when off
+	relevelled []string
 }
 
 func (f *fakePlayer) Play(path string, onEnd func(error)) error {
@@ -63,6 +65,8 @@ func (f *fakePlayer) Duration() time.Duration             { return 3 * time.Minu
 func (f *fakePlayer) Seek(d time.Duration) error          { f.pos = d; return nil }
 func (f *fakePlayer) SetVolume(level float64)             { f.level = level }
 func (f *fakePlayer) SetFade(on bool)                     { f.fade = on }
+func (f *fakePlayer) SetLevelling(g func(string) float64) { f.levelling = g }
+func (f *fakePlayer) Relevel(path string)                 { f.relevelled = append(f.relevelled, path) }
 func (f *fakePlayer) SetSpeed(speed float64)              { f.speed = speed }
 func (f *fakePlayer) SetCrossfeed(l audio.CrossfeedLevel) { f.feed = l }
 func (f *fakePlayer) SetEQ(s audio.EQSettings)            { f.eq = s }

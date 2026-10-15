@@ -39,7 +39,9 @@ type Player struct {
 	speed float64 // playback speed, kept across tracks
 	feed  CrossfeedLevel
 	fade  bool // fade in when playing starts or resumes
-	eqSet EQSettings
+	// gainOf gives a song's volume levelling gain in dB; nil when off.
+	gainOf func(path string) float64
+	eqSet  EQSettings
 
 	onEnd     func(error) // the current song's end-of-track callback
 	nextPath  string      // the song asked to follow, "" for none
@@ -89,6 +91,7 @@ func (p *Player) Play(path string, onEnd func(error)) error {
 	if err != nil {
 		return err
 	}
+	d.level.set(p.levelOf(path))
 	if err := p.openOutput(int(d.format.SampleRate)); err != nil {
 		d.stream.Close()
 		p.letGo()
@@ -182,12 +185,13 @@ func (p *Player) Prepare(path string) {
 	if path == "" {
 		return
 	}
-	gen, rate, speed := p.gen, cur.format.SampleRate, p.speed
+	gen, rate, speed, lv := p.gen, cur.format.SampleRate, p.speed, p.levelOf(path)
 	go func() {
 		d, err := openDeck(path, speed)
 		if err != nil {
 			return // Play will fail too, and say why
 		}
+		d.level.set(lv)
 		p.onMain(func() {
 			if p.gen != gen || p.nextPath != path || d.format.SampleRate != rate {
 				d.stream.Close()
@@ -454,6 +458,54 @@ func (p *Player) applyLevel() {
 		gain = math.Pow(2, (p.level-1)*6)
 	}
 	p.vol.set(gain)
+}
+
+// SetLevelling turns volume levelling on, with gainOf giving each song's
+// gain in dB, or off with nil. The songs playing and readied glide to
+// their new gain.
+func (p *Player) SetLevelling(gainOf func(path string) float64) {
+	p.gainOf = gainOf
+	p.relevel(func(string) bool { return true })
+}
+
+// Relevel asks again for the gain of the song at path, if it is playing or
+// readied, as when its loudness has just been measured; it glides there.
+func (p *Player) Relevel(path string) {
+	p.relevel(func(s string) bool { return s == path })
+}
+
+// relevel sets the gain of the songs playing and readied that which picks.
+// The gains are worked out before taking the output's lock, as that can
+// mean looking at the files.
+func (p *Player) relevel(which func(path string) bool) {
+	if p.decks == nil {
+		return
+	}
+	p.out.mu.Lock()
+	ds := []*deck{p.decks.cur, p.decks.next}
+	p.out.mu.Unlock()
+	var gains [2]float64
+	for i, d := range ds {
+		if d != nil && which(d.path) {
+			gains[i] = p.levelOf(d.path)
+		}
+	}
+	p.out.mu.Lock()
+	defer p.out.mu.Unlock()
+	for i, d := range ds {
+		if d != nil && which(d.path) {
+			d.level.target = gains[i]
+		}
+	}
+}
+
+// levelOf is the song at path's levelling gain, as a multiple: 1 when
+// levelling is off.
+func (p *Player) levelOf(path string) float64 {
+	if p.gainOf == nil {
+		return 1
+	}
+	return math.Pow(10, p.gainOf(path)/20)
 }
 
 // SetFade turns fading in, when playing starts or resumes, and fading out,

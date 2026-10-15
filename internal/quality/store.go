@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -19,7 +20,15 @@ type Store struct {
 	mu       sync.Mutex
 	path     string // where it is saved; "" keeps it in memory only
 	entries  map[string]Entry
-	pictures map[string][]byte // spectrograms, when kept in memory
+	loudness map[string]storedLoudness // by song, measured for volume levelling
+	pictures map[string][]byte         // spectrograms, when kept in memory
+}
+
+// storedLoudness is a song's loudness, measured on its own for levelling,
+// with the stamp of the file it is in.
+type storedLoudness struct {
+	Stamp    string
+	Loudness Loudness
 }
 
 type Entry struct {
@@ -33,17 +42,21 @@ type Entry struct {
 const qualityVersion = 5
 
 type qualityFile struct {
-	Version int
-	Entries map[string]Entry
+	Version  int
+	Entries  map[string]Entry
+	Loudness map[string]storedLoudness // missing from files saved before levelling
 }
 
 // LoadStore reads the results saved at path. A missing, corrupt or
 // outdated file just gives an empty store.
 func LoadStore(path string) *Store {
-	s := &Store{path: path, entries: map[string]Entry{}, pictures: map[string][]byte{}}
+	s := &Store{path: path, entries: map[string]Entry{}, loudness: map[string]storedLoudness{}, pictures: map[string][]byte{}}
 	var f qualityFile
 	if path != "" && gobfile.Load(path, &f) == nil && f.Version == qualityVersion && f.Entries != nil {
 		s.entries = f.Entries
+		if f.Loudness != nil {
+			s.loudness = f.Loudness
+		}
 	}
 	s.dropOldPictures()
 	return s
@@ -89,17 +102,50 @@ func (s *Store) Save() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.path != "" {
-		gobfile.Save(s.path, qualityFile{Version: qualityVersion, Entries: s.entries})
+		gobfile.Save(s.path, qualityFile{Version: qualityVersion, Entries: s.entries, Loudness: s.loudness})
 	}
 }
 
-// Forget drops the result for a file that has changed or gone.
+// Forget drops the results for files that have changed or gone, and the
+// loudness of their songs, those of a disc image included.
 func (s *Store) Forget(paths []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, p := range paths {
 		delete(s.entries, p)
+		for song := range s.loudness {
+			if song == p || strings.HasPrefix(song, p+"#") {
+				delete(s.loudness, song)
+			}
+		}
 	}
+}
+
+// Loudness returns how loud the song at path is, if known: measured for
+// levelling, or by a quality check of its file. file is the file the song
+// is in, which for a song from a CUE sheet is its disc image, whose check
+// measured the whole album rather than the song; stamp is the file's.
+func (s *Store) Loudness(path, file, stamp string) (Loudness, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if stamp == "" {
+		return Loudness{}, false
+	}
+	if l, ok := s.loudness[path]; ok && l.Stamp == stamp {
+		return l.Loudness, true
+	}
+	if e, ok := s.entries[file]; ok && path == file && e.Stamp == stamp && e.Report.Levels.Measured {
+		return Loudness{LUFS: e.Report.Levels.LUFS, TruePeak: e.Report.Levels.TruePeak}, true
+	}
+	return Loudness{}, false
+}
+
+// PutLoudness records how loud the song at path is, and saves the store.
+func (s *Store) PutLoudness(path, stamp string, l Loudness) {
+	s.mu.Lock()
+	s.loudness[path] = storedLoudness{stamp, l}
+	s.mu.Unlock()
+	s.Save()
 }
 
 // Levels returns every saved verdict, by path. Whether each file is still

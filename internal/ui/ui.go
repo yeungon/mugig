@@ -156,6 +156,9 @@ type ui struct {
 	speedItems     []*fyne.MenuItem // one per speed, in the Controls menu
 	crossfeed      audio.CrossfeedLevel
 	fadeInItem     *fyne.MenuItem
+	levellingItem  *fyne.MenuItem
+	measuring      map[string]bool // songs whose loudness is being measured, for levelling
+	lastGain       float64         // the last song levelled's gain, in dB
 	eq             audio.EQSettings
 	eqView         *eqView          // the Equalizer window, while open
 	crossfeedItems []*fyne.MenuItem // one per level, in the Controls menu
@@ -339,6 +342,7 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	u.playlistsPath = d.playlists
 	u.playlists = library.LoadPlaylists(d.playlists)
 	u.selected = map[string]bool{}
+	u.measuring = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
 		u.pick = defaultPicker
 	}

@@ -9,6 +9,7 @@ package audio
 // reopened, which leaves a short gap.
 
 import (
+	"math"
 	"os"
 	"time"
 
@@ -25,6 +26,7 @@ type deck struct {
 	stream  beep.StreamSeekCloser // reads ahead; owns the file
 	format  beep.Format
 	stretch *stretcher
+	level   level // volume levelling's gain for this song
 }
 
 func openDeck(path string, speed float64) (*deck, error) {
@@ -33,7 +35,45 @@ func openDeck(path string, speed float64) (*deck, error) {
 		return nil, err
 	}
 	ra := newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate)
-	return &deck{path: path, stream: ra, format: format, stretch: newStretcher(ra, int(format.SampleRate), speed)}, nil
+	d := &deck{path: path, stream: ra, format: format, stretch: newStretcher(ra, int(format.SampleRate), speed)}
+	d.level = level{gain: 1, target: 1, step: math.Pow(10, levelGlideDB/20/float64(max(int(format.SampleRate), 1)))}
+	return d, nil
+}
+
+// levelGlideDB is how fast, in dB a second, a song's levelling gain moves
+// to a new one, such as when its loudness is measured as it plays.
+const levelGlideDB = 20
+
+// level is a song's levelling gain, gliding to a new one rather than
+// jumping. At 1, as with levelling off, the samples pass through as they
+// are. It is changed with the output locked.
+type level struct {
+	gain, target float64
+	step         float64 // the gain's multiple per sample while gliding
+}
+
+// set goes to gain at once, for a song not yet playing.
+func (l *level) set(gain float64) { l.gain, l.target = gain, gain }
+
+func (l *level) apply(samples [][2]float64) {
+	if l.gain == l.target {
+		if l.gain != 1 {
+			for i := range samples {
+				samples[i][0] *= l.gain
+				samples[i][1] *= l.gain
+			}
+		}
+		return
+	}
+	for i := range samples {
+		if l.gain < l.target {
+			l.gain = min(l.gain*l.step, l.target)
+		} else {
+			l.gain = max(l.gain/l.step, l.target)
+		}
+		samples[i][0] *= l.gain
+		samples[i][1] *= l.gain
+	}
 }
 
 // decks plays cur, then next if one is readied, without a gap. It is read
@@ -49,6 +89,7 @@ type decks struct {
 func (d *decks) Stream(samples [][2]float64) (n int, ok bool) {
 	for n < len(samples) && !d.ended {
 		got, more := d.cur.stretch.Stream(samples[n:])
+		d.cur.level.apply(samples[n : n+got])
 		n += got
 		switch {
 		case more && got == 0:
