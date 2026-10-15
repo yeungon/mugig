@@ -121,10 +121,11 @@ type SongFacts struct {
 }
 
 // Matches reports whether t passes the rule. A rule that can't be read,
-// such as a number that isn't one, matches nothing.
+// such as a number that isn't one, or a comparison its field doesn't
+// offer, matches nothing.
 func (r SmartRule) Matches(t Track, f SongFacts) bool {
 	kind, ok := FieldKindOf(r.Field)
-	if !ok {
+	if !ok || !slices.Contains(KindOps[kind], r.Op) {
 		return false
 	}
 	value := strings.TrimSpace(r.Value)

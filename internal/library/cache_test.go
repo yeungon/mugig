@@ -4,6 +4,7 @@ import (
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -88,5 +89,50 @@ func TestCacheIgnoresBadFiles(t *testing.T) {
 	// Leftover temp files would mean save isn't cleaning up.
 	if m, _ := filepath.Glob(filepath.Join(dir, "*.tmp")); len(m) != 0 {
 		t.Errorf("temp files left behind: %v", m)
+	}
+}
+
+// Taking a folder out forgets just its songs, not those of a folder whose
+// name starts the same; a complete scan of one folder leaves the others'
+// songs alone too. File dates come from the cache.
+func TestCacheForgetting(t *testing.T) {
+	c := LoadCache("")
+	when := time.Date(2024, 3, 1, 10, 0, 0, 0, time.UTC)
+	entry := func(path string) CacheEntry {
+		return CacheEntry{Size: 1, ModTime: when.UnixNano(), Track: Track{Path: path}}
+	}
+	paths := []string{"/Music/a.flac", "/Music/Album/b.flac", "/Music Library/c.flac", "/Musical/d.flac", "/Other/e.flac"}
+	seen := map[string]CacheEntry{}
+	for _, p := range paths {
+		seen[p] = entry(p)
+	}
+	c.Update("/", seen, false)
+	cached := func() (out []string) {
+		for _, p := range paths {
+			if _, ok := c.Lookup(p, 1, when.UnixNano()); ok {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+
+	if got := c.ModTime("/Other/e.flac"); !got.Equal(when) {
+		t.Errorf("file date %v, want %v", got, when)
+	}
+	if got := c.ModTime("/not/cached.flac"); !got.IsZero() {
+		t.Errorf("an unknown file's date should be zero, not %v", got)
+	}
+
+	c.Update("/Music", map[string]CacheEntry{"/Music/a.flac": entry("/Music/a.flac")}, true)
+	if got := cached(); !slices.Equal(got, []string{"/Music/a.flac", "/Music Library/c.flac", "/Musical/d.flac", "/Other/e.flac"}) {
+		t.Errorf("after a complete scan of /Music: %v", got)
+	}
+	c.ForgetUnder("/Music")
+	if got := cached(); !slices.Equal(got, []string{"/Music Library/c.flac", "/Musical/d.flac", "/Other/e.flac"}) {
+		t.Errorf("after taking /Music out: %v", got)
+	}
+	c.Forget([]string{"/Other/e.flac", "/never/cached.flac"})
+	if got := cached(); !slices.Equal(got, []string{"/Music Library/c.flac", "/Musical/d.flac"}) {
+		t.Errorf("after forgetting e: %v", got)
 	}
 }

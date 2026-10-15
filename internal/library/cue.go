@@ -140,10 +140,8 @@ func parseCue(text, dir string) []cueSheet {
 		switch strings.ToUpper(cmd) {
 		case "REM":
 			key, value := cueWord(rest)
-			if strings.EqualFold(key, "DATE") {
-				if y, err := strconv.Atoi(strings.TrimSpace(value)[:min(4, len(strings.TrimSpace(value)))]); err == nil {
-					year = y
-				}
+			if y, ok := cueYear(value); ok && strings.EqualFold(key, "DATE") {
+				year = y
 			}
 		case "TITLE":
 			if cur != nil {
@@ -195,6 +193,16 @@ func parseCue(text, dir string) []cueSheet {
 		s.tracks = ok
 	}
 	return sheets
+}
+
+// cueYear reads the year from a DATE, written 1999, "1999" or 1999-05-01.
+func cueYear(s string) (int, bool) {
+	s = cueString(s)
+	if len(s) < 4 {
+		return 0, false
+	}
+	y, err := strconv.Atoi(s[:4])
+	return y, err == nil && y > 0
 }
 
 // cueWord splits off the first word.
@@ -249,12 +257,22 @@ func cueTime(s string) (time.Duration, bool) {
 
 // cueSongs makes the songs of a sheet, given the image's own track, read
 // from its tags, for its length, size and format.
+//
+// A sheet can run past its image, as one kept beside a shorter rip of the
+// disc does: a song that would start after the image ends isn't there, and
+// the song the image ends in ends with it.
 func cueSongs(s cueSheet, image Track) []Track {
 	var out []Track
 	for i, ct := range s.tracks {
+		if image.Length > 0 && ct.start >= image.Length {
+			break
+		}
 		end := image.Length
 		if i+1 < len(s.tracks) {
 			end = s.tracks[i+1].start
+			if image.Length > 0 {
+				end = min(end, image.Length)
+			}
 		}
 		t := Track{
 			Path:   CuePath(s.file, ct.number),

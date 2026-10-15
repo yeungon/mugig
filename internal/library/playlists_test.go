@@ -107,3 +107,98 @@ func TestUniqueName(t *testing.T) {
 		t.Errorf("%q", got)
 	}
 }
+
+// Rules that can't be read match nothing, whatever the field: a value that
+// isn't a number, a comparison the field doesn't have, a file whose date
+// isn't known. Values are read without the spaces around them.
+func TestSmartRulesThatCantBeRead(t *testing.T) {
+	song := Track{Path: "/music/a.flac", Title: "A", Year: 1968, Size: 30e6, Length: 7 * time.Minute}
+	now := time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+	known := SongFacts{
+		Level:   func(Track) quality.Level { return quality.Lossless },
+		ModTime: func(string) time.Time { return now.Add(-24 * time.Hour) },
+		Now:     now,
+	}
+	unknownDate := known
+	unknownDate.ModTime = func(string) time.Time { return time.Time{} }
+	for _, c := range []struct {
+		rule  SmartRule
+		facts SongFacts
+	}{
+		{SmartRule{"Time", OpMore, "abc"}, known},
+		{SmartRule{"Size", OpLess, ""}, known},
+		{SmartRule{"File Date", OpWithin, "a week"}, known},
+		{SmartRule{"File Date", OpWithin, "30"}, unknownDate},
+		{SmartRule{"File Date", OpNotWithin, "30"}, unknownDate},
+		{SmartRule{"Time", OpIs, "7"}, known},             // Time has only more and less
+		{SmartRule{"Title", OpMore, "a"}, known},          // text has no more than
+		{SmartRule{"Quality", OpContains, "loss"}, known}, // Quality is or is not
+		{SmartRule{"Year", "", "1968"}, known},
+	} {
+		if c.rule.Matches(song, c.facts) {
+			t.Errorf("%s %q %q matched", c.rule.Field, c.rule.Op, c.rule.Value)
+		}
+	}
+	for _, r := range []SmartRule{{"Year", OpIs, " 1968 "}, {"Artist", OpIs, ""}, {"Title", OpIs, "  a "}} {
+		if !r.Matches(song, known) {
+			t.Errorf("%s %s %q should match", r.Field, r.Op, r.Value)
+		}
+	}
+}
+
+// Every field has comparisons, and the Quality rule offers every verdict
+// the column shows, and songs not checked yet.
+func TestSmartFieldChoices(t *testing.T) {
+	for _, f := range SmartFields {
+		if kind, ok := FieldKindOf(f.Name); !ok || kind != f.Kind || len(KindOps[f.Kind]) == 0 {
+			t.Errorf("field %s: kind %v, comparisons %v", f.Name, kind, KindOps[f.Kind])
+		}
+	}
+	if _, ok := FieldKindOf("Colour"); ok {
+		t.Error("Colour isn't a field")
+	}
+	choices := QualityChoices()
+	for l, name := range quality.LevelNames {
+		if !slices.Contains(choices, name) {
+			t.Errorf("verdict %v (%s) isn't offered", l, name)
+		}
+	}
+	if choices[len(choices)-1] != notCheckedChoice || len(choices) != len(quality.LevelNames)+1 {
+		t.Errorf("choices %v", choices)
+	}
+}
+
+// Adding skips songs already there; removing takes out only those named;
+// moving is among the songs the library has, skipping any on a disk not
+// plugged in, and does nothing past either end.
+func TestPlaylistEditing(t *testing.T) {
+	p := &Playlist{Name: "Mix"}
+	if n := p.Add("/a", "/b", "/a", "/x", "/c"); n != 4 || !slices.Equal(p.Songs, []string{"/a", "/b", "/x", "/c"}) {
+		t.Fatalf("added %d: %v", n, p.Songs)
+	}
+	if n := p.Add("/b"); n != 0 {
+		t.Errorf("added %d already there", n)
+	}
+	all := []Track{{Path: "/a"}, {Path: "/b"}, {Path: "/c"}} // /x's disk is unplugged
+	listed := p.Tracks(all, nil, SongFacts{})
+	if len(listed) != 3 {
+		t.Fatalf("listed %v", listed)
+	}
+	p.Move("/b", +1, listed) // past /x, which isn't listed, to swap with /c
+	if !slices.Equal(p.Songs, []string{"/a", "/c", "/x", "/b"}) {
+		t.Errorf("after moving /b down: %v", p.Songs)
+	}
+	listed = p.Tracks(all, nil, SongFacts{})
+	before := slices.Clone(p.Songs)
+	p.Move("/a", -1, listed)    // already first
+	p.Move("/b", +1, listed)    // already last
+	p.Move("/x", +1, listed)    // not listed
+	p.Move("/none", -1, listed) // not in the playlist
+	if !slices.Equal(p.Songs, before) {
+		t.Errorf("moves past the ends changed %v to %v", before, p.Songs)
+	}
+	p.Remove("/c", "/none")
+	if !slices.Equal(p.Songs, []string{"/a", "/x", "/b"}) {
+		t.Errorf("after removing: %v", p.Songs)
+	}
+}
