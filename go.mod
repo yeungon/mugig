@@ -13,6 +13,7 @@ require (
 	github.com/go-text/typesetting v0.3.5
 	github.com/gopxl/beep/v2 v2.1.1
 	github.com/mewkiz/flac v1.0.14
+	golang.org/x/text v0.23.0
 )
 
 require (
@@ -53,6 +54,5 @@ require (
 	golang.org/x/image v0.24.0 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

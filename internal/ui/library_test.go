@@ -31,6 +31,23 @@ func TestSearchFiltersByAllWords(t *testing.T) {
 	}
 }
 
+// Typing without accents finds songs with them.
+func TestSearchWithoutAccents(t *testing.T) {
+	u, _, _ := newTestUI(t)
+	setLibrary(u, append(fiveTracks(), track("Diễm Xưa", "Trịnh Công Sơn", "Ca Khúc Da Vàng", 1968))...)
+	for query, want := range map[string][]string{
+		"trinh cong son": {"Diễm Xưa"},
+		"diem":           {"Diễm Xưa"},
+		"Diễm XƯA":       {"Diễm Xưa"},
+		"queen":          {"Bohemian Rhapsody"},
+	} {
+		u.search.SetText(query)
+		if got := titles(u.tracks); !slices.Equal(got, want) {
+			t.Errorf("search %q = %v, want %v", query, got, want)
+		}
+	}
+}
+
 func TestSearchCount(t *testing.T) {
 	u, _, _ := newTestUI(t)
 	setLibrary(u, fiveTracks()...)

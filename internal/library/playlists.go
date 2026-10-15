@@ -133,7 +133,7 @@ func (r SmartRule) Matches(t Track, f SongFacts) bool {
 	case textField:
 		have := map[string]string{"Title": t.Title, "Artist": t.Artist, "Album": t.Album,
 			"Format": t.Format, "Folder": filepath.Dir(t.Path)}[r.Field]
-		have, want := strings.ToLower(have), strings.ToLower(value)
+		have, want := Fold(have), Fold(value)
 		switch r.Op {
 		case OpContains:
 			return strings.Contains(have, want)

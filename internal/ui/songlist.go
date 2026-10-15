@@ -22,7 +22,7 @@ import (
 )
 
 func (u *ui) searchWords() []string {
-	return strings.Fields(strings.ToLower(u.search.Text))
+	return library.SearchWords(u.search.Text)
 }
 
 // applyView rebuilds the visible list from the library using the current

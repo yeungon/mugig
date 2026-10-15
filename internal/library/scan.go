@@ -185,12 +185,13 @@ func ReadTrack(path string) Track {
 	return t
 }
 
-// searchKey is what the search box matches against.
+// searchKey is what the search box matches against, folded (see Fold).
 func searchKey(t Track) string {
-	return strings.ToLower(t.Title + "\x00" + t.Artist + "\x00" + t.Album)
+	return Fold(t.Title + "\x00" + t.Artist + "\x00" + t.Album)
 }
 
 // Matches reports whether t contains every search word, in any field.
+// The words are folded, as SearchWords gives them.
 func Matches(t Track, words []string) bool {
 	key := t.search
 	if key == "" && len(words) > 0 {
