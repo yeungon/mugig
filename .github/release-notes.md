@@ -13,10 +13,19 @@
 Mugig isn't signed with a paid Apple or Microsoft certificate, so each
 system warns about it once.
 
-- **macOS:** unzip, and move Mugig to Applications. Open it; macOS says it
-  can't verify the app. Click Done, then open **System Settings → Privacy &
-  Security**, scroll down, and click **Open Anyway** beside the message about
-  Mugig. Later, it opens like any other app.
+- **macOS:** unzip, move Mugig to Applications, and double-click it. macOS
+  says it can't verify the app: click **Done**. Then, straight away, open
+  **System Settings → Privacy & Security**, scroll to the very bottom, and
+  click **Open Anyway** next to "Mugig was blocked to protect your Mac".
+  Confirm with your password, and click **Open Anyway** once more. The button
+  only shows for a while after you try to open Mugig; if it isn't there,
+  double-click Mugig again. From then on, it opens like any other app.
+
+  Or install it from Terminal, which skips the warning:
+
+  ```sh
+  curl -fL https://github.com/yeungon/mugig/releases/latest/download/Mugig-macOS.zip -o /tmp/Mugig.zip && ditto -x -k /tmp/Mugig.zip /Applications
+  ```
 - **Windows:** unzip, and run Mugig.exe; it needs nothing else installed. If SmartScreen says "Windows
   protected your PC", click **More info**, then **Run anyway**.
 - **Linux:** unpack with `tar -xf Mugig-Linux.tar.xz`, go into the `mugig`
