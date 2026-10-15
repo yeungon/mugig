@@ -8,6 +8,7 @@ package main
 // The line under the title totals the selection.
 
 import (
+	"mugig/internal/audio"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -146,7 +147,7 @@ func (u *ui) songsMenu(ts []Track) *fyne.Menu {
 		fyne.NewMenuItem("Copy File Paths", func() {
 			paths := make([]string, len(ts))
 			for i, t := range ts {
-				paths[i] = FileOf(t.Path)
+				paths[i] = audio.FileOf(t.Path)
 			}
 			fyne.CurrentApp().Clipboard().SetContent(strings.Join(paths, "\n"))
 		}),

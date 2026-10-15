@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"mugig/internal/audio"
 	"os"
 	"path/filepath"
 	"slices"
@@ -299,7 +300,7 @@ func cuePath(image string, number int) string {
 // rememberCue records where a song from a CUE sheet is.
 func rememberCue(t Track) {
 	if t.File != "" {
-		RememberSpan(t.Path, Span{t.File, t.Start, t.End})
+		audio.RememberSpan(t.Path, audio.Span{File: t.File, Start: t.Start, End: t.End})
 	}
 }
 

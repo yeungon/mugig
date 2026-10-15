@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audio"
 	"strings"
 	"testing"
 
@@ -119,13 +120,13 @@ func TestExclusiveAccess(t *testing.T) {
 // the Now Playing page, which no longer says the sound is unconverted.
 func TestCrossfeedMenu(t *testing.T) {
 	u, fp, a := newTestUI(t)
-	if u.crossfeed != CrossfeedOff || !u.crossfeedItems[0].Checked {
+	if u.crossfeed != audio.CrossfeedOff || !u.crossfeedItems[0].Checked {
 		t.Fatal("crossfeed should be off by default")
 	}
 	setLibrary(u, fiveTracks()...)
 	u.togglePlay()
 	u.crossfeedItems[2].Action()
-	if fp.feed != CrossfeedMedium || !u.crossfeedItems[2].Checked || u.crossfeedItems[0].Checked {
+	if fp.feed != audio.CrossfeedMedium || !u.crossfeedItems[2].Checked || u.crossfeedItems[0].Checked {
 		t.Errorf("player at %v", fp.feed)
 	}
 	if got := u.npOutput.Text; got != "Playing on Speakers at 44.1 kHz, with medium crossfeed" {
@@ -133,7 +134,7 @@ func TestCrossfeedMenu(t *testing.T) {
 	}
 	fp2 := &fakePlayer{}
 	newUI(u.win, a.Preferences(), uiDeps{player: fp2, cache: u.cache})
-	if fp2.feed != CrossfeedMedium {
+	if fp2.feed != audio.CrossfeedMedium {
 		t.Error("level not remembered")
 	}
 	u.crossfeedItems[0].Action()

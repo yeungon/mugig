@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"mugig/internal/audio"
 	"mugig/internal/humanize"
 	"runtime"
 	"strings"
@@ -89,7 +90,7 @@ func (u *ui) checkSongs(songs []Track) {
 	var todo []Track
 	files := map[string]bool{}
 	for _, t := range songs {
-		if f := FileOf(t.Path); !lossyFormats[t.Format] && !files[f] {
+		if f := audio.FileOf(t.Path); !lossyFormats[t.Format] && !files[f] {
 			files[f] = true
 			todo = append(todo, t)
 		}
@@ -133,7 +134,7 @@ func (u *ui) runBatch(ctx context.Context, b *batchCheck, todo []Track, workers 
 		go func() {
 			defer wg.Done()
 			for t := range jobs {
-				if r, ok := u.checkOne(ctx, FileOf(t.Path)); ok {
+				if r, ok := u.checkOne(ctx, audio.FileOf(t.Path)); ok {
 					results <- r
 				}
 			}
@@ -188,7 +189,7 @@ func (u *ui) checkOne(ctx context.Context, path string) (r batchResult, ok bool)
 		r.level, r.reused = e.Level, true
 		return r, true
 	}
-	info, err := Probe(path)
+	info, err := audio.Probe(path)
 	if err != nil || !canVerify(info) {
 		return r, true // unreadable or not checkable: stays unknown
 	}

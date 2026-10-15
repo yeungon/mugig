@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/cmplx"
 	"math/rand/v2"
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"path/filepath"
 	"testing"
@@ -38,7 +39,7 @@ func gappy(n int, rate float64, dropShare float64) []float64 {
 			x[k] = cmplx.Rect(audiotest.Pink(float64(k)*rate/frame), rng.Float64()*2*math.Pi)
 			x[frame-k] = cmplx.Conj(x[k])
 		}
-		FFT(x) // inverse, up to scale and order, for a real signal
+		audio.FFT(x) // inverse, up to scale and order, for a real signal
 		for i := range frame {
 			out[start+i] += real(x[i]) * win[i]
 		}

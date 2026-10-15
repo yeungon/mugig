@@ -11,6 +11,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"mugig/internal/audio"
 	"strconv"
 	"strings"
 
@@ -27,24 +28,24 @@ const prefEQ = "equalizer" // the setting, as JSON
 // eqPresets are gains for the ten bands, at their usual frequencies.
 var eqPresets = []struct {
 	name  string
-	gains [EQBands]float64
+	gains [audio.EQBands]float64
 }{
-	{"Flat", [EQBands]float64{}},
-	{"Bass Boost", [EQBands]float64{6, 5, 4, 2, 0, 0, 0, 0, 0, 0}},
-	{"Bass Cut", [EQBands]float64{-6, -5, -4, -2, 0, 0, 0, 0, 0, 0}},
-	{"Treble Boost", [EQBands]float64{0, 0, 0, 0, 0, 0, 2, 4, 5, 6}},
-	{"Treble Cut", [EQBands]float64{0, 0, 0, 0, 0, 0, -2, -4, -5, -6}},
-	{"Vocal", [EQBands]float64{-2, -2, -1, 0, 2, 3, 3, 2, 0, -1}},
-	{"Loudness", [EQBands]float64{5, 4, 2, 0, -1, 0, 0, 1, 3, 4}},
+	{"Flat", [audio.EQBands]float64{}},
+	{"Bass Boost", [audio.EQBands]float64{6, 5, 4, 2, 0, 0, 0, 0, 0, 0}},
+	{"Bass Cut", [audio.EQBands]float64{-6, -5, -4, -2, 0, 0, 0, 0, 0, 0}},
+	{"Treble Boost", [audio.EQBands]float64{0, 0, 0, 0, 0, 0, 2, 4, 5, 6}},
+	{"Treble Cut", [audio.EQBands]float64{0, 0, 0, 0, 0, 0, -2, -4, -5, -6}},
+	{"Vocal", [audio.EQBands]float64{-2, -2, -1, 0, 2, 3, 3, 2, 0, -1}},
+	{"Loudness", [audio.EQBands]float64{5, 4, 2, 0, -1, 0, 0, 1, 3, 4}},
 }
 
 const eqCustom = "Custom"
 
 // loadEQ reads the saved setting and hands it to the player.
 func (u *ui) loadEQ() {
-	u.eq = EQSettings{Bands: DefaultEQBands()}
+	u.eq = audio.EQSettings{Bands: audio.DefaultEQBands()}
 	if saved := u.prefs.String(prefEQ); saved != "" {
-		var s EQSettings
+		var s audio.EQSettings
 		if json.Unmarshal([]byte(saved), &s) == nil {
 			u.eq = s
 		}
@@ -55,7 +56,7 @@ func (u *ui) loadEQ() {
 // setEQ applies a setting: to the player, the window and the Now Playing
 // page. save also writes it to the preferences, which is left until a
 // slider is let go.
-func (u *ui) setEQ(s EQSettings, save bool) {
+func (u *ui) setEQ(s audio.EQSettings, save bool) {
 	u.eq = s
 	u.player.SetEQ(s)
 	if save {
@@ -88,17 +89,17 @@ type eqView struct {
 	on       *widget.Check
 	preset   *widget.Select
 	graph    *eqGraph
-	gains    [EQBands]*widget.Slider
-	values   [EQBands]*widget.Label
-	freqs    [EQBands]*widget.Entry
-	qs       [EQBands]*widget.Entry
+	gains    [audio.EQBands]*widget.Slider
+	values   [audio.EQBands]*widget.Label
+	freqs    [audio.EQBands]*widget.Entry
+	qs       [audio.EQBands]*widget.Entry
 	headroom *widget.Label
 	showing  bool // filling in the widgets: their callbacks are ignored
 }
 
 func (u *ui) newEQView() *eqView {
 	v := &eqView{win: fyne.CurrentApp().NewWindow("Equalizer")}
-	change := func(f func(s *EQSettings), save bool) {
+	change := func(f func(s *audio.EQSettings), save bool) {
 		if v.showing {
 			return
 		}
@@ -106,7 +107,7 @@ func (u *ui) newEQView() *eqView {
 		f(&s)
 		u.setEQ(s, save)
 	}
-	v.on = widget.NewCheck("On", func(on bool) { change(func(s *EQSettings) { s.On = on }, true) })
+	v.on = widget.NewCheck("On", func(on bool) { change(func(s *audio.EQSettings) { s.On = on }, true) })
 	names := []string{}
 	for _, p := range eqPresets {
 		names = append(names, p.name)
@@ -114,8 +115,8 @@ func (u *ui) newEQView() *eqView {
 	v.preset = widget.NewSelect(names, func(name string) {
 		for _, p := range eqPresets {
 			if p.name == name {
-				change(func(s *EQSettings) {
-					s.On, s.Bands = true, DefaultEQBands()
+				change(func(s *audio.EQSettings) {
+					s.On, s.Bands = true, audio.DefaultEQBands()
 					for i, g := range p.gains {
 						s.Bands[i].Gain = g
 					}
@@ -127,33 +128,33 @@ func (u *ui) newEQView() *eqView {
 	v.graph = newEQGraph()
 	v.headroom = secondaryLabel("")
 
-	columns := make([]fyne.CanvasObject, EQBands)
-	for i := range EQBands {
+	columns := make([]fyne.CanvasObject, audio.EQBands)
+	for i := range audio.EQBands {
 		v.values[i] = widget.NewLabelWithStyle("", fyne.TextAlignCenter, fyne.TextStyle{})
 		v.values[i].SizeName = theme.SizeNameCaptionText
-		g := widget.NewSlider(-EQMaxGain, EQMaxGain)
+		g := widget.NewSlider(-audio.EQMaxGain, audio.EQMaxGain)
 		g.Step = 0.5
 		g.Orientation = widget.Vertical
 		g.OnChanged = func(gain float64) {
-			change(func(s *EQSettings) { s.On, s.Bands[i].Gain = true, gain }, false)
+			change(func(s *audio.EQSettings) { s.On, s.Bands[i].Gain = true, gain }, false)
 		}
-		g.OnChangeEnded = func(float64) { change(func(*EQSettings) {}, true) }
+		g.OnChangeEnded = func(float64) { change(func(*audio.EQSettings) {}, true) }
 		v.gains[i] = g
 		v.freqs[i] = bandEntry(func(text string) {
 			if f, ok := parseFreq(text); ok {
-				change(func(s *EQSettings) { s.Bands[i].Freq = f }, true)
+				change(func(s *audio.EQSettings) { s.Bands[i].Freq = f }, true)
 			}
 		})
 		v.qs[i] = bandEntry(func(text string) {
 			if q, err := strconv.ParseFloat(strings.TrimSpace(text), 64); err == nil && q >= 0.1 && q <= 10 {
-				change(func(s *EQSettings) { s.Bands[i].Q = q }, true)
+				change(func(s *audio.EQSettings) { s.Bands[i].Q = q }, true)
 			}
 		})
 		kind := "Peak"
 		switch i {
 		case 0:
 			kind = "Low shelf"
-		case EQBands - 1:
+		case audio.EQBands - 1:
 			kind = "High shelf"
 		}
 		tall := canvas.NewRectangle(color.Transparent)
@@ -173,14 +174,14 @@ func (u *ui) newEQView() *eqView {
 	v.win.SetContent(container.NewPadded(container.NewBorder(
 		container.NewVBox(top, v.graph),
 		container.NewVBox(help, v.headroom), nil, nil,
-		container.NewGridWithColumns(EQBands, columns...),
+		container.NewGridWithColumns(audio.EQBands, columns...),
 	)))
 	v.win.Resize(fyne.NewSize(780, 600))
 	return v
 }
 
 // show fills in the widgets from a setting.
-func (v *eqView) show(s EQSettings) {
+func (v *eqView) show(s audio.EQSettings) {
 	v.showing = true
 	defer func() { v.showing = false }()
 	v.on.SetChecked(s.On)
@@ -188,7 +189,7 @@ func (v *eqView) show(s EQSettings) {
 	for _, p := range eqPresets {
 		match := true
 		for i, b := range s.Bands {
-			d := DefaultEQBands()[i]
+			d := audio.DefaultEQBands()[i]
 			match = match && b.Gain == p.gains[i] && b.Freq == d.Freq && b.Q == d.Q
 		}
 		if match {
@@ -211,7 +212,7 @@ func (v *eqView) show(s EQSettings) {
 		}
 	}
 	v.graph.show(s)
-	f := NewEQFilters(s, 48000)
+	f := audio.NewEQFilters(s, 48000)
 	switch {
 	case !s.On:
 		v.headroom.SetText("Off: the sound passes through untouched.")
@@ -272,7 +273,7 @@ func parseFreq(text string) (float64, bool) {
 // eqGraph draws the equalizer's response from 20 Hz to 20 kHz, ±12 dB.
 type eqGraph struct {
 	widget.BaseWidget
-	setting EQSettings
+	setting audio.EQSettings
 }
 
 func newEQGraph() *eqGraph {
@@ -281,7 +282,7 @@ func newEQGraph() *eqGraph {
 	return g
 }
 
-func (g *eqGraph) show(s EQSettings) {
+func (g *eqGraph) show(s audio.EQSettings) {
 	g.setting = s
 	g.Refresh()
 }
@@ -315,7 +316,7 @@ type eqGraphRenderer struct {
 	dbLabels, fLabels []*canvas.Text
 	curve             *canvas.Raster
 	size              fyne.Size
-	filters           *EQFilters // nil when flat or off
+	filters           *audio.EQFilters // nil when flat or off
 	line              color.Color
 }
 
@@ -328,7 +329,7 @@ func (r *eqGraphRenderer) x(f float64) float32 {
 
 func (r *eqGraphRenderer) y(db float64) float32 {
 	pad := float32(8)
-	return pad + float32((EQMaxGain-db)/(2*EQMaxGain))*(r.size.Height-2*pad)
+	return pad + float32((audio.EQMaxGain-db)/(2*audio.EQMaxGain))*(r.size.Height-2*pad)
 }
 
 func (r *eqGraphRenderer) Layout(size fyne.Size) {
@@ -361,7 +362,7 @@ func (r *eqGraphRenderer) drawCurve(w, h int) image.Image {
 		freq := 20 * math.Pow(1000, px/float64(w))
 		db := 0.0
 		if r.filters != nil {
-			db = min(max(r.filters.ResponseDB(freq), -EQMaxGain-1), EQMaxGain+1)
+			db = min(max(r.filters.ResponseDB(freq), -audio.EQMaxGain-1), audio.EQMaxGain+1)
 		}
 		return float64(r.y(db)) * scale
 	}
@@ -402,7 +403,7 @@ func (r *eqGraphRenderer) Refresh() {
 	if !r.g.setting.On {
 		r.line = th.Color(theme.ColorNameDisabled, v)
 	}
-	r.filters = DesignEQ(r.g.setting, 48000)
+	r.filters = audio.DesignEQ(r.g.setting, 48000)
 	r.curve.Refresh()
 	canvas.Refresh(r.g)
 }

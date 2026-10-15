@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ func FuzzAnalyse(f *testing.F) {
 	audiotest.FuzzSeeds(f)
 	f.Fuzz(func(t *testing.T, data []byte, ext uint8) {
 		path := audiotest.FuzzFile(t, data, ext)
-		info, err := Probe(path)
+		info, err := audio.Probe(path)
 		if err != nil || !canAnalyse(info) {
 			return
 		}

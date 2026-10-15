@@ -3,6 +3,8 @@ package main
 // The Quality column: each song's saved verdict, in the song list.
 
 import (
+	"mugig/internal/audio"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 )
@@ -14,7 +16,7 @@ var lossyFormats = map[string]bool{"MP3": true, "OGG": true}
 //
 // Verdicts are kept by file, so the songs of a disc image share its one.
 func (u *ui) levelOf(t Track) qualityLevel {
-	if l, ok := u.levels[FileOf(t.Path)]; ok {
+	if l, ok := u.levels[audio.FileOf(t.Path)]; ok {
 		return l
 	}
 	if lossyFormats[t.Format] {
@@ -55,6 +57,6 @@ var levelRank = map[qualityLevel]int{
 
 // setLevel records a song's new verdict and shows it.
 func (u *ui) setLevel(path string, l qualityLevel) {
-	u.levels[FileOf(path)] = l
+	u.levels[audio.FileOf(path)] = l
 	u.table.Refresh()
 }

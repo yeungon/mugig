@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/audio"
 	"mugig/internal/humanize"
 	"strings"
 
@@ -118,7 +119,7 @@ func (u *ui) updateOutputInfo() {
 	}
 	var text string
 	switch {
-	case device == track && u.speed == 1 && u.crossfeed == CrossfeedOff && !u.eq.Active():
+	case device == track && u.speed == 1 && u.crossfeed == audio.CrossfeedOff && !u.eq.Active():
 		text = fmt.Sprintf("Playing on %s at %s, unconverted", name, humanize.KHz(float64(track)))
 	case device == track:
 		text = fmt.Sprintf("Playing on %s at %s", name, humanize.KHz(float64(track)))
@@ -132,8 +133,8 @@ func (u *ui) updateOutputInfo() {
 	if u.eq.Active() {
 		text += ", with the equalizer"
 	}
-	if u.crossfeed != CrossfeedOff {
-		text += fmt.Sprintf(", with %s crossfeed", strings.ToLower(CrossfeedNames[u.crossfeed]))
+	if u.crossfeed != audio.CrossfeedOff {
+		text += fmt.Sprintf(", with %s crossfeed", strings.ToLower(audio.CrossfeedNames[u.crossfeed]))
 	}
 	switch {
 	case u.player.Exclusive():
@@ -149,21 +150,21 @@ func (u *ui) updateOutputInfo() {
 // last chosen.
 func (u *ui) buildCrossfeedMenu() *fyne.MenuItem {
 	u.crossfeedItems = nil
-	for i, name := range CrossfeedNames {
-		u.crossfeedItems = append(u.crossfeedItems, fyne.NewMenuItem(name, func() { u.setCrossfeed(CrossfeedLevel(i)) }))
+	for i, name := range audio.CrossfeedNames {
+		u.crossfeedItems = append(u.crossfeedItems, fyne.NewMenuItem(name, func() { u.setCrossfeed(audio.CrossfeedLevel(i)) }))
 	}
 	sub := fyne.NewMenuItem("Crossfeed (for Headphones)", nil)
 	sub.ChildMenu = fyne.NewMenu("", u.crossfeedItems...)
-	u.crossfeed = CrossfeedLevel(u.prefs.Int(prefCrossfeed))
-	if u.crossfeed < CrossfeedOff || u.crossfeed > CrossfeedStrong {
-		u.crossfeed = CrossfeedOff
+	u.crossfeed = audio.CrossfeedLevel(u.prefs.Int(prefCrossfeed))
+	if u.crossfeed < audio.CrossfeedOff || u.crossfeed > audio.CrossfeedStrong {
+		u.crossfeed = audio.CrossfeedOff
 	}
 	u.showCrossfeed()
 	return sub
 }
 
 // setCrossfeed changes the crossfeed level and remembers it.
-func (u *ui) setCrossfeed(level CrossfeedLevel) {
+func (u *ui) setCrossfeed(level audio.CrossfeedLevel) {
 	u.crossfeed = level
 	u.prefs.SetInt(prefCrossfeed, int(level))
 	u.showCrossfeed()
@@ -174,7 +175,7 @@ func (u *ui) setCrossfeed(level CrossfeedLevel) {
 func (u *ui) showCrossfeed() {
 	u.player.SetCrossfeed(u.crossfeed)
 	for i, it := range u.crossfeedItems {
-		it.Checked = CrossfeedLevel(i) == u.crossfeed
+		it.Checked = audio.CrossfeedLevel(i) == u.crossfeed
 	}
 	if u.mainMenu != nil {
 		u.mainMenu.Refresh()

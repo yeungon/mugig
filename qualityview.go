@@ -12,6 +12,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"mugig/internal/audio"
 	"os"
 	"path/filepath"
 	"slices"
@@ -46,7 +47,7 @@ const (
 // trackQuality is what is known about the playing track's quality.
 type trackQuality struct {
 	path   string // "" while the headers are being read, or nothing plays
-	info   Info
+	info   audio.Info
 	err    error          // the headers couldn't be read
 	rep    *qualityReport // nil until checked
 	state  checkState
@@ -67,8 +68,8 @@ func (u *ui) loadQuality(t Track) {
 	ctx, cancel := context.WithCancel(context.Background())
 	u.quality.cancel = cancel
 	u.async(func() {
-		file := FileOf(t.Path)
-		info, err := Probe(file)
+		file := audio.FileOf(t.Path)
+		info, err := audio.Probe(file)
 		var rep qualityReport
 		saved := err == nil && canAnalyse(info) && u.qualityStore.get(file, fileStamp(file), &rep)
 		onUI(func() {
@@ -106,7 +107,7 @@ func (u *ui) checkAudioQuality() {
 
 // qualityText sums up what is known about a file's quality, adding a line
 // for a check that is running or could be run.
-func qualityText(info Info, err error, rep *qualityReport, state checkState, offerCheck bool) assessment {
+func qualityText(info audio.Info, err error, rep *qualityReport, state checkState, offerCheck bool) assessment {
 	if err != nil {
 		return assessment{checks: []check{{checkInfo, "Can't read the audio format: " + err.Error()}}}
 	}
@@ -566,7 +567,7 @@ func (u *ui) trackMenu(t Track) *fyne.Menu {
 		fyne.NewMenuItem("Check Audio Quality…", func() { u.checkTrack(t) }),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem(revealLabel, func() { u.revealTrack(t) }),
-		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(FileOf(t.Path)) }),
+		fyne.NewMenuItem("Copy File Path", func() { fyne.CurrentApp().Clipboard().SetContent(audio.FileOf(t.Path)) }),
 		fyne.NewMenuItemSeparator(),
 		u.trashItem([]Track{t}),
 	)...)
@@ -614,8 +615,8 @@ func (u *ui) checkTrack(t Track) (*qualityPanel, *spectrogramView, dialog.Dialog
 				}
 			})
 		}
-		file := FileOf(t.Path) // a song from a CUE sheet: its whole disc image
-		info, err := Probe(file)
+		file := audio.FileOf(t.Path) // a song from a CUE sheet: its whole disc image
+		info, err := audio.Probe(file)
 		if err != nil || !canAnalyse(info) {
 			post(func() {
 				p.show(qualityText(info, err, nil, notChecked, false))

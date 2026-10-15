@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audio"
 	"testing"
 	"time"
 )
@@ -59,7 +60,7 @@ func TestPrepareNextNearTheEnd(t *testing.T) {
 	if fp.next != "" {
 		t.Errorf("readied %q three minutes early", fp.next)
 	}
-	fp.pos = 3*time.Minute - GaplessLead + time.Second
+	fp.pos = 3*time.Minute - audio.GaplessLead + time.Second
 	u.prepareNext()
 	if titleOf(fp.next) != "Help" {
 		t.Errorf("readied %q", fp.next)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audio"
 	"os"
 	"path/filepath"
 	"slices"
@@ -51,8 +52,8 @@ func TestScanMeasuresCachedSongs(t *testing.T) {
 	if !r.cached || r.track.Title != "Cached Title" {
 		t.Errorf("tags should come from the cache: %+v", r.track)
 	}
-	if r.track.Length != FileLength(path) || r.track.Length == 0 {
-		t.Errorf("length %v, want %v", r.track.Length, FileLength(path))
+	if r.track.Length != audio.FileLength(path) || r.track.Length == 0 {
+		t.Errorf("length %v, want %v", r.track.Length, audio.FileLength(path))
 	}
 	if got := readTrack(path).Length; got != r.track.Length {
 		t.Errorf("readTrack length %v, want %v", got, r.track.Length)

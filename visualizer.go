@@ -10,6 +10,7 @@ import (
 	"image/color"
 	"math"
 	"math/cmplx"
+	"mugig/internal/audio"
 	"time"
 
 	"fyne.io/fyne/v2/canvas"
@@ -245,7 +246,7 @@ func (a *analyzer) bands(samples, out []float64) {
 	for i, s := range samples {
 		a.buf[i] = complex(s*a.window[i], 0)
 	}
-	FFT(a.buf)
+	audio.FFT(a.buf)
 	for b := range out {
 		peak := 0.0
 		for k := a.edges[b]; k < a.edges[b+1] && k < fftSize/2; k++ {

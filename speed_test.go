@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audio"
 	"strings"
 	"testing"
 
@@ -72,7 +73,7 @@ func TestSpeedButtonOpensChoices(t *testing.T) {
 			}
 		})
 	}
-	if menu == nil || len(menu.Items) != len(Speeds) {
+	if menu == nil || len(menu.Items) != len(audio.Speeds) {
 		t.Fatalf("menu %v", menu)
 	}
 }

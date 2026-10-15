@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
@@ -139,12 +140,12 @@ func TestScanCueSongs(t *testing.T) {
 		if want := 2*time.Second - (time.Second + 10*time.Second/75); s.Length != want {
 			t.Errorf("%s: length %v, want %v", when, s.Length, want)
 		}
-		if FileOf(s.Path) != filepath.Join(dir, "Album.wav") || !FromCue(s.Path) {
-			t.Errorf("%s: its file is %q", when, FileOf(s.Path))
+		if audio.FileOf(s.Path) != filepath.Join(dir, "Album.wav") || !audio.FromCue(s.Path) {
+			t.Errorf("%s: its file is %q", when, audio.FileOf(s.Path))
 		}
 	}
 	check("first scan")
-	ForgetSpans() // as at the next start
+	audio.ForgetSpans() // as at the next start
 	u.scanLibrary()
 	check("from the cache")
 }
@@ -161,7 +162,7 @@ func TestCueSongsPlayTheImageExactly(t *testing.T) {
 	var got []float64
 	buf := make([][2]float64, 3000)
 	for n := 1; n <= 3; n++ {
-		s, _, err := Decode(cuePath(image, n))
+		s, _, err := audio.Decode(cuePath(image, n))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -189,7 +190,7 @@ func TestCueSongsPlayTheImageExactly(t *testing.T) {
 	}
 
 	// Seeking is within the song.
-	b, _, err := Decode(cuePath(image, 2))
+	b, _, err := audio.Decode(cuePath(image, 2))
 	if err != nil {
 		t.Fatal(err)
 	}

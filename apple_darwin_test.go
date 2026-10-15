@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"math"
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
@@ -18,7 +19,7 @@ func TestAppleDecoderIsBitExact(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "x.flac")
 		s := audiotest.Noise(3*44100, 44100, audiotest.Pink)
 		audiotest.WriteFLAC(t, path, 44100, bits, audiotest.Quantize(s, bits), audiotest.Quantize(s, bits))
-		info, _ := Probe(path)
+		info, _ := audio.Probe(path)
 		lv := newLevels(44100, 2)
 		rep, spec, err := verifyWithApple(context.Background(), path, info, func(int64) {}, lv)
 		if err != nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
@@ -31,11 +32,11 @@ func opusFile(t *testing.T) string {
 // the Vorbis decoder crashed the app.
 func TestOpusRefusedNotCrashing(t *testing.T) {
 	path := opusFile(t)
-	_, _, err := Decode(path)
+	_, _, err := audio.Decode(path)
 	if err == nil || !strings.Contains(err.Error(), "Ogg Opus") {
 		t.Errorf("got %v", err)
 	}
-	info, err := Probe(path)
+	info, err := audio.Probe(path)
 	if err != nil || info.Codec != "Ogg Opus" || canAnalyse(info) {
 		t.Errorf("probe %+v %v", info, err)
 	}
@@ -64,7 +65,7 @@ func TestEmptyAndMacOSXFilesSkipped(t *testing.T) {
 // rests on the checksum: matching means intact; without one, the doubt is
 // stated rather than a verdict of damage.
 func TestSecondOpinionWording(t *testing.T) {
-	info := Info{Codec: "FLAC", Lossless: true, Kind: FLAC, Bits: 16, SampleRate: 44100}
+	info := audio.Info{Codec: "FLAC", Lossless: true, Kind: audio.FLAC, Bits: 16, SampleRate: 44100}
 	base := qualityReport{ReadBy: "macOS", OwnStop: "CRC-16 checksum mismatch", OwnStopAt: 118e9, Spectrum: spectrumResult{Analysed: true}}
 
 	ok := base

@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/audio"
 	"mugig/internal/humanize"
 	"os"
 	"path/filepath"
@@ -21,7 +22,7 @@ import (
 // revealTrack shows t's file in the file manager, or says it can't be
 // found, as when its disk is unplugged.
 func (u *ui) revealTrack(t Track) {
-	file := FileOf(t.Path) // a song from a CUE sheet: its disc image
+	file := audio.FileOf(t.Path) // a song from a CUE sheet: its disc image
 	if _, err := os.Stat(file); err != nil {
 		u.missingFile(t)
 		return
@@ -35,7 +36,7 @@ func (u *ui) revealTrack(t Track) {
 
 func (u *ui) missingFile(t Track) {
 	dialog.ShowInformation("File Not Found",
-		fmt.Sprintf("Can't find %s.\nIf it's on a removable disk, connect it and try again.", filepath.Base(FileOf(t.Path))), u.win)
+		fmt.Sprintf("Can't find %s.\nIf it's on a removable disk, connect it and try again.", filepath.Base(audio.FileOf(t.Path))), u.win)
 }
 
 // showInfo shows t's file details. The format is read from the file, which
@@ -44,7 +45,7 @@ func (u *ui) missingFile(t Track) {
 // For a song from a CUE sheet, the file is its disc image, and the dialog
 // says where in it the song is.
 func (u *ui) showInfo(t Track) dialog.Dialog {
-	file := FileOf(t.Path)
+	file := audio.FileOf(t.Path)
 	st, err := os.Stat(file)
 	if err != nil {
 		u.missingFile(t)
@@ -78,7 +79,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 		widget.NewFormItem("Year", value(year)),
 		widget.NewFormItem("Quality", value(quality)),
 	)
-	cue := FromCue(t.Path)
+	cue := audio.FromCue(t.Path)
 	if cue {
 		at := fmt.Sprintf("A disc image, with a CUE sheet: this song runs from %s to %s", humanize.Clock(t.Start), humanize.Clock(t.Start+t.Length))
 		form.Items = slices.Insert(form.Items, 2, widget.NewFormItem("Part", value(at)))
@@ -90,7 +91,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 	d.Show()
 
 	u.async(func() {
-		info, err := Probe(file)
+		info, err := audio.Probe(file)
 		onUI(func() {
 			if err != nil {
 				format.SetText("Can't read the format: " + err.Error())

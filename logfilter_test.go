@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
@@ -29,7 +30,7 @@ func TestQuietLogWhileDecoding(t *testing.T) {
 	const rate = 176400
 	path := filepath.Join(t.TempDir(), "x.flac")
 	audiotest.WriteFLAC(t, path, rate, 24, audiotest.Quantize(audiotest.Noise(rate, rate, audiotest.Pink), 24))
-	info, err := Probe(path)
+	info, err := audio.Probe(path)
 	if err != nil {
 		t.Fatal(err)
 	}

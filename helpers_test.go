@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"math"
+	"mugig/internal/audio"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,8 +23,8 @@ type fakePlayer struct {
 	level  float64
 	speed  float64
 	fade   bool
-	feed   CrossfeedLevel
-	eq     EQSettings
+	feed   audio.CrossfeedLevel
+	eq     audio.EQSettings
 	bad    map[string]bool // paths that fail to play
 	next   string          // the path readied to follow, by Prepare
 
@@ -44,16 +45,16 @@ func (f *fakePlayer) Play(path string, onEnd func(error)) error {
 
 func (f *fakePlayer) Prepare(path string) { f.next = path }
 
-func (f *fakePlayer) TogglePause() bool             { f.paused = !f.paused; return f.paused }
-func (f *fakePlayer) Stop()                         { f.onEnd, f.next = nil, "" }
-func (f *fakePlayer) Position() time.Duration       { return f.pos }
-func (f *fakePlayer) Duration() time.Duration       { return 3 * time.Minute }
-func (f *fakePlayer) Seek(d time.Duration) error    { f.pos = d; return nil }
-func (f *fakePlayer) SetVolume(level float64)       { f.level = level }
-func (f *fakePlayer) SetFadeIn(on bool)             { f.fade = on }
-func (f *fakePlayer) SetSpeed(speed float64)        { f.speed = speed }
-func (f *fakePlayer) SetCrossfeed(l CrossfeedLevel) { f.feed = l }
-func (f *fakePlayer) SetEQ(s EQSettings)            { f.eq = s }
+func (f *fakePlayer) TogglePause() bool                   { f.paused = !f.paused; return f.paused }
+func (f *fakePlayer) Stop()                               { f.onEnd, f.next = nil, "" }
+func (f *fakePlayer) Position() time.Duration             { return f.pos }
+func (f *fakePlayer) Duration() time.Duration             { return 3 * time.Minute }
+func (f *fakePlayer) Seek(d time.Duration) error          { f.pos = d; return nil }
+func (f *fakePlayer) SetVolume(level float64)             { f.level = level }
+func (f *fakePlayer) SetFadeIn(on bool)                   { f.fade = on }
+func (f *fakePlayer) SetSpeed(speed float64)              { f.speed = speed }
+func (f *fakePlayer) SetCrossfeed(l audio.CrossfeedLevel) { f.feed = l }
+func (f *fakePlayer) SetEQ(s audio.EQSettings)            { f.eq = s }
 
 // testRate is the sample rate of the fake player's audio.
 const testRate = 44100
@@ -76,8 +77,8 @@ func (f *fakePlayer) Output() (int, int) {
 	return testRate, testRate
 }
 
-func (f *fakePlayer) Devices() []Device {
-	return []Device{{ID: "aa", Name: "Speakers", IsDefault: true}, {ID: "bb", Name: "USB DAC"}}
+func (f *fakePlayer) Devices() []audio.Device {
+	return []audio.Device{{ID: "aa", Name: "Speakers", IsDefault: true}, {ID: "bb", Name: "USB DAC"}}
 }
 func (f *fakePlayer) SetDevice(id string)  { f.device = id }
 func (f *fakePlayer) SetMatchRate(on bool) { f.matchRate = on }

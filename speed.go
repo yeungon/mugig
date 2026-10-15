@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/audio"
 	"slices"
 
 	"fyne.io/fyne/v2"
@@ -22,7 +23,7 @@ func speedLabel(s float64) string { return fmt.Sprintf("%g×", s) }
 func (u *ui) buildSpeedMenu(item func(string, fyne.KeyName, fyne.KeyModifier, func()) *fyne.MenuItem) []*fyne.MenuItem {
 	cmd := fyne.KeyModifierShortcutDefault
 	u.speedItems = nil
-	for _, s := range Speeds {
+	for _, s := range audio.Speeds {
 		label := speedLabel(s)
 		if s == 1 {
 			label += " (Normal)"
@@ -42,7 +43,7 @@ func (u *ui) buildSpeedMenu(item func(string, fyne.KeyName, fyne.KeyModifier, fu
 // speed last chosen.
 func (u *ui) buildSpeedButton() *widget.Button {
 	u.speedBtn = widget.NewButton("", u.showSpeedChoices)
-	u.speed = nearest(Speeds, u.prefs.FloatWithFallback(prefSpeed, 1))
+	u.speed = nearest(audio.Speeds, u.prefs.FloatWithFallback(prefSpeed, 1))
 	u.showSpeed()
 	return u.speedBtn
 }
@@ -71,9 +72,9 @@ func (u *ui) setSpeed(s float64) {
 
 // stepSpeed moves to the next speed up (by 1) or down (by -1).
 func (u *ui) stepSpeed(by int) {
-	i := slices.Index(Speeds, u.speed) + by
-	if i >= 0 && i < len(Speeds) {
-		u.setSpeed(Speeds[i])
+	i := slices.Index(audio.Speeds, u.speed) + by
+	if i >= 0 && i < len(audio.Speeds) {
+		u.setSpeed(audio.Speeds[i])
 	}
 }
 
@@ -88,7 +89,7 @@ func (u *ui) showSpeed() {
 	}
 	u.speedBtn.Refresh()
 	for i, it := range u.speedItems {
-		it.Checked = Speeds[i] == u.speed
+		it.Checked = audio.Speeds[i] == u.speed
 	}
 	if u.mainMenu != nil {
 		u.mainMenu.Refresh()

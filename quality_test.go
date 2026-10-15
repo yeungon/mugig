@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"math"
+	"mugig/internal/audio"
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
@@ -16,9 +17,9 @@ import (
 )
 
 // checkFile probes and verifies path.
-func checkFile(t *testing.T, path string) (Info, qualityReport) {
+func checkFile(t *testing.T, path string) (audio.Info, qualityReport) {
 	t.Helper()
-	info, err := Probe(path)
+	info, err := audio.Probe(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,14 +41,14 @@ func TestMisnamedFile(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "song.flac")
 	os.WriteFile(path, data, 0o644)
-	info, err := Probe(path)
+	info, err := audio.Probe(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if info.Codec != "MP3" || info.Lossless || info.Mismatch != ".flac" {
 		t.Errorf("got %+v", info)
 	}
-	s, _, err := Decode(path)
+	s, _, err := audio.Decode(path)
 	if err != nil {
 		t.Fatalf("misnamed file doesn't play: %v", err)
 	}
@@ -211,7 +212,7 @@ func TestDamageDetected(t *testing.T) {
 func TestVerifyStopsWhenCancelled(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "x.flac")
 	audiotest.WriteFLAC(t, path, 44100, 16, audiotest.Quantize(audiotest.Noise(44100, 44100, audiotest.Pink), 16))
-	info, _ := Probe(path)
+	info, _ := audio.Probe(path)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := verify(ctx, path, info); err != context.Canceled {
