@@ -10,17 +10,17 @@ import (
 // Songs from CUE sheets are known by their path everywhere, but playing
 // one, or anything else that reads it, needs its image and where in it
 // the song is. The scan records them here.
-var cueSpans sync.Map // song path → cueSpan
+var cueSpans sync.Map // song path → Span
 
 type Span struct {
 	File       string
 	Start, End time.Duration // end 0 for the end of the file
 }
 
-// rememberSpan records that the song at path is a stretch of an image.
+// RememberSpan records that the song at path is a stretch of an image.
 func RememberSpan(path string, s Span) { cueSpans.Store(path, s) }
 
-// forgetSpans forgets every song recorded, as if starting afresh.
+// ForgetSpans forgets every song recorded, as if starting afresh.
 func ForgetSpans() { cueSpans.Clear() }
 
 // spanOf returns where the song at path is: its image and the stretch of
@@ -32,10 +32,10 @@ func spanOf(path string) Span {
 	return Span{File: path}
 }
 
-// fileOf is the file a song is in: its image, for a song from a CUE sheet.
+// FileOf is the file a song is in: its image, for a song from a CUE sheet.
 func FileOf(path string) string { return spanOf(path).File }
 
-// fromCue reports whether the song at path is part of an image.
+// FromCue reports whether the song at path is part of an image.
 func FromCue(path string) bool { return spanOf(path).File != path }
 
 // segment plays a stretch of s, as if it were all there is.

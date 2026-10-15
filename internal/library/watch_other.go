@@ -10,7 +10,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// watchFolder reports changes under root using fsnotify, which watches one
+// WatchFolder reports changes under root using fsnotify, which watches one
 // folder at a time, so every folder in the tree is added, including new
 // ones as they appear. changed is called on another goroutine.
 func WatchFolder(root string, changed func(paths []string)) (stop func(), err error) {

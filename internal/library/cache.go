@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// libraryCache remembers each file's tags along with its size and
+// Cache remembers each file's tags along with its size and
 // modification time, so a rescan only opens files that have changed.
 //
 // It is read concurrently by the scan workers, and updated both after a
@@ -29,7 +29,7 @@ type CacheEntry struct {
 	Images map[string][2]int64
 }
 
-// cacheVersion is bumped whenever Track or cacheEntry change shape, so old
+// cacheVersion is bumped whenever Track or CacheEntry change shape, so old
 // caches are ignored instead of misread.
 const cacheVersion = 1
 
@@ -38,7 +38,7 @@ type cacheFile struct {
 	Entries map[string]CacheEntry
 }
 
-// loadCache reads the cache saved at path. A missing, corrupt or outdated
+// LoadCache reads the cache saved at path. A missing, corrupt or outdated
 // file just gives an empty cache.
 func LoadCache(path string) *Cache {
 	c := &Cache{path: path, entries: map[string]CacheEntry{}}
@@ -49,7 +49,7 @@ func LoadCache(path string) *Cache {
 	return c
 }
 
-// lookup returns the cached track for path if the file is unchanged.
+// Lookup returns the cached track for path if the file is unchanged.
 func (c *Cache) Lookup(path string, size, modTime int64) (Track, bool) {
 	e, ok := c.entry(path, size, modTime)
 	return e.Track, ok
@@ -66,7 +66,7 @@ func (c *Cache) entry(path string, size, modTime int64) (CacheEntry, bool) {
 	return e, true
 }
 
-// modTime is when the file at path was last changed, as the cache has it,
+// ModTime is when the file at path was last changed, as the cache has it,
 // or the zero time if it isn't cached.
 func (c *Cache) ModTime(path string) time.Time {
 	c.mu.RLock()
@@ -77,7 +77,7 @@ func (c *Cache) ModTime(path string) time.Time {
 	return time.Time{}
 }
 
-// update records a scan of root. After a complete scan, entries under root
+// Update records a scan of root. After a complete scan, entries under root
 // that it didn't see are dropped, as those files are gone; a cancelled scan
 // only adds. Entries for other folders are kept.
 func (c *Cache) Update(root string, seen map[string]CacheEntry, complete bool) {
@@ -96,7 +96,7 @@ func (c *Cache) Update(root string, seen map[string]CacheEntry, complete bool) {
 	}
 }
 
-// forget drops the entries for files that are gone.
+// Forget drops the entries for files that are gone.
 func (c *Cache) Forget(paths []string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -105,7 +105,7 @@ func (c *Cache) Forget(paths []string) {
 	}
 }
 
-// forgetUnder drops the entries for files in dir, a folder taken out of
+// ForgetUnder drops the entries for files in dir, a folder taken out of
 // the library.
 func (c *Cache) ForgetUnder(dir string) {
 	c.mu.Lock()
@@ -117,7 +117,7 @@ func (c *Cache) ForgetUnder(dir string) {
 	}
 }
 
-// save writes the cache to disk.
+// Save writes the cache to disk.
 func (c *Cache) Save() error {
 	if c.path == "" {
 		return nil

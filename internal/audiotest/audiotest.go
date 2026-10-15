@@ -20,7 +20,7 @@ import (
 	"github.com/mewkiz/flac/meta"
 )
 
-// noise synthesises n samples of random-phase noise whose amplitude at
+// Noise synthesises n samples of random-phase noise whose amplitude at
 // each frequency is gain(f), scaled so the loudest sample is 0.5. Shaping
 // it in the frequency domain gives exact cut-offs, as a lossy encoder would.
 func Noise(n int, rate float64, gain func(f float64) float64) []float64 {
@@ -48,7 +48,7 @@ func Noise(n int, rate float64, gain func(f float64) float64) []float64 {
 	return out
 }
 
-// pink is a rough model of music: level falling 3 dB per octave.
+// Pink is a rough model of music: level falling 3 dB per octave.
 func Pink(f float64) float64 {
 	if f < 20 {
 		return 0
@@ -56,7 +56,7 @@ func Pink(f float64) float64 {
 	return 1 / math.Sqrt(f)
 }
 
-// lowpass cuts gain off at hz, falling 60 dB over width Hz as an MP3
+// Lowpass cuts gain off at hz, falling 60 dB over width Hz as an MP3
 // encoder's filter does, then silent.
 func Lowpass(gain func(float64) float64, hz, width float64) func(float64) float64 {
 	return func(f float64) float64 {
@@ -70,7 +70,7 @@ func Lowpass(gain func(float64) float64, hz, width float64) func(float64) float6
 	}
 }
 
-// quantize turns s into bits-bit integers with TPDF dither, as converting
+// Quantize turns s into bits-bit integers with TPDF dither, as converting
 // to 16 bits for a CD or FLAC does.
 func Quantize(s []float64, bits int) []int32 {
 	rng := rand.New(rand.NewPCG(3, 4))
@@ -82,7 +82,7 @@ func Quantize(s []float64, bits int) []int32 {
 	return out
 }
 
-// writeFLAC encodes channels of samples, which must have equal lengths, as
+// WriteFLAC encodes channels of samples, which must have equal lengths, as
 // a FLAC file with an MD5 checksum.
 func WriteFLAC(t testing.TB, path string, rate, bits int, channels ...[]int32) {
 	t.Helper()
@@ -134,7 +134,7 @@ func WriteFLAC(t testing.TB, path string, rate, bits int, channels ...[]int32) {
 	g.Close()
 }
 
-// writeWAV writes integer PCM, each sample stored in sampleBytes bytes with
+// WriteWAV writes integer PCM, each sample stored in sampleBytes bytes with
 // the given valid bits (using the extensible header if they differ).
 func WriteWAV(t testing.TB, path string, rate, bits, sampleBytes int, channels ...[]int32) {
 	t.Helper()
@@ -234,7 +234,7 @@ func fft(x []complex128) {
 
 var FuzzExts = []string{".flac", ".wav", ".mp3", ".ogg"}
 
-// fuzzSeeds adds the sample files, whole and cut short, as starting points,
+// FuzzSeeds adds the sample files, whole and cut short, as starting points,
 // each under its own extension and under the wrong one.
 func FuzzSeeds(f *testing.F) {
 	for i, ext := range FuzzExts {
@@ -249,7 +249,7 @@ func FuzzSeeds(f *testing.F) {
 	}
 }
 
-// slowLimit is how long reading one small, corrupt file may take: longer
+// SlowLimit is how long reading one small, corrupt file may take: longer
 // would stall a scan of thousands of them.
 const SlowLimit = 2 * time.Second
 
@@ -261,7 +261,7 @@ func Timed(t testing.TB, what string, f func()) {
 	}
 }
 
-// fuzzFile writes data to a file with one of the audio extensions.
+// FuzzFile writes data to a file with one of the audio extensions.
 func FuzzFile(t testing.TB, data []byte, ext uint8) string {
 	path := filepath.Join(t.TempDir(), "x"+FuzzExts[int(ext)%len(FuzzExts)])
 	if err := os.WriteFile(path, data, 0o644); err != nil {

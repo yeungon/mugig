@@ -1,6 +1,6 @@
 package quality
 
-// levelNames are the column's words for each verdict; unchecked songs stay
+// LevelNames are the column's words for each verdict; unchecked songs stay
 // blank.
 var LevelNames = map[Level]string{
 	Lossy:    "Lossy",
@@ -10,7 +10,7 @@ var LevelNames = map[Level]string{
 	Damaged:  "Damaged",
 }
 
-// levelRank orders the column so problems sort first and unchecked songs
+// LevelRank orders the column so problems sort first and unchecked songs
 // last.
 var LevelRank = map[Level]int{
 	Damaged:  0,

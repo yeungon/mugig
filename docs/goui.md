@@ -21,7 +21,7 @@ silicon).
   reliably called before that point when quitting by ⌘Q or a signal, so a
   "closing" flag set there doesn't help. What works: note the main
   goroutine's ID at the start of `main()`, and skip the work when it runs
-  anywhere else. See `onUI` and `goroutineID` in `main.go`; all UI updates
+  anywhere else. See `onUI` and `goroutineID` in `internal/ui/ui.go`; all UI updates
   from goroutines go through `onUI`. Fyne tells goroutines apart the same
   way internally.
 - **Timers that redraw** (the visualizer, the position display) are where
@@ -186,7 +186,7 @@ silicon).
   A USB disk waking up, or a failing disk retrying a bad sector, takes
   200–500 ms. Decoding inside the callback made damaged songs stutter dozens
   of times. A goroutine now decodes up to 3 s ahead into a ring buffer
-  (`readahead.go`); the callback only copies. If it ever runs dry, play
+  (`internal/audio/readahead.go`); the callback only copies. If it ever runs dry, play
   silence rather than ending the song.
 - **beep: `Stream` returning `ok == false` ends the track**, whatever the
   reason. Check `Err()` to tell a finished song from a failed one, and say
@@ -226,7 +226,7 @@ silicon).
   multiply at a gain of exactly 1 so full volume stays bit-perfect. A
   fresh song's fader must start *at* its gain, not rise to it, unless it
   is meant to fade in: otherwise every song fades in.
-- **Speed with pitch kept**: WSOLA (`stretch.go`) — overlapping pieces of
+- **Speed with pitch kept**: WSOLA (`internal/audio/stretch.go`) — overlapping pieces of
   50–100 ms, each joined where its waveform best matches the last, found by
   a coarse then fine correlation search. Cheap (under 1% of a core at
   192 kHz). Bypass it entirely at 1×.
@@ -235,7 +235,7 @@ silicon).
   thread, which opens the next file and restarts the device: 50–200 ms of
   silence. Instead the UI names the next song 20 s before the end (asked
   again every tick, so changes to Up Next, shuffle or repeat are followed),
-  a goroutine opens it, and the streamer (`gapless.go`) moves on to it in
+  a goroutine opens it, and the streamer (`internal/audio/gapless.go`) moves on to it in
   the same buffer. Only at the same sample rate: another rate needs the
   device reopened. Then the UI's usual "song ended, play the next" call
   finds that song already playing and just claims it, so the play-order
@@ -273,7 +273,7 @@ silicon).
   MP3's length by reading every frame, far too slow for a library scan.
   Read it instead from FLAC's STREAMINFO, WAV's data size, the last Ogg
   page's granule position, or the MP3's Xing/VBRI frame count (otherwise
-  constant bitrate: audio bytes × 8 ÷ bitrate) (`length.go`). Checked
+  constant bitrate: audio bytes × 8 ÷ bitrate) (`internal/audio/length.go`). Checked
   against the decoders on 150 real songs: none was off by more than a
   second. The 4,167 songs on two USB disks took 40 s, once.
 - **Don't cache "unknown" as an answer** if it might be a passing read
@@ -288,13 +288,13 @@ silicon).
   fuzzing found it.
 - **It logs a note for every frame of a 176.4 kHz or 24 kHz file** through
   the standard logger (its tests don't cover those rates). Filter its
-  messages with a log writer (`logfilter.go`) rather than silencing the log,
+  messages with a log writer (`internal/ui/logfilter.go`) rather than silencing the log,
   which Fyne also uses.
 - **`frame.Parse` reads exactly one frame and no further**, so byte offsets
   can be tracked with a counting reader. That makes it possible to skip a
   damaged frame: search for the next sync code (0xFFF8/0xFFF9), parse, and
   accept only a frame whose CRCs pass and whose place in the stream fits
-  (`flacplay.go`). Fill the gap with silence to keep timing.
+  (`internal/audio/flacplay.go`). Fill the gap with silence to keep timing.
 - **`frame.SampleNumber()` is wrong for the last frame of a fixed-block-size
   stream**; use frame number × the stream's block size.
 - **Its `Seek` reads every frame from the start when there's no seek table,
@@ -362,11 +362,12 @@ silicon).
   frameworks in `LDFLAGS`; give other systems a `*_other.go` stub.
 - AppKit calls must run on the main queue: `dispatch_async(dispatch_get_main_queue(), …)`.
 - Callbacks into Go (`//export`) arrive on arbitrary threads; hand them to
-  the UI with `onUI`.
+  the UI with `onUI`. Code outside the UI package takes a function for
+  that (`audio.NewPlayer(onUI)`) rather than calling the UI itself.
 
 ## 11. Testing and fuzzing
 
-- **Fuzz everything that parses file bytes** (`fuzz_test.go`), with a time
+- **Fuzz everything that parses file bytes** (`fuzz_test.go` in `audio`, `library` and `quality`), with a time
   limit per input. The Go fuzzer reports 0 executions per second while it
   minimises a new input; that's not a hang. To find genuinely slow inputs,
   add a watchdog that saves any input taking over a few seconds.
@@ -380,7 +381,33 @@ silicon).
   halves of the tests before it (a compiled `-race` test binary makes this
   fast).
 
-## 12. Licences
+## 12. Organising the code
+
+- **Split by what the code does, not by pattern.** MVC and DDD fit Go and
+  Fyne poorly: a Fyne widget is view and controller at once, and a music
+  player has no business domain to model. Mugig is `ui` on top of
+  `library`, on top of `quality`, on top of `audio`, with dependencies one
+  way only, so the compiler keeps everything below the UI free of it.
+- **The consumer defines the interface.** The UI's `audioPlayer` interface
+  lives in `ui`, and `audio.Player` just has the methods; tests give the UI
+  a fake player.
+- **Shared test helpers go in a normal package** (`internal/audiotest`),
+  since `_test.go` files can't be imported. It must not import the
+  packages it helps test, or their tests would make an import cycle, so it
+  keeps its own small FFT. It finds `testdata` through `runtime.Caller`, so
+  every package's tests can use the same sample files.
+- **Moving a large package**: first split mixed files inside the package,
+  rename to the exported names while it is still one package (a type-aware
+  rename, so fields and methods are right), then move the files and prefix
+  the uses. Check every build tag: a rename tool that only loads the
+  current system misses `*_other.go`. In cgo files, the type checker's
+  byte offsets are in the generated file; use the line and column it
+  reports, which point at the original, and check the text is there before
+  changing it.
+- **gob doesn't record type names**, only field names, so renaming types
+  keeps saved data readable; renaming fields would not.
+
+## 13. Licences
 
 - Don't copy GPL code (e.g. Spek) into the project; learn from it and write
   your own. Credit ideas taken from permissively licensed projects

@@ -15,7 +15,7 @@ var coverNames = map[string]bool{
 	"cover": true, "folder": true, "front": true, "album": true, "albumart": true,
 }
 
-// coverArt finds a picture for the track at path: one embedded in its tags,
+// CoverArt finds a picture for the track at path: one embedded in its tags,
 // or else a cover image in its folder. It returns nil if there is none.
 func CoverArt(path string) []byte {
 	path = audio.FileOf(path) // a song from a CUE sheet: its disc image

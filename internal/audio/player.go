@@ -20,7 +20,7 @@ import (
 	mewflac "github.com/mewkiz/flac"
 )
 
-// player plays one track at a time through out, the next one joined on
+// Player plays one track at a time through out, the next one joined on
 // without a gap if it is readied in time. Its fields are only touched on
 // the UI thread, except what the audio thread reads through out's lock.
 type Player struct {
@@ -52,7 +52,7 @@ type Player struct {
 	hogged    uint32             // the device Mugig has to itself, 0 for none
 }
 
-// newPlayer makes a player whose callbacks, such as a song's end, are run
+// NewPlayer makes a player whose callbacks, such as a song's end, are run
 // by onMain on the UI thread.
 func NewPlayer(onMain func(func())) *Player {
 	return &Player{onMain: onMain, level: 1, speed: 1, matchRate: true, original: map[string]float64{}}
@@ -222,7 +222,7 @@ func (p *Player) openOutput(rate int) error {
 	return p.out.open(rate, p.device)
 }
 
-// decode opens path and returns a decoder for it, which owns the file. The
+// Decode opens path and returns a decoder for it, which owns the file. The
 // format is taken from the file's contents, so a misnamed file still plays,
 // falling back to its extension.
 //

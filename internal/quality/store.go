@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// qualityStore keeps check results on disk, so each file is checked only
+// Store keeps check results on disk, so each file is checked only
 // once. Entries are tied to the file's size and modification time, so an
 // edited file is checked afresh.
 type Store struct {
@@ -28,7 +28,7 @@ type Entry struct {
 	Level  Level // the verdict, for the song list's Quality column
 }
 
-// qualityVersion is bumped whenever qualityReport changes shape or the
+// qualityVersion is bumped whenever Report changes shape or the
 // analysis measures differently, so old results are checked again.
 const qualityVersion = 5
 
@@ -37,7 +37,7 @@ type qualityFile struct {
 	Entries map[string]Entry
 }
 
-// loadQualityStore reads the results saved at path. A missing, corrupt or
+// LoadStore reads the results saved at path. A missing, corrupt or
 // outdated file just gives an empty store.
 func LoadStore(path string) *Store {
 	s := &Store{path: path, entries: map[string]Entry{}, pictures: map[string][]byte{}}
@@ -49,7 +49,7 @@ func LoadStore(path string) *Store {
 	return s
 }
 
-// lookup returns the saved entry for path, if the file is unchanged.
+// Lookup returns the saved entry for path, if the file is unchanged.
 func (s *Store) Lookup(path, stamp string) (Entry, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -57,7 +57,7 @@ func (s *Store) Lookup(path, stamp string) (Entry, bool) {
 	return e, ok && e.Stamp == stamp && stamp != ""
 }
 
-// get fills rep with the saved result for path, if the file is unchanged.
+// Get fills rep with the saved result for path, if the file is unchanged.
 func (s *Store) Get(path, stamp string, rep *Report) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -69,14 +69,14 @@ func (s *Store) Get(path, stamp string, rep *Report) bool {
 	return true
 }
 
-// put records a result and saves the store. Saving errors are ignored: the
+// Put records a result and saves the store. Saving errors are ignored: the
 // result is still remembered for this session.
 func (s *Store) Put(path, stamp string, rep Report, level Level) {
 	s.PutQuietly(path, stamp, rep, level)
 	s.Save()
 }
 
-// putQuietly records a result without saving, for checking many files at
+// PutQuietly records a result without saving, for checking many files at
 // once: saving after each would rewrite the whole store thousands of
 // times. Call save now and then, and at the end.
 func (s *Store) PutQuietly(path, stamp string, rep Report, level Level) {
@@ -93,7 +93,7 @@ func (s *Store) Save() {
 	}
 }
 
-// forget drops the result for a file that has changed or gone.
+// Forget drops the result for a file that has changed or gone.
 func (s *Store) Forget(paths []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -102,7 +102,7 @@ func (s *Store) Forget(paths []string) {
 	}
 }
 
-// levels returns every saved verdict, by path. Whether each file is still
+// Levels returns every saved verdict, by path. Whether each file is still
 // unchanged isn't checked here: that would mean reading thousands of files
 // at startup. The watcher drops results for files that change.
 func (s *Store) Levels() map[string]Level {
@@ -139,7 +139,7 @@ func (s *Store) dropOldPictures() {
 	}
 }
 
-// putPicture saves the spectrogram for path. Saving errors are ignored, as
+// PutPicture saves the spectrogram for path. Saving errors are ignored, as
 // for put.
 func (s *Store) PutPicture(path string, img *image.Gray) {
 	if img == nil {
@@ -161,7 +161,7 @@ func (s *Store) PutPicture(path string, img *image.Gray) {
 	}
 }
 
-// picture returns the saved spectrogram for path.
+// Picture returns the saved spectrogram for path.
 func (s *Store) Picture(path string) (*image.Gray, bool) {
 	s.mu.Lock()
 	data, ok := s.pictures[path]

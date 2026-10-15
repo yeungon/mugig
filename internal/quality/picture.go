@@ -11,13 +11,13 @@ const (
 	SpecRows     = 256 // frequency rows, from 0 Hz to half the sample rate
 	PictureWidth = 720 // time columns
 
-	// A picture keeps each point's level, from 0 dBFS down to keptFloorDB,
+	// A picture keeps each point's level, from 0 dBFS down to KeptFloorDB,
 	// so it can be drawn for any range of levels without analysing again.
 	KeptFloorDB = -140
 )
 
 // picture returns the spectrogram's levels, or nil if no audio was
-// analysed. Each pixel is a level: 0 for keptFloorDB or quieter, up to 255
+// analysed. Each pixel is a level: 0 for KeptFloorDB or quieter, up to 255
 // for full scale. paint turns it into colours.
 func (s *spectrum) picture() *image.Gray {
 	n := len(s.columns)
@@ -44,7 +44,7 @@ func (s *spectrum) picture() *image.Gray {
 	return img
 }
 
-// levelDB is the level a picture's pixel value stands for.
+// LevelDB is the level a picture's pixel value stands for.
 func LevelDB(v uint8) float64 { return KeptFloorDB * (1 - float64(v)/255) }
 
 // Levels are saved losslessly, as a greyscale PNG.

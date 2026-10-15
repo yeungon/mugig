@@ -20,20 +20,20 @@ const (
 	EQMaxGain = 12 // dB, either way
 )
 
-// eqBand is one band's setting.
+// EQBand is one band's setting.
 type EQBand struct {
 	Freq float64 // Hz
 	Gain float64 // dB
 	Q    float64
 }
 
-// eqSettings is the whole equalizer's setting.
+// EQSettings is the whole equalizer's setting.
 type EQSettings struct {
 	On    bool
 	Bands [EQBands]EQBand
 }
 
-// defaultEQBands are octave bands from 31 Hz to 16 kHz, flat. Peaks an
+// DefaultEQBands are octave bands from 31 Hz to 16 kHz, flat. Peaks an
 // octave wide have a Q of 1.41; shelves are at their usual 0.71.
 func DefaultEQBands() [EQBands]EQBand {
 	var b [EQBands]EQBand
@@ -44,7 +44,7 @@ func DefaultEQBands() [EQBands]EQBand {
 	return b
 }
 
-// flat reports whether the setting changes nothing.
+// Flat reports whether the setting changes nothing.
 func (s EQSettings) Flat() bool {
 	for _, b := range s.Bands {
 		if b.Gain != 0 {
@@ -54,7 +54,7 @@ func (s EQSettings) Flat() bool {
 	return true
 }
 
-// active reports whether the equalizer changes the sound.
+// Active reports whether the equalizer changes the sound.
 func (s EQSettings) Active() bool { return s.On && !s.Flat() }
 
 // eqFilter is one band's filter, a biquad: its coefficients, normalized
@@ -103,7 +103,7 @@ func (f *eqFilter) response(freq, rate float64) float64 {
 	return cmplx.Abs(num / den)
 }
 
-// eqFilters are the ten filters for a setting at a rate, and the gain
+// EQFilters are the ten filters for a setting at a rate, and the gain
 // that keeps their largest boost from clipping.
 type EQFilters struct {
 	f    [EQBands]eqFilter
@@ -120,7 +120,7 @@ func NewEQFilters(s EQSettings, rate float64) *EQFilters {
 	return e
 }
 
-// responseDB is the filters' combined gain at freq, in dB, not counting
+// ResponseDB is the filters' combined gain at freq, in dB, not counting
 // the gain that stops clipping.
 func (e *EQFilters) ResponseDB(freq float64) float64 {
 	g := 1.0
@@ -130,7 +130,7 @@ func (e *EQFilters) ResponseDB(freq float64) float64 {
 	return 20 * math.Log10(g)
 }
 
-// peak is the largest gain from 20 Hz to 20 kHz (or the top of the
+// Peak is the largest gain from 20 Hz to 20 kHz (or the top of the
 // range), in dB.
 func (e *EQFilters) Peak() float64 {
 	top := min(20000, 0.49*e.rate)
@@ -150,7 +150,7 @@ type equalizer struct {
 	filters *EQFilters // nil while it changes nothing
 }
 
-// designEQ makes the filters for a setting at rate, or nil if it changes
+// DesignEQ makes the filters for a setting at rate, or nil if it changes
 // nothing.
 func DesignEQ(s EQSettings, rate int) *EQFilters {
 	if !s.Active() || rate <= 0 {
@@ -162,7 +162,7 @@ func DesignEQ(s EQSettings, rate int) *EQFilters {
 // set applies a setting at the sample rate of the audio.
 func (e *equalizer) set(s EQSettings, rate int) { e.use(s, DesignEQ(s, rate)) }
 
-// use applies a setting, with its filters from designEQ. They take over
+// use applies a setting, with its filters from DesignEQ. They take over
 // the old filters' state, so moving a band while music plays doesn't
 // click.
 func (e *equalizer) use(s EQSettings, f *EQFilters) {

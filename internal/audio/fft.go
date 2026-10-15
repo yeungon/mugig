@@ -5,7 +5,7 @@ import (
 	"math/cmplx"
 )
 
-// fft replaces x with its discrete Fourier transform. len(x) must be a power
+// FFT replaces x with its discrete Fourier transform. len(x) must be a power
 // of two.
 func FFT(x []complex128) {
 	n := len(x)

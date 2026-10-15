@@ -9,5 +9,5 @@ import "runtime"
 // parallelWorkers is for solid-state drives.
 func parallelWorkers() int { return max(4, runtime.NumCPU()) }
 
-// gentleWorkers is for spinning disks, and drives that may be one.
+// GentleWorkers is for spinning disks, and drives that may be one.
 const GentleWorkers = 2

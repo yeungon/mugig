@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// fileLength opens path and returns how long its audio lasts, or 0.
+// FileLength opens path and returns how long its audio lasts, or 0.
 func FileLength(path string) time.Duration {
 	f, err := os.Open(path)
 	if err != nil {
@@ -21,7 +21,7 @@ func FileLength(path string) time.Duration {
 	return TrackLength(f)
 }
 
-// trackLength returns how long the audio in f lasts, or 0 if its headers
+// TrackLength returns how long the audio in f lasts, or 0 if its headers
 // don't say. It reads with ReadAt, so it leaves f's offset where it was.
 func TrackLength(f *os.File) time.Duration {
 	st, err := f.Stat()

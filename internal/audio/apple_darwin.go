@@ -25,7 +25,7 @@ import (
 // library rejects (see verifyFLAC), so those still play and can be checked.
 const AppleDecoding = true
 
-// appleFile is a file open in macOS's decoder.
+// AppleFile is a file open in macOS's decoder.
 type AppleFile struct {
 	h        unsafe.Pointer
 	Rate     float64
@@ -51,7 +51,7 @@ func OpenApple(path string, asFloat bool) (*AppleFile, error) {
 	return &AppleFile{h: h, Rate: float64(rate), Channels: int(channels), Bits: int(bits), Frames: int64(frames)}, nil
 }
 
-// read fills buf with interleaved samples (float32 or int32, as opened)
+// Read fills buf with interleaved samples (float32 or int32, as opened)
 // and returns the frames read, 0 at the end.
 func (f *AppleFile) Read(buf unsafe.Pointer, frames int) (int, error) {
 	n := int(C.appleRead(f.h, buf, C.int(frames), C.int(f.Channels)))

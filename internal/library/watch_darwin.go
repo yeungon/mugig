@@ -10,7 +10,7 @@ import (
 	"github.com/fsnotify/fsevents"
 )
 
-// watchFolder reports changes under root using macOS's FSEvents, which
+// WatchFolder reports changes under root using macOS's FSEvents, which
 // follows a whole folder tree as one stream. (fsnotify's kqueue backend
 // needs a file handle for every file and folder, which a big library can
 // run out of.) changed is called on another goroutine with the paths that

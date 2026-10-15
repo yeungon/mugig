@@ -15,7 +15,7 @@ import (
 	"github.com/gopxl/beep/v2"
 )
 
-// crossfeedLevel is how much of each channel reaches the other ear.
+// CrossfeedLevel is how much of each channel reaches the other ear.
 type CrossfeedLevel int
 
 const (

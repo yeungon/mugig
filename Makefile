@@ -5,7 +5,7 @@ APP  := Mugig.app
 .PHONY: run test fuzz build package icon install clean \
 	mac mac-arm64 mac-intel windows windows-arm64 linux linux-arm64 all-platforms
 
-# Builds every .go file in the package (main.go alone misses the rest).
+# The app is main.go and the packages under internal/.
 run:
 	go run .
 
@@ -16,10 +16,11 @@ test:
 	FYNE_CACHE=1h go test -race ./...
 
 # Feeds corrupt files to everything that reads them, a minute per target.
-# Crashers found are saved under testdata/fuzz and replayed by `make test`.
+# Crashers found are saved under each package's testdata/fuzz and replayed
+# by `make test`.
 fuzz:
-	for t in FuzzProbe FuzzReadTrack FuzzDecode FuzzAnalyse; do \
-		go test -run '^$$' -fuzz "^$$t$$" -fuzztime 1m . || exit 1; \
+	for t in audio:FuzzProbe audio:FuzzDecode library:FuzzReadTrack quality:FuzzAnalyse; do \
+		go test -run '^$$' -fuzz "^$${t#*:}$$" -fuzztime 1m ./internal/$${t%%:*} || exit 1; \
 	done
 
 build:

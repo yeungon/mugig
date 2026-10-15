@@ -14,10 +14,10 @@ import (
 	"time"
 )
 
-// fileKind is the kind of file, found from its first bytes.
+// Kind is the kind of file, found from its first bytes.
 type Kind int
 
-// audioInfo describes a file's audio as its headers state it.
+// Info describes a file's audio as its headers state it.
 type Info struct {
 	Codec      string // e.g. "FLAC", "WAV", "MP3", "Ogg Vorbis"
 	Lossless   bool
@@ -41,7 +41,7 @@ type Info struct {
 	SampleBytes int            // WAV: bytes per sample as stored
 }
 
-// sniff identifies a file from its first bytes, or returns unknownFile.
+// sniff identifies a file from its first bytes, or returns Unknown.
 func sniff(path string) Kind {
 	f, err := os.Open(path)
 	if err != nil {
@@ -72,7 +72,7 @@ func sniffFile(f *os.File) (Kind, int64) {
 	return Unknown, start
 }
 
-// probe reads the headers of the file at path.
+// Probe reads the headers of the file at path.
 func Probe(path string) (Info, error) {
 	f, err := os.Open(path)
 	if err != nil {

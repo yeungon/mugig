@@ -63,7 +63,7 @@ func unhogDevice(dev uint32) { C.caUnhog(C.uint(dev)) }
 func hogOwner(dev uint32) int { return int(C.caHogOwner(C.uint(dev))) }
 
 // devicesChanged is called, on a CoreAudio thread, when an output device is
-// added or removed, or the default output changes. Set by watchDevices.
+// added or removed, or the default output changes. Set by WatchDevices.
 var devicesChanged func()
 
 func WatchDevices(f func()) {

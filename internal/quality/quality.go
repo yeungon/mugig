@@ -49,10 +49,10 @@ const (
 	checksumBad
 )
 
-// qualityReport is what decoding a lossless file in full found. It holds
+// Report is what decoding a lossless file in full found. It holds
 // measurements rather than verdicts, so results saved by an older version
 // are judged by the current rules (see assess). Its fields are exported to
-// be saved (see qualityStore).
+// be saved (see Store).
 type Report struct {
 	Damaged  string        // why decoding failed partway, if it did
 	DamageAt time.Duration // where
@@ -74,7 +74,7 @@ func verify(ctx context.Context, path string, info audio.Info) (Report, error) {
 	return rep, err
 }
 
-// analyse decodes the whole file, checking lossless audio (see verify) and,
+// Analyse decodes the whole file, checking lossless audio (see verify) and,
 // if picture is set, drawing a spectrogram of any audio. progress, if not
 // nil, is called with the fraction done as decoding goes on.
 func Analyse(ctx context.Context, path string, info audio.Info, picture bool, progress func(float64)) (rep Report, img *image.Gray, err error) {
@@ -107,7 +107,7 @@ func Analyse(ctx context.Context, path string, info audio.Info, picture bool, pr
 	return rep, img, nil
 }
 
-// canAnalyse reports whether analyse can decode the file.
+// CanAnalyse reports whether analyse can decode the file.
 func CanAnalyse(info audio.Info) bool {
 	return CanVerify(info) || info.Kind == audio.MP3 || info.Codec == "Ogg Vorbis"
 }
@@ -468,7 +468,7 @@ type spectrum struct {
 	block  int // blocks seen
 	fill   int // samples in buf
 
-	// columns holds every analysed block's power in specRows frequency
+	// columns holds every analysed block's power in SpecRows frequency
 	// rows, quiet ones included, to draw the spectrogram (see picture).
 	columns [][]float32
 
@@ -651,7 +651,7 @@ func (s *spectrum) result() spectrumResult {
 // Verdict
 // ---------------------------------------------------------------------------
 
-// qualityLevel is the one-word verdict shown on the badge.
+// Level is the one-word verdict shown on the badge.
 type Level int
 
 const (
@@ -673,7 +673,7 @@ const (
 	CheckPending
 )
 
-// check is one finding, as a sentence for the Now Playing page.
+// Check is one finding, as a sentence for the Now Playing page.
 type Check struct {
 	Kind CheckKind
 	Text string
@@ -685,7 +685,7 @@ type Assessment struct {
 	Checks []Check
 }
 
-// canVerify reports whether verify can check the file's audio.
+// CanVerify reports whether verify can check the file's audio.
 func CanVerify(info audio.Info) bool {
 	return info.Lossless && (info.Kind == audio.FLAC || info.Kind == audio.WAV)
 }
@@ -695,7 +695,7 @@ func CanVerify(info audio.Info) bool {
 // they are only mentioned.
 const lossyCutoff = 19_500.0
 
-// assess turns what probe and verify found into a verdict. rep is nil if
+// Assess turns what probe and verify found into a verdict. rep is nil if
 // the audio hasn't been checked, in which case the verdict comes from the
 // headers alone.
 func Assess(info audio.Info, rep *Report) Assessment {
@@ -880,7 +880,7 @@ func lossyGuess(hz float64) string {
 	return "an MP3 of about 192 kbps"
 }
 
-// describe sums up the format, e.g. "FLAC · 24-bit · 96 kHz · Stereo ·
+// Describe sums up the format, e.g. "FLAC · 24-bit · 96 kHz · Stereo ·
 // 2,304 kbps".
 func Describe(info audio.Info) string {
 	parts := []string{info.Codec}

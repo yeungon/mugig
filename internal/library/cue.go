@@ -291,7 +291,7 @@ func cueSongs(s cueSheet, image Track) []Track {
 	return out
 }
 
-// cuePath names a song of an image: the image's path and the song's
+// CuePath names a song of an image: the image's path and the song's
 // number.
 func CuePath(image string, number int) string {
 	return fmt.Sprintf("%s#%02d", image, number)
@@ -345,7 +345,7 @@ func imagesUnchanged(images map[string][2]int64) bool {
 	return true
 }
 
-// dropImages leaves out of songs the disc images whose songs, from their
+// DropImages leaves out of songs the disc images whose songs, from their
 // CUE sheets, are listed instead.
 func DropImages(songs []Track) []Track {
 	if images := CueImages(songs); len(images) > 0 {
@@ -354,7 +354,7 @@ func DropImages(songs []Track) []Track {
 	return songs
 }
 
-// cueImages are the disc images that songs from CUE sheets are in.
+// CueImages are the disc images that songs from CUE sheets are in.
 func CueImages(songs []Track) map[string]bool {
 	images := map[string]bool{}
 	for _, t := range songs {
@@ -369,7 +369,7 @@ func WithoutImages(songs []Track, images map[string]bool) []Track {
 	return slices.DeleteFunc(songs, func(t Track) bool { return t.File == "" && images[t.Path] })
 }
 
-// songFile is the file t is in: its own, or its disc image.
+// SongFile is the file t is in: its own, or its disc image.
 func SongFile(t Track) string {
 	if t.File != "" {
 		return t.File

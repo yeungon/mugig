@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-// scanWorkers asks macOS whether root is on a solid-state drive. USB
+// ScanWorkers asks macOS whether root is on a solid-state drive. USB
 // enclosures and network shares usually don't say, so they are read gently,
 // which costs little: tags are small, and rescans mostly use the cache.
 func ScanWorkers(root string) int {

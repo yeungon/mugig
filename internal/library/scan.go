@@ -39,7 +39,7 @@ var audioExts = map[string]string{
 	".wav":  "WAV", // usually has no tags, so the file name is the title
 }
 
-// walk finds audio files and CUE sheets under root and sends their paths
+// Walk finds audio files and CUE sheets under root and sends their paths
 // to the channel. It closes paths when finished or cancelled.
 func Walk(ctx context.Context, root string, paths chan<- string) {
 	defer close(paths)
@@ -68,7 +68,7 @@ func Walk(ctx context.Context, root string, paths chan<- string) {
 	})
 }
 
-// scanResult is one scanned file, with what the cache needs to know. For
+// ScanResult is one scanned file, with what the cache needs to know. For
 // a CUE sheet, track is empty and cue holds its songs.
 type ScanResult struct {
 	Track   Track
@@ -80,7 +80,7 @@ type ScanResult struct {
 	Cached  bool  // tags came from the cache, not the file
 }
 
-// songs are the songs the file gives the library.
+// Songs are the songs the file gives the library.
 func (r ScanResult) Songs() []Track {
 	if r.Path != "" && isCueFile(r.Path) {
 		return r.cue
@@ -88,12 +88,12 @@ func (r ScanResult) Songs() []Track {
 	return []Track{r.Track}
 }
 
-// entry is what the cache keeps of the file.
+// Entry is what the cache keeps of the file.
 func (r ScanResult) Entry() CacheEntry {
 	return CacheEntry{Size: r.size, ModTime: r.ModTime, Track: r.Track, Cue: r.cue, Images: r.images}
 }
 
-// worker reads tags for each path, unless the cache has them, and sends the
+// Worker reads tags for each path, unless the cache has them, and sends the
 // result.
 func Worker(ctx context.Context, cache *Cache, paths <-chan string, results chan<- ScanResult, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -129,9 +129,7 @@ func ScanFile(cache *Cache, path string) ScanResult {
 	return r
 }
 
-// readTrack opens one file and parses its tags. Files with missing or broken
-// tags fall back to using the file name as the title.
-// isAudioFile reports whether path names a file the app can play. Hidden
+// IsAudioFile reports whether path names a file the app can play. Hidden
 // files are left out: macOS puts a "._" file beside every file it copies
 // to an exFAT or FAT disk, such as most USB drives, and "._song.flac" holds
 // metadata, not audio.
@@ -154,6 +152,8 @@ func hidden(path string) bool {
 	return strings.HasPrefix(name, ".") || name == "__MACOSX"
 }
 
+// ReadTrack opens one file and parses its tags. Files with missing or
+// broken tags fall back to using the file name as the title.
 func ReadTrack(path string) Track {
 	t := Track{
 		Path:   path,
@@ -190,7 +190,7 @@ func searchKey(t Track) string {
 	return strings.ToLower(t.Title + "\x00" + t.Artist + "\x00" + t.Album)
 }
 
-// matches reports whether t contains every search word, in any field.
+// Matches reports whether t contains every search word, in any field.
 func Matches(t Track, words []string) bool {
 	key := t.search
 	if key == "" && len(words) > 0 {
@@ -204,7 +204,7 @@ func Matches(t Track, words []string) bool {
 	return true
 }
 
-// libraryLess is the default order: artist, then album, then title.
+// Less is the default order: artist, then album, then title.
 func Less(a, b Track) bool {
 	if c := CompareFold(a.Artist, b.Artist); c != 0 {
 		return c < 0

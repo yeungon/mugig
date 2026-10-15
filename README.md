@@ -202,25 +202,28 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 
 ## Project layout
 
-| Files | What they do |
+`main.go` only starts the app; the code is in packages under `internal/`,
+each with its own tests. They depend on each other in one direction only:
+`ui` uses `library`, `quality` and `audio`; `library` uses `quality` (for
+smart playlists' rules) and `audio`; `quality` uses `audio`; `audio` uses
+none of them.
+
+| Folder | What it does |
 |---|---|
-| `main.go`, `layout.go`, `theme.go` | The window, its layout and the theme |
-| `library.go`, `folders.go`, `folderview.go`, `cache.go`, `length.go`, `skip.go`, `watch*.go`, `drive*.go` | Scanning, song lengths, folders left out, the music folders, the saved library, folder watching |
-| `cue.go` | CUE sheets: an album in one file, listed and played song by song |
-| `playlists.go`, `playlistview.go` | Playlists and smart playlists |
-| `selection.go`, `columns.go` | Selecting several songs and acting on them; showing and hiding columns |
-| `trashsongs.go`, `internal/trash` | Move to Trash, with each system's own Trash |
-| `transport.go`, `upnext.go`, `resume.go` | The player bar, play order, shuffle, repeat, Up Next, resuming |
-| `player.go`, `gapless.go`, `output.go`, `readahead.go`, `flacplay.go`, `stretch.go`, `eq*.go`, `crossfeed.go`, `fader.go` | Decoding, gapless playback, read-ahead, damage-tolerant FLAC, speed, equalizer, crossfeed, volume, audio output |
-| `quality.go`, `levels.go`, `spectrogram.go`, `batch.go` | The quality check, loudness, spectrograms, Check All Songs |
-| `*_darwin.go`, `*_darwin.m` | macOS parts: CoreAudio, Now Playing, Open panel, Finder, Dock |
+| `internal/ui` | The window, made with Fyne: sidebar, song list, player bar, Now Playing, the quality window, the equalizer, menus, keyboard, and the macOS Now Playing, Open panel, Finder and Dock |
+| `internal/library` | Finding songs: walking folders (leaving out what isn't music), tags, lengths, the saved library, CUE sheets, watching folders, cover art, playlists and smart playlists' rules |
+| `internal/audio` | Reading and playing audio: formats, decoding (with damaged FLAC played past the damage), gapless playback, read-ahead, speed, equalizer, crossfeed, volume, the output device, and on macOS CoreAudio and the system decoder |
+| `internal/quality` | The quality check: integrity, lossy source, fake hi-res, loudness and peaks, the spectrogram's analysis, verdicts, and the saved results |
+| `internal/trash` | Move to Trash, with each system's own Trash |
+| `internal/humanize`, `internal/gobfile` | Wording numbers ("1,204 songs", "38.2 MB"); saving files safely |
+| `internal/audiotest` | Test audio: shaped noise, FLAC and WAV files, CUE albums, the sample files in `testdata` |
 | `tools/mkicon` | Draws the app icon (`make icon`) |
 | `docs/goui.md` | Lessons learned building a Go and Fyne app |
 
 ## Credits
 
 - The UI font is [Inter](https://rsms.me/inter/), under the SIL Open Font
-  License (`fonts/LICENSE-Inter.txt`).
+  License (`internal/ui/fonts/LICENSE-Inter.txt`).
 - Crossfeed follows Boris Mikhaylov's design in
   [bs2b](https://bs2b.sourceforge.net/), with its presets by Chu Moy and
   Jan Meier.

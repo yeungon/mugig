@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// folderChanges is what changed in the music folder.
+// Changes is what changed in the music folder.
 type Changes struct {
 	RootGone bool
 	Scanned  []ScanResult               // files added or changed
@@ -17,7 +17,7 @@ type Changes struct {
 	Folders  map[string]map[string]bool // folders read again, with the audio files now in them
 }
 
-// readChanges looks at each changed path. It runs off the UI thread.
+// ReadChanges looks at each changed path. It runs off the UI thread.
 func ReadChanges(root string, paths []string, cache *Cache) Changes {
 	ch := Changes{Folders: map[string]map[string]bool{}}
 	if _, err := os.Stat(root); err != nil {
@@ -67,7 +67,7 @@ func ReadChanges(root string, paths []string, cache *Cache) Changes {
 	return ch
 }
 
-// within reports whether path is dir or inside it.
+// Within reports whether path is dir or inside it.
 func Within(path, dir string) bool {
 	return path == dir || strings.HasPrefix(path, dir+string(filepath.Separator))
 }

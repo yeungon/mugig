@@ -18,7 +18,7 @@ import (
 	"github.com/gopxl/beep/v2"
 )
 
-// outputDevice is a device that can play sound.
+// Device is a device that can play sound.
 type Device struct {
 	ID        string // malgo's device ID in hex; stable for a device
 	Name      string

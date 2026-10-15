@@ -15,7 +15,7 @@ import (
 	"github.com/gopxl/beep/v2"
 )
 
-// gaplessLead is how long before a song ends the one after it is readied.
+// GaplessLead is how long before a song ends the one after it is readied.
 const GaplessLead = 20 * time.Second
 
 // deck is a song readied to play: its decoder, reading ahead, and the
