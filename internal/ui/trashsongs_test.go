@@ -46,7 +46,7 @@ func TestMoveSongsToTrash(t *testing.T) {
 	if u.playing.Path != "" || fp.onEnd != nil {
 		t.Error("the song playing should have stopped")
 	}
-	if u.status.Text != "Moved 2 songs to the Trash" {
+	if u.status.Text != "Moved 2 songs to "+trashName() {
 		t.Errorf("status %q", u.status.Text)
 	}
 }
