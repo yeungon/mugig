@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
-	"math"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"

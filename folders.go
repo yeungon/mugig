@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/humanize"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -194,7 +195,7 @@ func (u *ui) confirmRemoveFolder(path string) {
 	}
 	msg := "Its songs are taken off the list. The files stay where they are."
 	if n > 0 {
-		msg = fmt.Sprintf("Its %s are taken off the list. The files stay where they are.", plural(n, "song"))
+		msg = fmt.Sprintf("Its %s are taken off the list. The files stay where they are.", humanize.Plural(n, "song"))
 	}
 	d := dialog.NewConfirm(fmt.Sprintf("Remove “%s” from Mugig?", filepath.Base(path)), msg, func(ok bool) {
 		if ok {

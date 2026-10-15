@@ -12,6 +12,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"mugig/internal/humanize"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -301,7 +302,7 @@ func (r *spectrogramRenderer) Refresh() {
 	r.times = nil
 	if v.length > 0 && v.levels != nil {
 		for i := range 5 {
-			r.times = append(r.times, axisText(formatTime(v.length*time.Duration(i)/4), muted))
+			r.times = append(r.times, axisText(humanize.Clock(v.length*time.Duration(i)/4), muted))
 		}
 	}
 
@@ -320,7 +321,7 @@ func (r *spectrogramRenderer) Refresh() {
 	warn := themeColor(theme.ColorNameWarning)
 	r.line.StrokeColor = warn
 	r.marker.Color = warn
-	r.marker.Text = kHz(v.cutoff) + " cut-off"
+	r.marker.Text = humanize.KHz(v.cutoff) + " cut-off"
 	r.line.Hidden = v.cutoff <= 0 || v.levels == nil
 	r.marker.Hidden = r.line.Hidden
 

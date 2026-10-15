@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/humanize"
 	"slices"
 	"strings"
 	"time"
@@ -84,7 +85,7 @@ func (u *ui) refreshPlaylists() {
 		case len(ts) == 0:
 			detail = "Empty"
 		case length > 0:
-			detail = totalTime(length)
+			detail = humanize.TotalTime(length)
 		}
 		if p.Smart != nil {
 			icon, detail = smartPlaylistIcon, "Smart · "+detail
@@ -92,7 +93,7 @@ func (u *ui) refreshPlaylists() {
 				detail = "Smart playlist"
 			}
 		}
-		p.row.show(icon, p.Name, detail, thousands(len(ts)), true, page && u.playlist == p)
+		p.row.show(icon, p.Name, detail, humanize.Thousands(len(ts)), true, page && u.playlist == p)
 	}
 }
 
@@ -185,7 +186,7 @@ func (u *ui) newPlaylist(songs []Track) {
 		if songs == nil {
 			u.showPlaylist(p)
 		} else {
-			u.status.SetText(fmt.Sprintf("Added %s to %s", plural(len(songs), "song"), p.Name))
+			u.status.SetText(fmt.Sprintf("Added %s to %s", humanize.Plural(len(songs), "song"), p.Name))
 		}
 	})
 }
@@ -198,7 +199,7 @@ func (u *ui) addToPlaylist(p *playlist, songs []Track) {
 	}
 	added := p.add(paths...)
 	u.playlistsChanged()
-	msg := fmt.Sprintf("Added %s to %s", plural(added, "song"), p.Name)
+	msg := fmt.Sprintf("Added %s to %s", humanize.Plural(added, "song"), p.Name)
 	if added < len(songs) {
 		msg += fmt.Sprintf(" (%d already in it)", len(songs)-added)
 	}
@@ -473,5 +474,5 @@ func (e *rulesEditor) update() {
 	if n == 1 {
 		verb = "matches"
 	}
-	e.count.SetText(fmt.Sprintf("%s %s", plural(n, "song"), verb))
+	e.count.SetText(fmt.Sprintf("%s %s", humanize.Plural(n, "song"), verb))
 }

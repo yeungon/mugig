@@ -100,16 +100,6 @@ func TestTimeColumn(t *testing.T) {
 	if !strings.HasSuffix(u.count.Text, "· 2 h 10 min") {
 		t.Errorf("stats %q should give the total time", u.count.Text)
 	}
-	for d, want := range map[time.Duration]string{
-		40 * time.Second:             "1 min",
-		48 * time.Minute:             "48 min",
-		9*time.Hour + 12*time.Minute: "9 h 12 min",
-		178 * time.Hour:              "7.4 days",
-	} {
-		if got := totalTime(d); got != want {
-			t.Errorf("totalTime(%v) = %q, want %q", d, got, want)
-		}
-	}
 }
 
 // Songs read before lengths were, and still unchanged, get their length

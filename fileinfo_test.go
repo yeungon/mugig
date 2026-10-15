@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/humanize"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,17 +11,6 @@ import (
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 )
-
-func TestFileSizeWording(t *testing.T) {
-	for n, want := range map[int64]string{
-		0: "0 bytes", 999: "999 bytes", 1000: "1 KB", 912_400: "912 KB", 999_600: "1.00 MB",
-		38_213_456: "38.2 MB", 9_217: "9 KB", 1_240_000_000: "1.24 GB", 412_000_000_000: "412 GB",
-	} {
-		if got := fileSize(n); got != want {
-			t.Errorf("fileSize(%d) = %q, want %q", n, got, want)
-		}
-	}
-}
 
 func TestSizeColumn(t *testing.T) {
 	u, _, _ := newTestUI(t)
@@ -130,7 +120,7 @@ func TestGetInfo(t *testing.T) {
 	for field, want := range map[string]string{
 		"Name": "song.flac", "Where": filepath.Dir(tr.Path), "Artist": "Someone", "Year": "1999",
 		"Format": "FLAC · 16-bit · 44.1 kHz · Mono", "Length": "0:02", "Quality": "Lossless",
-		"Size": fileSize(st.Size()),
+		"Size": humanize.FileSize(st.Size()),
 	} {
 		if !strings.HasPrefix(got[field], want) {
 			t.Errorf("%s: %q, want %q", field, got[field], want)

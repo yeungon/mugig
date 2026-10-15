@@ -1,9 +1,10 @@
 package main
 
 import (
-	"fyne.io/fyne/v2"
 	"strings"
 	"testing"
+
+	"fyne.io/fyne/v2"
 )
 
 func TestOutputDeviceMenu(t *testing.T) {

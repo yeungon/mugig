@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/humanize"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -38,7 +39,7 @@ func (u *ui) trashItem(ts []Track) *fyne.MenuItem {
 
 // confirmTrash asks before moving songs to the Trash.
 func (u *ui) confirmTrash(ts []Track) {
-	title := fmt.Sprintf("Move %s to %s?", plural(len(ts), "song"), trashName())
+	title := fmt.Sprintf("Move %s to %s?", humanize.Plural(len(ts), "song"), trashName())
 	if len(ts) == 1 {
 		title = fmt.Sprintf("Move “%s” to %s?", ts[0].Title, trashName())
 	}
@@ -82,7 +83,7 @@ func (u *ui) trashSongs(ts []Track) {
 			u.dropSongs(gone)
 			if len(failed) > 0 {
 				dialog.ShowError(fmt.Errorf("Couldn't move %s to %s:\n%s",
-					plural(len(failed), "song"), trashName(), strings.Join(failed, "\n")), u.win)
+					humanize.Plural(len(failed), "song"), trashName(), strings.Join(failed, "\n")), u.win)
 			}
 		})
 	})
@@ -105,7 +106,7 @@ func (u *ui) dropSongs(paths []string) {
 	u.queueChanged()
 	u.forgetInPlaylists(paths)
 	u.applyView()
-	u.status.SetText(fmt.Sprintf("Moved %s to %s", plural(len(paths), "song"), trashName()))
+	u.status.SetText(fmt.Sprintf("Moved %s to %s", humanize.Plural(len(paths), "song"), trashName()))
 	cache, store := u.cache, u.qualityStore
 	u.async(func() {
 		cache.forget(paths)

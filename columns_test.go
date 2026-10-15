@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mugig/internal/humanize"
 	"slices"
 	"strings"
 	"testing"
@@ -37,7 +38,7 @@ func TestHideAndShowColumns(t *testing.T) {
 	}
 	cell := u.table.CreateCell().(*trackCell)
 	u.table.UpdateCell(widget.TableCellID{Row: 3, Col: 5}, cell) // Size, where Format was
-	if cell.seg.Text != fileSize(u.tracks[3].Size) {
+	if cell.seg.Text != humanize.FileSize(u.tracks[3].Size) {
 		t.Errorf("column 5 shows %q", cell.seg.Text)
 	}
 	if item := u.columnItems[formatCol]; item.Checked || !u.columnItems[albumCol].Checked || !u.columnItems[titleCol].Disabled {

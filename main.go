@@ -27,8 +27,10 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/dhowden/tag"
+	"mugig/internal/humanize"
 	"mugig/internal/trash"
+
+	"github.com/dhowden/tag"
 )
 
 // Track holds what we report to the GUI for one audio file.
@@ -618,7 +620,7 @@ func cellText(t Track, col int) string {
 		return t.Album
 	case timeCol:
 		if t.Length > 0 {
-			return formatTime(t.Length)
+			return humanize.Clock(t.Length)
 		}
 		return ""
 	case yearCol:
@@ -629,7 +631,7 @@ func cellText(t Track, col int) string {
 	case formatCol:
 		return t.Format
 	case sizeCol:
-		return fileSize(t.Size)
+		return humanize.FileSize(t.Size)
 	case pathCol:
 		return t.Path
 	}
@@ -796,7 +798,7 @@ func (u *ui) flush(root string, batch []Track) {
 		}
 		u.table.Refresh()
 		u.updateCount()
-		u.status.SetText(fmt.Sprintf("Scanning %s… %s found", filepath.Base(root), plural(u.countIn(root), "track")))
+		u.status.SetText(fmt.Sprintf("Scanning %s… %s found", filepath.Base(root), humanize.Plural(u.countIn(root), "track")))
 	})
 }
 
@@ -861,15 +863,15 @@ func (u *ui) finish(root string, tally scanTally) {
 		}
 		in := ""
 		if u.run.folders > 1 {
-			in = " in " + plural(u.run.folders, "folder")
+			in = " in " + humanize.Plural(u.run.folders, "folder")
 		}
 		elapsed := time.Duration(0)
 		if !u.run.started.IsZero() {
 			elapsed = time.Since(u.run.started)
 		}
 		u.status.SetText(fmt.Sprintf("%s %s%s in %s\n%s unchanged · %s without tags",
-			verb, plural(u.run.tracks, "track"), in, elapsed.Round(10*time.Millisecond),
-			thousands(u.run.fromCache), thousands(u.run.noTags)))
+			verb, humanize.Plural(u.run.tracks, "track"), in, elapsed.Round(10*time.Millisecond),
+			humanize.Thousands(u.run.fromCache), humanize.Thousands(u.run.noTags)))
 		u.run = scanRun{}
 		u.restoreSession()
 	})

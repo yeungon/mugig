@@ -264,19 +264,6 @@ func TestMuteRestoresVolume(t *testing.T) {
 	}
 }
 
-func TestFormatTime(t *testing.T) {
-	for d, want := range map[time.Duration]string{
-		0:                                     "0:00",
-		59*time.Second + 999*time.Millisecond: "0:59",
-		65 * time.Second:                      "1:05",
-		3725 * time.Second:                    "1:02:05",
-	} {
-		if got := formatTime(d); got != want {
-			t.Errorf("formatTime(%v) = %q, want %q", d, got, want)
-		}
-	}
-}
-
 func tracksFor(u *ui, paths []string) []Track {
 	var ts []Track
 	for _, p := range paths {

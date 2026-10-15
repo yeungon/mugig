@@ -6,6 +6,7 @@ package main
 // point, paused; Play carries on from there. Nothing plays by itself.
 
 import (
+	"mugig/internal/humanize"
 	"time"
 
 	"fyne.io/fyne/v2/widget"
@@ -85,7 +86,7 @@ func (u *ui) cue(t Track, at time.Duration) {
 	if t.Length > 0 {
 		u.seek.Max = t.Length.Seconds()
 		u.seek.Enable()
-		u.total.SetText(formatTime(t.Length))
+		u.total.SetText(humanize.Clock(t.Length))
 	}
 	u.sizeTimes(t.Length)
 	u.setSeek(at)

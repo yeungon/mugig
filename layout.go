@@ -12,6 +12,7 @@ package main
 import (
 	"fmt"
 	"image/color"
+	"mugig/internal/humanize"
 	"strings"
 	"time"
 
@@ -119,12 +120,12 @@ func libraryStats(tracks []Track) string {
 		}
 	}
 	s := fmt.Sprintf("%s · %s · %s",
-		plural(len(tracks), "track"), plural(len(artists), "artist"), plural(len(albums), "album"))
+		humanize.Plural(len(tracks), "track"), humanize.Plural(len(artists), "artist"), humanize.Plural(len(albums), "album"))
 	if length > 0 {
-		s += " · " + totalTime(length)
+		s += " · " + humanize.TotalTime(length)
 	}
 	if size > 0 {
-		s += " · " + fileSize(size)
+		s += " · " + humanize.FileSize(size)
 	}
 	return s
 }
@@ -137,60 +138,12 @@ func selectionStats(ts []Track) string {
 		size += t.Size
 		length += t.Length
 	}
-	s := plural(len(ts), "song") + " selected"
+	s := humanize.Plural(len(ts), "song") + " selected"
 	if length > 0 {
-		s += " · " + totalTime(length)
+		s += " · " + humanize.TotalTime(length)
 	}
 	if size > 0 {
-		s += " · " + fileSize(size)
-	}
-	return s
-}
-
-// totalTime formats how long a list of songs plays for: "48 min",
-// "9 h 12 min", "7.4 days".
-func totalTime(d time.Duration) string {
-	switch {
-	case d >= 24*time.Hour:
-		return fmt.Sprintf("%.1f days", d.Hours()/24)
-	case d >= time.Hour:
-		return fmt.Sprintf("%d h %d min", int(d.Hours()), int(d.Minutes())%60)
-	}
-	return fmt.Sprintf("%d min", int(d.Round(time.Minute).Minutes()))
-}
-
-// fileSize formats a size in bytes as Finder does, in powers of 1000:
-// "912 KB", "38.2 MB", "1.24 GB".
-func fileSize(n int64) string {
-	units := []string{"bytes", "KB", "MB", "GB", "TB"}
-	v, u := float64(n), 0
-	for v >= 999.5 && u < len(units)-1 {
-		v /= 1000
-		u++
-	}
-	switch {
-	case u == 0:
-		return fmt.Sprintf("%d bytes", n)
-	case u == 1 || v >= 100:
-		return fmt.Sprintf("%.0f %s", v, units[u])
-	case v >= 10:
-		return fmt.Sprintf("%.1f %s", v, units[u])
-	}
-	return fmt.Sprintf("%.2f %s", v, units[u])
-}
-
-func plural(n int, noun string) string {
-	if n != 1 {
-		noun += "s"
-	}
-	return thousands(n) + " " + noun
-}
-
-// thousands formats n with comma separators.
-func thousands(n int) string {
-	s := fmt.Sprint(n)
-	for i := len(s) - 3; i > 0; i -= 3 {
-		s = s[:i] + "," + s[i:]
+		s += " · " + humanize.FileSize(size)
 	}
 	return s
 }

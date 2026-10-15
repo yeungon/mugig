@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"mugig/internal/humanize"
 	"os"
 	"path/filepath"
 	"slices"
@@ -67,7 +68,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 	form := widget.NewForm(
 		widget.NewFormItem("Name", value(filepath.Base(file))),
 		widget.NewFormItem("Where", value(filepath.Dir(file))),
-		widget.NewFormItem("Size", value(fmt.Sprintf("%s (%s bytes)", fileSize(st.Size()), thousands(int(st.Size()))))),
+		widget.NewFormItem("Size", value(fmt.Sprintf("%s (%s bytes)", humanize.FileSize(st.Size()), humanize.Thousands(int(st.Size()))))),
 		widget.NewFormItem("Modified", value(st.ModTime().Format("2 Jan 2006 at 15:04"))),
 		widget.NewFormItem("Format", format),
 		widget.NewFormItem("Length", length),
@@ -79,7 +80,7 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 	)
 	cue := fromCue(t.Path)
 	if cue {
-		at := fmt.Sprintf("A disc image, with a CUE sheet: this song runs from %s to %s", formatTime(t.Start), formatTime(t.Start+t.Length))
+		at := fmt.Sprintf("A disc image, with a CUE sheet: this song runs from %s to %s", humanize.Clock(t.Start), humanize.Clock(t.Start+t.Length))
 		form.Items = slices.Insert(form.Items, 2, widget.NewFormItem("Part", value(at)))
 	}
 	show := widget.NewButtonWithIcon(revealLabel, theme.FolderOpenIcon(), func() { u.revealTrack(t) })
@@ -97,9 +98,9 @@ func (u *ui) showInfo(t Track) dialog.Dialog {
 				return
 			}
 			format.SetText(describe(info))
-			length.SetText(formatTime(info.Duration))
+			length.SetText(humanize.Clock(info.Duration))
 			if cue {
-				length.SetText(fmt.Sprintf("%s, of %s for the whole image", formatTime(t.Length), formatTime(info.Duration)))
+				length.SetText(fmt.Sprintf("%s, of %s for the whole image", humanize.Clock(t.Length), humanize.Clock(info.Duration)))
 			}
 			content.Refresh()
 		})

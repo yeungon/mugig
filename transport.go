@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math/rand/v2"
+	"mugig/internal/humanize"
 	"slices"
 	"time"
 
@@ -79,7 +80,7 @@ func (u *ui) buildTransport() fyne.CanvasObject {
 			return
 		}
 		u.seeking = true // preview the time while dragging
-		u.elapsed.SetText(formatTime(seconds(v)))
+		u.elapsed.SetText(humanize.Clock(seconds(v)))
 	}
 	u.seek.OnChangeEnded = func(v float64) {
 		if u.settingSeek {
@@ -186,7 +187,7 @@ func (u *ui) start(t Track, queued bool) {
 	if d := u.player.Duration(); d > 0 {
 		u.seek.Max = d.Seconds()
 		u.seek.Enable()
-		u.total.SetText(formatTime(d))
+		u.total.SetText(humanize.Clock(d))
 	} else {
 		u.seek.Disable() // length unknown, so seeking isn't possible
 		u.total.SetText("--:--")
@@ -550,7 +551,7 @@ func (u *ui) setStopped() {
 	u.seeking = false
 	u.setSeek(0)
 	u.seek.Disable()
-	u.total.SetText(formatTime(0))
+	u.total.SetText(humanize.Clock(0))
 	u.sizeTimes(0)
 	u.table.UnselectAll()
 	u.updateVisHeader()
@@ -577,7 +578,7 @@ func (u *ui) setSeek(pos time.Duration) {
 	u.settingSeek = true
 	u.seek.SetValue(pos.Seconds())
 	u.settingSeek = false
-	u.elapsed.SetText(formatTime(pos))
+	u.elapsed.SetText(humanize.Clock(pos))
 }
 
 // revealPlaying scrolls the playing track's row into view, if it is in the
@@ -628,7 +629,6 @@ func seconds(v float64) time.Duration {
 	return time.Duration(v * float64(time.Second))
 }
 
-// formatTime renders d as m:ss, or h:mm:ss for long tracks.
 // timeLabel shows a time next to the seek bar.
 func timeLabel(text string, align fyne.TextAlign) *widget.Label {
 	l := widget.NewLabelWithStyle(text, align, fyne.TextStyle{})
@@ -647,7 +647,7 @@ func (u *ui) sizeTimes(d time.Duration) {
 			widest, w = r, rw
 		}
 	}
-	sample := []rune(formatTime(max(d, 0)))
+	sample := []rune(humanize.Clock(max(d, 0)))
 	for i, r := range sample {
 		if r >= '0' && r <= '9' {
 			sample[i] = widest
@@ -658,12 +658,4 @@ func (u *ui) sizeTimes(d time.Duration) {
 		r.SetMinSize(fyne.NewSize(width, 0))
 		r.Refresh()
 	}
-}
-
-func formatTime(d time.Duration) string {
-	s := int(d / time.Second)
-	if s >= 3600 {
-		return fmt.Sprintf("%d:%02d:%02d", s/3600, s/60%60, s%60)
-	}
-	return fmt.Sprintf("%d:%02d", s/60, s%60)
 }

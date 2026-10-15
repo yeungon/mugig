@@ -7,6 +7,7 @@ package main
 
 import (
 	"io/fs"
+	"mugig/internal/humanize"
 	"os"
 	"path/filepath"
 	"slices"
@@ -253,10 +254,10 @@ func (u *ui) applyChanges(root string, ch folderChanges) {
 	if added > 0 || len(removed) > 0 {
 		var parts []string
 		if added > 0 {
-			parts = append(parts, plural(added, "track")+" added")
+			parts = append(parts, humanize.Plural(added, "track")+" added")
 		}
 		if len(removed) > 0 {
-			parts = append(parts, plural(len(removed), "track")+" removed")
+			parts = append(parts, humanize.Plural(len(removed), "track")+" removed")
 		}
 		u.status.SetText("Library updated: " + strings.Join(parts, " · "))
 	}

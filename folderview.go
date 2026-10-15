@@ -5,6 +5,7 @@ package main
 // right-clicking offers to rescan it, show it in Finder, or remove it.
 
 import (
+	"mugig/internal/humanize"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -156,7 +157,7 @@ func (r *folderRow) set(f *musicFolder, count int, detail string, chosen bool) {
 	if onRemovableDisk(f.path) {
 		icon = theme.StorageIcon()
 	}
-	countText := thousands(count)
+	countText := humanize.Thousands(count)
 	if !f.connected {
 		icon, countText = theme.NewDisabledResource(icon), ""
 	}

@@ -53,11 +53,6 @@ func TestLibraryStatsWording(t *testing.T) {
 	if got := libraryStats(one); got != "1 track · 1 artist · 1 album" {
 		t.Errorf("one track: %q", got)
 	}
-	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567"} {
-		if got := thousands(n); got != want {
-			t.Errorf("thousands(%d) = %q, want %q", n, got, want)
-		}
-	}
 }
 
 func TestSortCyclesAscDescOff(t *testing.T) {

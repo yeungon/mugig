@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"mugig/internal/humanize"
 	"runtime"
 	"strings"
 	"sync"
@@ -243,7 +244,7 @@ func (u *ui) showBatch() {
 	var found []string
 	for _, l := range []qualityLevel{qualityDamaged, qualitySuspect, qualityLossless, qualityHiRes} {
 		if n := b.counts[l]; n > 0 {
-			found = append(found, fmt.Sprintf("%s %s", thousands(n), strings.ToLower(levelNames[l])))
+			found = append(found, fmt.Sprintf("%s %s", humanize.Thousands(n), strings.ToLower(levelNames[l])))
 		}
 	}
 	verb := "Checking"
@@ -253,7 +254,7 @@ func (u *ui) showBatch() {
 			verb = "Stopped after"
 		}
 	}
-	text := fmt.Sprintf("%s %s of %s songs", verb, thousands(b.done), thousands(b.total))
+	text := fmt.Sprintf("%s %s of %s songs", verb, humanize.Thousands(b.done), humanize.Thousands(b.total))
 	if len(found) > 0 {
 		text += ": " + strings.Join(found, " · ")
 	}

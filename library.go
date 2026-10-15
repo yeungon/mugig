@@ -8,6 +8,7 @@ package main
 import (
 	"cmp"
 	"fmt"
+	"mugig/internal/humanize"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -98,7 +99,7 @@ func (u *ui) updateCount() {
 		return
 	}
 	if len(u.searchWords()) > 0 {
-		u.count.SetText(fmt.Sprintf("%s of %s match", thousands(len(u.tracks)), plural(len(shown), "track")))
+		u.count.SetText(fmt.Sprintf("%s of %s match", humanize.Thousands(len(u.tracks)), humanize.Plural(len(shown), "track")))
 		return
 	}
 	key := fmt.Sprintf("%s\x00%p\x00%d", u.filter, u.playlist, len(shown))

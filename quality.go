@@ -26,6 +26,7 @@ import (
 	"io"
 	"math"
 	"math/bits"
+	"mugig/internal/humanize"
 	"os"
 	"path/filepath"
 	"slices"
@@ -1018,9 +1019,9 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 		// frame (see flacStream).
 		a.checks = append(a.checks, check{checkBad, fmt.Sprintf(
 			"Damaged: unreadable audio at %s, and perhaps later. It plays with a short silence in place of each damaged part",
-			formatTime(rep.DamageAt))})
+			humanize.Clock(rep.DamageAt))})
 	case rep.Damaged != "":
-		a.checks = append(a.checks, check{checkBad, fmt.Sprintf("Damaged: the audio can't be read from %s on", formatTime(rep.DamageAt))})
+		a.checks = append(a.checks, check{checkBad, fmt.Sprintf("Damaged: the audio can't be read from %s on", humanize.Clock(rep.DamageAt))})
 	case rep.Checksum == checksumBad:
 		a.checks = append(a.checks, check{checkBad, "Damaged: the audio doesn't match the checksum stored in the file"})
 	case rep.Missing > 0:
@@ -1036,11 +1037,11 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 	case rep.ReadBy != "" && rep.Checksum == checksumOK:
 		a.checks = append(a.checks, check{checkInfo, fmt.Sprintf(
 			"Mugig's decoder stopped at %s, but %s's read the whole file and it matches its checksum. "+
-				"If this keeps changing, the disk may be returning bad data", formatTime(rep.OwnStopAt), rep.ReadBy)})
+				"If this keeps changing, the disk may be returning bad data", humanize.Clock(rep.OwnStopAt), rep.ReadBy)})
 	case rep.ReadBy != "" && rep.Checksum == noChecksum:
 		a.checks = append(a.checks, check{checkWarn, fmt.Sprintf(
 			"Mugig's decoder stopped at %s, but %s's read the whole file. With no stored checksum, "+
-				"damage can't be ruled out", formatTime(rep.OwnStopAt), rep.ReadBy)})
+				"damage can't be ruled out", humanize.Clock(rep.OwnStopAt), rep.ReadBy)})
 	}
 	damaged := rep.Damaged != "" || rep.Checksum == checksumBad || rep.Missing > 0
 
@@ -1061,7 +1062,7 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 		}
 		a.checks = append(a.checks, check{checkWarn, fmt.Sprintf(
 			"Sound drops %.0f dB at %s%s, like %s: %s converted from a lossy file",
-			sp.Drop, kHz(sp.Cutoff), gaps, lossyGuess(sp.Cutoff), likely(sp.Drop >= strongDrop || holey))})
+			sp.Drop, humanize.KHz(sp.Cutoff), gaps, lossyGuess(sp.Cutoff), likely(sp.Drop >= strongDrop || holey))})
 	case holey:
 		suspect = true
 		a.checks = append(a.checks, check{checkWarn, fmt.Sprintf(
@@ -1071,7 +1072,7 @@ func assess(info audioInfo, rep *qualityReport) assessment {
 		suspect = true
 		a.checks = append(a.checks, check{checkWarn, fmt.Sprintf(
 			"Sound drops %.0f dB at %s: %s upsampled from CD quality, not true hi-res",
-			sp.Drop, kHz(sp.Cutoff), likely(sp.Drop >= strongDrop))})
+			sp.Drop, humanize.KHz(sp.Cutoff), likely(sp.Drop >= strongDrop))})
 	case info.SampleRate > 48000:
 		a.checks = append(a.checks, check{checkOK, "No sign of upsampling or a lossy source"})
 	default:
@@ -1120,7 +1121,7 @@ func levelChecks(lv levelsResult) []check {
 	switch {
 	case lv.ClipRuns > 0:
 		checks = append(checks, check{checkWarn, fmt.Sprintf(
-			"Clipped in %s: the waveform is cut flat at full volume, which distorts", plural(lv.ClipRuns, "place"))})
+			"Clipped in %s: the waveform is cut flat at full volume, which distorts", humanize.Plural(lv.ClipRuns, "place"))})
 	case lv.TruePeak > 0.05:
 		checks = append(checks, check{checkWarn, fmt.Sprintf(
 			"Peaks reach %.1f dB over full scale between samples, which can distort on some players", lv.TruePeak)})
@@ -1179,7 +1180,7 @@ func describe(info audioInfo) string {
 		parts = append(parts, fmt.Sprintf("%d-bit", info.Bits))
 	}
 	if info.SampleRate > 0 {
-		parts = append(parts, kHz(float64(info.SampleRate)))
+		parts = append(parts, humanize.KHz(float64(info.SampleRate)))
 	}
 	switch info.Channels {
 	case 0:
@@ -1191,20 +1192,15 @@ func describe(info audioInfo) string {
 		parts = append(parts, fmt.Sprintf("%d channels", info.Channels))
 	}
 	if info.Kbps > 0 {
-		parts = append(parts, thousands(info.Kbps)+" kbps")
+		parts = append(parts, humanize.Thousands(info.Kbps)+" kbps")
 	}
 	return strings.Join(parts, " · ")
-}
-
-// kHz formats a frequency, e.g. "44.1 kHz", "48 kHz".
-func kHz(hz float64) string {
-	return strings.TrimSuffix(fmt.Sprintf("%.1f", hz/1000), ".0") + " kHz"
 }
 
 // roundedDuration formats d for a sentence, e.g. "2 seconds", "1:05".
 func roundedDuration(d time.Duration) string {
 	if d < time.Minute {
-		return plural(max(int(d.Round(time.Second)/time.Second), 1), "second")
+		return humanize.Plural(max(int(d.Round(time.Second)/time.Second), 1), "second")
 	}
-	return formatTime(d)
+	return humanize.Clock(d)
 }
