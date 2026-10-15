@@ -29,6 +29,7 @@ func TestSmartRules(t *testing.T) {
 		{"Artist", OpIsNot, "Beatles", true},
 		{"Title", OpStartsWith, "hey", true},
 		{"Folder", OpContains, "/rock", true},
+		{"Folder", OpContains, `\rock`, true}, // either slash, on any system
 		{"Format", OpIs, "flac", true},
 		{"Year", OpLess, "1970", true},
 		{"Year", OpMore, "1970", false},

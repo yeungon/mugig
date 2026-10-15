@@ -165,7 +165,7 @@ the audio output use C:
 | System | C compiler and libraries |
 |---|---|
 | macOS | Xcode's command line tools: `xcode-select --install` |
-| Linux (Debian, Ubuntu) | `sudo apt install gcc libgl1-mesa-dev xorg-dev` |
+| Linux (Debian, Ubuntu) | `sudo apt install gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev` |
 | Windows | A MinGW-w64 GCC, for example from [MSYS2](https://www.msys2.org) |
 
 Then:

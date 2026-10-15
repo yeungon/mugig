@@ -30,10 +30,11 @@ jobs:
         with:
           go-version: "1.24"
 
-      # Fyne draws with OpenGL through GLFW, which needs these to build.
+      # Fyne draws with OpenGL through GLFW, which needs these to build: its
+      # X11 and Wayland support both.
       - name: Install Linux libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev
+        run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
 
       - name: Vet
         run: go vet ./... 2>&1 | tee vet.log; exit ${PIPESTATUS[0]}

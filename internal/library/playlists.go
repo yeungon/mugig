@@ -134,6 +134,9 @@ func (r SmartRule) Matches(t Track, f SongFacts) bool {
 		have := map[string]string{"Title": t.Title, "Artist": t.Artist, "Album": t.Album,
 			"Format": t.Format, "Folder": filepath.Dir(t.Path)}[r.Field]
 		have, want := Fold(have), Fold(value)
+		if r.Field == "Folder" { // either slash, whatever the system's
+			have, want = filepath.ToSlash(have), strings.ReplaceAll(want, `\`, "/")
+		}
 		switch r.Op {
 		case OpContains:
 			return strings.Contains(have, want)

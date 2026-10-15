@@ -4,6 +4,7 @@ import (
 	"mugig/internal/audiotest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func TestParseCue(t *testing.T) {
 		t.Fatalf("%d files", len(sheets))
 	}
 	s := sheets[0]
-	if s.album != "An Album" || s.performer != "Some Singer" || s.year != 2005 || s.file != "/music/Disc 1/Album.wav" {
+	if s.album != "An Album" || s.performer != "Some Singer" || s.year != 2005 || s.file != filepath.Join("/music", "Disc 1", "Album.wav") {
 		t.Errorf("sheet %+v", s)
 	}
 	if len(s.tracks) != 3 || s.tracks[1].performer != "A Guest" || s.tracks[1].start != time.Second+10*time.Second/75 {
@@ -99,6 +100,10 @@ func TestParseCueDates(t *testing.T) {
 // as they go wrong: a track with only a pregap, and tracks out of order,
 // which are left out.
 func TestParseCueVariants(t *testing.T) {
+	elsewhere := "/elsewhere/Disc 2.flac" // an absolute path, on this system
+	if runtime.GOOS == "windows" {
+		elsewhere = `C:\elsewhere\Disc 2.flac`
+	}
 	text := strings.Join([]string{
 		`title "Live"`,
 		`file My Album.wav WAVE`,
@@ -110,17 +115,17 @@ func TestParseCueVariants(t *testing.T) {
 		`    INDEX 01 01:00:00`,
 		`  TRACK 04 AUDIO`,
 		`    INDEX 01 00:40:00`, // before the track above it
-		`FILE "/elsewhere/Disc 2.flac" WAVE`,
+		`FILE "` + elsewhere + `" WAVE`,
 		`  TRACK 05 AUDIO`,
 		`    TITLE "Encore"`,
 		`    INDEX 01 00:00:00`,
 	}, "\r\n")
-	sheets := parseCue(text, "/music")
+	sheets := parseCue(text, filepath.FromSlash("/music"))
 	if len(sheets) != 2 {
 		t.Fatalf("%d files, want 2", len(sheets))
 	}
 	a, b := sheets[0], sheets[1]
-	if a.file != "/music/My Album.wav" || a.album != "Live" || b.file != "/elsewhere/Disc 2.flac" || b.album != "Live" {
+	if a.file != filepath.Join("/music", "My Album.wav") || a.album != "Live" || b.file != elsewhere || b.album != "Live" {
 		t.Errorf("files %q %q, albums %q %q", a.file, b.file, a.album, b.album)
 	}
 	var numbers []int

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"math"
 	"mugig/internal/audiotest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -23,6 +24,10 @@ func testPlayer(t *testing.T) *Player {
 	p := NewPlayer(func(f func()) { f() }) // as the test app's UI thread does
 	p.out.backends = []malgo.Backend{nullBackend}
 	p.matchRate = false
+	// Cleanups run last first: making the test's temporary folder now has
+	// it removed after the player has closed the songs in it, which
+	// Windows needs, as it can't delete an open file.
+	t.TempDir()
 	t.Cleanup(p.Close)
 	return p
 }
@@ -161,7 +166,13 @@ func TestPlayerSpeed(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the track never ended")
 	}
-	if took := time.Since(start); took < 1200*time.Millisecond || took > 2200*time.Millisecond {
+	// Shared CI machines can be slow to decode, so there it need only be
+	// faster than normal speed.
+	slowest := 2200 * time.Millisecond
+	if os.Getenv("CI") != "" {
+		slowest = 2900 * time.Millisecond
+	}
+	if took := time.Since(start); took < 1200*time.Millisecond || took > slowest {
 		t.Errorf("3 s at 2× took %v, want about 1.5 s", took)
 	}
 }
