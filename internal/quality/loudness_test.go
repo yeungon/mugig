@@ -10,18 +10,18 @@ import (
 	"mugig/internal/audiotest"
 )
 
-// Songs are brought to -18 LUFS: loud ones down, quiet ones up, but never
+// Songs are brought to -14 LUFS: loud ones down, quiet ones up, but never
 // up past -1 dBTP; a song too close to its peak to rise isn't cut for it.
 func TestLoudnessGain(t *testing.T) {
 	for _, c := range []struct {
 		l    Loudness
 		want float64
 	}{
-		{Loudness{LUFS: -9, TruePeak: 0.5}, -9},    // a loud master: down 9 dB
-		{Loudness{LUFS: -25, TruePeak: -3}, 2},     // quiet, but its peaks allow only +2
-		{Loudness{LUFS: -25, TruePeak: -12}, 7},    // quiet with room: up the full 7
-		{Loudness{LUFS: -18.5, TruePeak: -0.2}, 0}, // no room to rise, no reason to fall
-		{Loudness{LUFS: -18, TruePeak: -5}, 0},
+		{Loudness{LUFS: -9, TruePeak: 0.5}, -5},                   // a loud master: down 5 dB
+		{Loudness{LUFS: -25, TruePeak: -3}, 2},                    // quiet, but its peaks allow only +2
+		{Loudness{LUFS: -25, TruePeak: -15}, 11},                  // quiet with room: up the full 11
+		{Loudness{LUFS: -15, TruePeak: -0.2}, 0},                  // no room to rise, no reason to fall
+		{Loudness{LUFS: -14, TruePeak: -5}, 0},                    // just right
 		{Loudness{LUFS: math.Inf(-1), TruePeak: math.Inf(-1)}, 0}, // silence
 	} {
 		if got := c.l.Gain(); math.Abs(got-c.want) > 1e-9 {

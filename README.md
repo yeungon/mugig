@@ -32,13 +32,13 @@ Written in Go with [Fyne](https://fyne.io).
   it down is immediate. At full volume the sound still passes through
   untouched.
 - **Volume levelling** (Controls → Volume Levelling): every song plays at
-  about the same loudness, -18 LUFS as ReplayGain 2.0 has it, without a
-  boost taking its peaks over -1 dBTP. A song's loudness comes from its
-  quality check, or is measured in the background as it starts or is
-  readied to follow (under a second on a USB disk), and saved; until then
+  about the same loudness, -14 LUFS as YouTube, Spotify and Tidal play,
+  without a boost taking its peaks over -1 dBTP. A song's loudness comes
+  from its quality check, or is measured in the background as it starts or
+  is readied to follow (under a second on a USB disk), and saved; until then
   it plays at the last song's gain, then glides to its own. Songs joined
-  without a gap change level on the very sample. Off unless turned on, as
-  it changes the sound; Now Playing says by how much.
+  without a gap change level on the very sample. Off unless turned on, as it
+  changes the sound; Now Playing says by how much.
 - **Exclusive access** (macOS, Controls → Exclusive Access): while a song
   plays or is paused, Mugig has the device to itself, so no other app's
   sound or alert is mixed into the music or changes the device's rate.

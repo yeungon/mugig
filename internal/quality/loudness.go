@@ -1,7 +1,8 @@
 package quality
 
 // Volume levelling plays every song at about the same loudness: each is
-// turned up or down to TargetLUFS, the ReplayGain 2.0 reference, by the
+// turned up or down to TargetLUFS, the level YouTube, Spotify and Tidal
+// play at, by the
 // loudness measured here or in a quality check. A boost stops short of
 // taking the song's true peak above -1 dBTP, so levelling never clips.
 
@@ -12,8 +13,12 @@ import (
 	"mugig/internal/audio"
 )
 
-// TargetLUFS is the loudness levelling aims for.
-const TargetLUFS = -18
+// TargetLUFS is the loudness levelling aims for. ReplayGain's -18 levels
+// a little more evenly, but most music today is mastered far louder (a
+// real library's median was -11 LUFS), so it turned the typical song down
+// 7 dB; at -14 that is 3 dB, and songs still end up within about 2 dB of
+// each other, against nearly 10 dB unlevelled.
+const TargetLUFS = -14
 
 // Loudness is how loud a song is.
 type Loudness struct {

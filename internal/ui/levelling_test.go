@@ -9,7 +9,7 @@ import (
 
 // Volume Levelling is off unless turned on, and remembered. On, a song's
 // loudness is measured when it starts, only the first time, and the player
-// levels it by the gain that brings it to -18 LUFS; Now Playing says by how
+// levels it by the gain that brings it to -14 LUFS; Now Playing says by how
 // much. Off, the player is told to stop.
 func TestVolumeLevelling(t *testing.T) {
 	u, fp, a := newTestUI(t)
