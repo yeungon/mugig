@@ -62,7 +62,7 @@ func (f *fakePlayer) Position() time.Duration             { return f.pos }
 func (f *fakePlayer) Duration() time.Duration             { return 3 * time.Minute }
 func (f *fakePlayer) Seek(d time.Duration) error          { f.pos = d; return nil }
 func (f *fakePlayer) SetVolume(level float64)             { f.level = level }
-func (f *fakePlayer) SetFadeIn(on bool)                   { f.fade = on }
+func (f *fakePlayer) SetFade(on bool)                     { f.fade = on }
 func (f *fakePlayer) SetSpeed(speed float64)              { f.speed = speed }
 func (f *fakePlayer) SetCrossfeed(l audio.CrossfeedLevel) { f.feed = l }
 func (f *fakePlayer) SetEQ(s audio.EQSettings)            { f.eq = s }

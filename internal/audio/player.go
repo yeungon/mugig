@@ -83,7 +83,7 @@ func (p *Player) Play(path string, onEnd func(error)) error {
 		p.onEnd = onEnd
 		return nil
 	}
-	wasPlaying := p.ctrl != nil && !p.ctrl.Paused // moving from one song to another
+	wasPlaying := p.ctrl != nil && !p.ctrl.Paused && !p.vol.fadingOut() // moving from one song to another
 	p.Stop()
 	d, err := openDeck(path, p.speed)
 	if err != nil {
@@ -318,18 +318,31 @@ func flacReadable(f *os.File) bool {
 }
 
 // TogglePause pauses or resumes the current track and reports whether it is
-// now paused.
+// now paused. With fades on, pausing fades out first, which takes a
+// quarter of a second; pressing again meanwhile carries on.
 func (p *Player) TogglePause() bool {
 	if p.ctrl == nil {
 		return false
 	}
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
-	p.ctrl.Paused = !p.ctrl.Paused
-	if !p.ctrl.Paused && p.fade {
-		p.vol.fadeIn()
+	switch {
+	case p.vol.fadingOut(): // pressed again while fading out: carry on
+		p.vol.cancelFadeOut()
+		return false
+	case p.ctrl.Paused:
+		p.ctrl.Paused = false
+		if p.fade {
+			p.vol.fadeIn()
+		}
+		return false
+	case p.fade:
+		ctrl := p.ctrl
+		p.vol.fadeOut(func() { ctrl.Paused = true })
+		return true
 	}
-	return p.ctrl.Paused
+	p.ctrl.Paused = true
+	return true
 }
 
 // Position reports how far into the current track playback is.
@@ -428,7 +441,9 @@ func (p *Player) applyLevel() {
 	p.vol.set(gain)
 }
 
-func (p *Player) SetFadeIn(on bool) { p.fade = on }
+// SetFade turns fading in, when playing starts or resumes, and fading out,
+// when pausing, on or off.
+func (p *Player) SetFade(on bool) { p.fade = on }
 
 func (p *Player) Samples(dst []float64) int {
 	if p.tap == nil {

@@ -676,9 +676,9 @@ type audioPlayer interface {
 	// carries on with it rather than starting it again.
 	Prepare(path string)
 	SetVolume(level float64)
-	// SetFadeIn turns fading in from near silence, when playing starts or
-	// resumes, on or off.
-	SetFadeIn(on bool)
+	// SetFade turns fading in from near silence, when playing starts or
+	// resumes, and fading out when pausing, on or off.
+	SetFade(on bool)
 	SetSpeed(speed float64) // 1 is normal; the pitch is kept
 	SetCrossfeed(level audio.CrossfeedLevel)
 	SetEQ(s audio.EQSettings)

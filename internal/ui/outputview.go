@@ -182,20 +182,21 @@ func (u *ui) showCrossfeed() {
 	}
 }
 
-const prefFadeIn = "fadeIn"
+const prefFadeIn = "fadeIn" // the setting's name from when it only faded in
 
-// buildFadeInItem creates Controls > Fade In When Playing, and applies the
-// choice last made.
+// buildFadeInItem creates Controls > Fade In and Out: fading in when
+// playing starts or resumes, and out when pausing. It applies the choice
+// last made.
 func (u *ui) buildFadeInItem() *fyne.MenuItem {
-	u.fadeInItem = fyne.NewMenuItem("Fade In When Playing", func() {
+	u.fadeInItem = fyne.NewMenuItem("Fade In and Out", func() {
 		on := !u.fadeInItem.Checked
 		u.fadeInItem.Checked = on
 		u.prefs.SetBool(prefFadeIn, on)
-		u.player.SetFadeIn(on)
+		u.player.SetFade(on)
 		u.mainMenu.Refresh()
 	})
 	u.fadeInItem.Checked = u.prefs.BoolWithFallback(prefFadeIn, true)
-	u.player.SetFadeIn(u.fadeInItem.Checked)
+	u.player.SetFade(u.fadeInItem.Checked)
 	return u.fadeInItem
 }
 

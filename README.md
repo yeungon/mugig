@@ -22,11 +22,12 @@ Written in Go with [Fyne](https://fyne.io).
 - **Gapless**: songs at the same sample rate follow each other without a
   pause, so live albums, classical works and mixes play as recorded. MP3s
   have the silence their encoder added cut off.
-- **Gentle on the ears**: playing or resuming fades in over a second
-  (Controls → Fade In When Playing, on unless turned off), and turning the
-  volume up glides there rather than jumping, so a slip of the slider
-  can't blast the music. Turning it down is immediate. At full volume the
-  sound still passes through untouched.
+- **Gentle on the ears**: playing or resuming fades in over a second, and
+  pausing fades out over a quarter of a second (Controls → Fade In and
+  Out, on unless turned off). Turning the volume up glides there rather
+  than jumping, so a slip of the slider can't blast the music. Turning
+  it down is immediate. At full volume the sound still passes through
+  untouched.
 - **Exclusive access** (macOS, Controls → Exclusive Access): while a song
   plays or is paused, Mugig has the device to itself, so no other app's
   sound or alert is mixed into the music or changes the device's rate.

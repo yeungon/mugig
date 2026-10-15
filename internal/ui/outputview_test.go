@@ -143,7 +143,7 @@ func TestCrossfeedMenu(t *testing.T) {
 	}
 }
 
-// Controls > Fade In When Playing is on unless turned off, and remembered.
+// Controls > Fade In and Out is on unless turned off, and remembered.
 func TestFadeInMenu(t *testing.T) {
 	u, fp, a := newTestUI(t)
 	if !u.fadeInItem.Checked || !fp.fade {
