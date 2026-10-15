@@ -151,7 +151,7 @@ func (u *ui) playlistMenu(p *library.Playlist) *fyne.Menu {
 // exportPlaylist saves p's songs as an M3U playlist, for other players.
 func (u *ui) exportPlaylist(p *library.Playlist) {
 	songs := p.Tracks(u.all, nil, u.songFacts())
-	name := strings.NewReplacer("/", "-", ":", "-", "\\", "-").Replace(p.Name) + ".m3u8"
+	name := fileNameFrom(p.Name) + ".m3u8"
 	u.save(u.win, name, func(path string) {
 		if path == "" {
 			return // cancelled

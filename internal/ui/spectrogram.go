@@ -91,10 +91,11 @@ type spectrogramView struct {
 	cutoff     float64 // Hz, or 0
 	note       string  // shown in place of the picture
 	top, floor float64 // dBFS drawn brightest and black
+	min        fyne.Size
 }
 
 func newSpectrogramView() *spectrogramView {
-	v := &spectrogramView{top: defaultTopDB, floor: defaultFloorDB}
+	v := &spectrogramView{top: defaultTopDB, floor: defaultFloorDB, min: fyne.NewSize(560, 240)}
 	v.ExtendBaseWidget(v)
 	return v
 }
@@ -112,7 +113,7 @@ func (v *spectrogramView) setRange(top, floor float64) {
 	v.Refresh()
 }
 
-func (v *spectrogramView) MinSize() fyne.Size { return fyne.NewSize(560, 240) }
+func (v *spectrogramView) MinSize() fyne.Size { return v.min }
 
 func (v *spectrogramView) CreateRenderer() fyne.WidgetRenderer {
 	r := &spectrogramRenderer{
@@ -266,7 +267,9 @@ func (r *spectrogramRenderer) Refresh() {
 	}
 	r.unit.Color = muted
 
-	warn := themeColor(theme.ColorNameWarning)
+	// The picture is dark in either theme, so the marker always takes the
+	// dark theme's colour, which stands out on it.
+	warn := appTheme{}.Color(theme.ColorNameWarning, theme.VariantDark)
 	r.line.StrokeColor = warn
 	r.marker.Color = warn
 	r.marker.Text = humanize.KHz(v.cutoff) + " cut-off"

@@ -14,7 +14,6 @@ import (
 	"mugig/internal/library"
 	"mugig/internal/quality"
 	"slices"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -406,16 +405,14 @@ func (u *ui) checkTrack(t library.Track) (*qualityPanel, *spectrogramView, dialo
 	bar.Hide()
 	title := widget.NewLabelWithStyle(t.Title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	title.Truncation = fyne.TextTruncateEllipsis
-	var detail []string
-	for _, s := range []string{t.Artist, t.Album} {
-		if s != "" {
-			detail = append(detail, s)
-		}
-	}
-	levels := u.levelsControl(spec)
-	levels.Hide()
-	content := container.NewVBox(title, secondaryLabel(strings.Join(detail, " · ")),
-		p.format, p.findings, spec, levels, bar)
+	var shown quality.Assessment // what the picture is saved with
+	saveBtn := widget.NewButtonWithIcon("Save as PNG…", theme.DocumentSaveIcon(), func() {
+		u.saveSpectrogram(t, shown, spec)
+	})
+	tools := container.NewBorder(nil, nil, nil, saveBtn, u.levelsControl(spec))
+	tools.Hide()
+	content := container.NewVBox(title, secondaryLabel(trackDetail(t)),
+		p.format, p.findings, spec, tools, bar)
 	d := dialog.NewCustom("Audio Quality", "Close", content, u.win)
 	ctx, cancel := context.WithCancel(context.Background())
 	d.SetOnClosed(cancel)
@@ -447,9 +444,10 @@ func (u *ui) checkTrack(t library.Track) (*qualityPanel, *spectrogramView, dialo
 			return
 		}
 		show := func(rep quality.Report, img *image.Gray) {
-			p.show(qualityText(info, nil, &rep, checked, false))
+			shown = qualityText(info, nil, &rep, checked, false)
+			p.show(shown)
 			spec.set(img, info.SampleRate, info.Duration, rep.Spectrum.Cutoff, "No sound to draw")
-			levels.Hidden = img == nil
+			tools.Hidden = img == nil
 		}
 
 		stamp := quality.FileStamp(file)

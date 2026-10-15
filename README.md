@@ -150,7 +150,8 @@ Results are saved, so each file is only ever checked once (until it changes).
 - **Loudness and peaks**: integrated loudness (ITU-R BS.1770-4, in LUFS), true
   peak, the DR dynamic range figure, and clipping.
 - **Spectrogram**, with a colour legend and an adjustable range of levels, and
-  the cut-off marked.
+  the cut-off marked. **Save as PNG…** saves it with the song's name, format
+  and findings above it, ready to share (1800 pixels wide).
 
 How well it works, measured on a real library of 833 files: the lossy-source
 test flagged 93% of MP3s decoded to 16-bit files, and 1.6% of genuine lossless
