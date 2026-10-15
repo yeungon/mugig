@@ -37,12 +37,15 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libwayland-dev libxkbcommon-dev
 
       # fyne takes a version of the form 1.2.3, so a suffix such as -rc.1 is
-      # dropped; the build number counts this workflow's runs.
+      # dropped; the build number counts this workflow's runs. Written into
+      # FyneApp.toml, it is built into the app, for the About window.
       - name: Version
         run: |
           v="${GITHUB_REF_NAME#v}"
           echo "APP_VERSION=${v%%-*}" >> "$GITHUB_ENV"
           echo "APP_BUILD=${{ github.run_number }}" >> "$GITHUB_ENV"
+          perl -pi -e "s/^Version = .*/Version = \"${v%%-*}\"/; s/^Build = .*/Build = ${{ github.run_number }}/" FyneApp.toml
+          cat FyneApp.toml
 
       # One app for Apple silicon and Intel Macs, signed ad hoc (see the
       # Makefile). ditto keeps the app's signature and permissions intact.

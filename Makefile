@@ -63,9 +63,9 @@ FYNE_CROSS := go run github.com/fyne-io/fyne-cross@v1.6.3
 DIST       := dist
 SRC        := $(CURDIR)
 
-# The release workflow stamps the version and build number with these, as
-# in `make mac APP_VERSION=0.1.0 APP_BUILD=7`. Otherwise FyneApp.toml's are
-# used.
+# The release workflow writes the version into FyneApp.toml, which fyne
+# build reads, and passes it here too, as in `make mac APP_VERSION=0.1.0
+# APP_BUILD=7`, for the app's Info.plist. Otherwise FyneApp.toml's is used.
 VERSION_FLAGS := $(if $(APP_VERSION),--app-version $(APP_VERSION)) $(if $(APP_BUILD),--app-build $(APP_BUILD))
 
 # mac-finish APP: Go programs need macOS 11, though fyne writes 10.11, so an
@@ -81,13 +81,15 @@ define mac-finish
 endef
 
 # fyne package uses an existing binary only when given its full path;
-# otherwise it builds one for this Mac.
+# otherwise it builds one for this Mac. The binaries are made with fyne
+# build, not go build, so they carry FyneApp.toml's version (for the About
+# window) and Fyne's release mode, as fyne package's own builds do.
 #
 # mac-build ARCH: builds the app for Apple silicon (arm64) or Intel (amd64)
 # into dist/macos-ARCH/Mugig.app.
 define mac-build
 	rm -rf "$(DIST)/macos-$(1)" && mkdir -p "$(DIST)/macos-$(1)"
-	GOOS=darwin GOARCH=$(1) CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$(DIST)/macos-$(1)/mugig" .
+	GOARCH=$(1) CGO_ENABLED=1 $(FYNE) build --os darwin --release -o "$(DIST)/macos-$(1)/mugig"
 	cd "$(DIST)/macos-$(1)" && $(FYNE) package --release --src "$(SRC)" --exe "$(CURDIR)/$(DIST)/macos-$(1)/mugig" --name Mugig --icon "$(SRC)/Icon.png" $(VERSION_FLAGS) && rm mugig
 	$(call mac-finish,$(DIST)/macos-$(1)/Mugig.app)
 endef
@@ -95,8 +97,8 @@ endef
 # One app for both Apple silicon and Intel Macs.
 mac:
 	rm -rf "$(DIST)/macos" "$(DIST)/macos-tmp" && mkdir -p "$(DIST)/macos" "$(DIST)/macos-tmp"
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$(DIST)/macos-tmp/arm64" .
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=1 go build -trimpath -ldflags "-s -w" -o "$(DIST)/macos-tmp/amd64" .
+	GOARCH=arm64 CGO_ENABLED=1 $(FYNE) build --os darwin --release -o "$(DIST)/macos-tmp/arm64"
+	GOARCH=amd64 CGO_ENABLED=1 $(FYNE) build --os darwin --release -o "$(DIST)/macos-tmp/amd64"
 	lipo -create -output "$(DIST)/macos/mugig" "$(DIST)/macos-tmp/arm64" "$(DIST)/macos-tmp/amd64"
 	cd "$(DIST)/macos" && $(FYNE) package --release --src "$(SRC)" --exe "$(CURDIR)/$(DIST)/macos/mugig" --name Mugig --icon "$(SRC)/Icon.png" $(VERSION_FLAGS) && rm mugig
 	rm -rf "$(DIST)/macos-tmp"
