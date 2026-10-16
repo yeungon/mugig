@@ -5,7 +5,7 @@
 
 A desktop music player that also tells you the truth about your files: whether
 a "lossless" FLAC really is lossless, whether it is intact, and how loud it is.
-Written in Go with [Fyne](https://fyne.io).
+It plays internet radio too. Written in Go with [Fyne](https://fyne.io).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/songs-dark.png">
@@ -161,6 +161,11 @@ warns about it the first time:
   Trash, which on a USB disk is that disk's own).
 
 ### Internet radio
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/radio-dark.png">
+  <img src="docs/images/radio-light.png" alt="Now Playing showing a radio station, Harbour FM, with the song on air, its format, AAC at 128 kbps, and a spectrum; the sidebar's Radio section lists three stations, and the player bar says LIVE">
+</picture>
 
 - **Add a station** with the **+** beside Radio in the sidebar, or
   File → Add Radio Station…: a name and a link. The link can be the stream
