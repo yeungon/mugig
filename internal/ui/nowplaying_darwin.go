@@ -9,7 +9,7 @@ package ui
 
 void npStart(void);
 void npUpdate(const char *title, const char *artist, const char *album,
-	double duration, double elapsed, double rate, int state, const void *art, int artLen);
+	double duration, double elapsed, double rate, int state, int live, const void *art, int artLen);
 */
 import "C"
 
@@ -45,7 +45,14 @@ func (*systemMedia) Update(info nowPlayingInfo) {
 	}
 	C.npUpdate(title, artist, album,
 		C.double(info.Duration.Seconds()), C.double(info.Elapsed.Seconds()),
-		C.double(info.Rate), C.int(info.State), art, C.int(len(info.Art)))
+		C.double(info.Rate), C.int(info.State), C.int(boolInt(info.Live)), art, C.int(len(info.Art)))
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 //export goRemoteCommand

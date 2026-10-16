@@ -7,6 +7,10 @@
 // switch the device to each song's sample rate and take it for Mugig
 // alone, and it can read files with the system's own decoder as well.
 //
+// It also plays internet radio, read by package radio: OpenLive connects
+// to a station, and Player.PlayLive plays it, connecting again if the
+// connection drops.
+//
 // A song from a CUE sheet is a stretch of a larger file; RememberSpan
 // records where, and everything here then plays and reads just that
 // stretch.

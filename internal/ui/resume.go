@@ -27,8 +27,12 @@ type cuedSong struct {
 }
 
 // saveSession remembers the song playing, or waiting to be resumed, and
-// how far into it. It is called on quit and when playback pauses.
+// how far into it. It is called on quit, when playback pauses, and when a
+// radio station takes over.
 func (u *ui) saveSession() {
+	if u.station != nil {
+		return // the song before the station is kept
+	}
 	song, at := u.playing.Path, u.player.Position()
 	if song == "" && u.cued != nil {
 		song, at = u.cued.track.Path, u.cued.at

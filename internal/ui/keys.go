@@ -89,7 +89,12 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		item("Open…", fyne.KeyO, cmd, u.openItems),
 		item("Add Music Folder…", fyne.KeyO, cmd|fyne.KeyModifierShift, u.chooseFolderToAdd),
 		item("Rescan Folders", fyne.KeyR, cmd, u.scanLibrary),
-		item(revealLabel, fyne.KeyR, cmd|fyne.KeyModifierShift, whilePlaying(func() { u.revealTrack(u.playing) })),
+		item("Add Radio Station…", "", 0, u.addStation),
+		item(revealLabel, fyne.KeyR, cmd|fyne.KeyModifierShift, whilePlaying(func() {
+			if u.station == nil {
+				u.revealTrack(u.playing)
+			}
+		})),
 		fyne.NewMenuItemSeparator(),
 		item("Find", fyne.KeyF, cmd, func() {
 			u.showVisualizer(false) // the results are in the track list

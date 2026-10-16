@@ -32,7 +32,7 @@ void npStart(void) {
 
 // state matches playState in nowplaying.go: 0 stopped, 1 playing, 2 paused.
 void npUpdate(const char *title, const char *artist, const char *album,
-	double duration, double elapsed, double rate, int state, const void *art, int artLen) {
+	double duration, double elapsed, double rate, int state, int live, const void *art, int artLen) {
 	@autoreleasepool {
 		MPNowPlayingInfoCenter *center = [MPNowPlayingInfoCenter defaultCenter];
 		if (state == 0) {
@@ -45,8 +45,12 @@ void npUpdate(const char *title, const char *artist, const char *album,
 		info[MPMediaItemPropertyTitle] = [NSString stringWithUTF8String:title];
 		info[MPMediaItemPropertyArtist] = [NSString stringWithUTF8String:artist];
 		info[MPMediaItemPropertyAlbumTitle] = [NSString stringWithUTF8String:album];
-		info[MPMediaItemPropertyPlaybackDuration] = @(duration);
-		info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(elapsed);
+		if (live) {
+			info[MPNowPlayingInfoPropertyIsLiveStream] = @YES; // no length or position
+		} else {
+			info[MPMediaItemPropertyPlaybackDuration] = @(duration);
+			info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(elapsed);
+		}
 		// The rate lets the system move the position along at the playing speed.
 		info[MPNowPlayingInfoPropertyPlaybackRate] = @(state == 1 ? rate : 0.0);
 		if (art != NULL && artLen > 0) {

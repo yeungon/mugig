@@ -129,10 +129,14 @@ func (u *ui) setVisMode(m visMode) {
 // updateVisHeader shows the playing track above the visualizer.
 func (u *ui) updateVisHeader() {
 	title := u.visTitle.Segments[0].(*widget.TextSegment)
-	if u.playing.Path == "" {
+	switch {
+	case u.playing.Path == "":
 		title.Text = "Nothing playing"
 		u.visDetail.SetText("Choose a track to see its sound here.")
-	} else {
+	case u.station != nil:
+		title.Text = u.station.s.Name
+		u.visDetail.SetText(u.station.detail())
+	default:
 		title.Text = u.playing.Title
 		var detail []string
 		for _, s := range []string{u.playing.Artist, u.playing.Album} {

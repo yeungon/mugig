@@ -160,6 +160,26 @@ warns about it the first time:
   Path** or **Move to Trash** (asks first; the file can be put back from the
   Trash, which on a USB disk is that disk's own).
 
+### Internet radio
+
+- **Add a station** with the **+** beside Radio in the sidebar, or
+  File → Add Radio Station…: a name and a link. The link can be the stream
+  itself, as Icecast and Shoutcast servers send it; an HLS playlist
+  (`.m3u8`), as the BBC and many others use; or a `.pls` or `.m3u` playlist
+  that points to either. Given a web page's address instead, Mugig says so.
+- **Plays like a song that never ends**: the player bar shows LIVE, and the
+  song on air when the station names it. Next and Previous move through
+  your stations. Pause hangs up, and Play joins the broadcast as it is now,
+  as a radio does.
+- **Keeps going on a shaky connection**: if the connection drops, Mugig
+  connects again by itself while the sound already received plays out, and
+  only gives up after about 40 seconds of trying.
+- MP3, AAC (HE-AAC included) and Ogg Vorbis streams. AAC, which most HLS
+  stations send, plays on macOS only for now; MP3 and Ogg stations play
+  everywhere. Radio plays at normal speed and isn't levelled; the equalizer
+  and crossfeed still apply.
+- Right-click a station to edit it, copy its link or remove it.
+
 ### Audio quality check
 
 <picture>
@@ -253,7 +273,8 @@ git tag -a v0.2.0-rc.1 -m "Mugig 0.2.0, release candidate 1"   # a pre-release
 Mugig is developed and tested on macOS. On Windows and Linux it builds and
 should work, but has had far less use. These are macOS only: switching the
 device's sample rate, the system's Now Playing controls, the native Open panel
-(which lists all disks), and the macOS decoder used as a second opinion.
+(which lists all disks), the macOS decoder used as a second opinion, and
+AAC radio stations, which include most HLS ones.
 
 ## Keyboard shortcuts
 
@@ -283,15 +304,16 @@ device's sample rate, the system's Now Playing controls, the native Open panel
 
 `main.go` only starts the app; the code is in packages under `internal/`,
 each with its own tests. They depend on each other in one direction only:
-`ui` uses `library`, `quality` and `audio`; `library` uses `quality` (for
-smart playlists' rules) and `audio`; `quality` uses `audio`; `audio` uses
-none of them.
+`ui` uses `library`, `quality`, `audio` and `radio`; `library` uses
+`quality` (for smart playlists' rules) and `audio`; `quality` uses `audio`;
+`audio` uses `radio`, to play stations; `radio` uses none of them.
 
 | Folder | What it does |
 |---|---|
-| `internal/ui` | The window, made with Fyne: sidebar, song list, player bar, Now Playing, the quality window, the equalizer, menus, keyboard, and the macOS Now Playing, Open panel, Finder and Dock |
+| `internal/ui` | The window, made with Fyne: sidebar, song list, radio stations, player bar, Now Playing, the quality window, the equalizer, menus, keyboard, and the macOS Now Playing, Open panel, Finder and Dock |
 | `internal/library` | Finding songs: walking folders (leaving out what isn't music), tags, lengths, the saved library, CUE sheets, watching folders, cover art, playlists and smart playlists' rules |
-| `internal/audio` | Reading and playing audio: formats, decoding (with damaged FLAC played past the damage), gapless playback, read-ahead, speed, equalizer, crossfeed, volume, the output device, and on macOS CoreAudio and the system decoder |
+| `internal/audio` | Reading and playing audio: formats, decoding (with damaged FLAC played past the damage), gapless playback, read-ahead, speed, equalizer, crossfeed, volume, the output device, live radio with reconnecting, and on macOS CoreAudio and the system decoder |
+| `internal/radio` | Internet radio: following a station's link through playlists, Icecast and Shoutcast streams with their song titles, HLS (MPEG-TS, packed AAC and MP3, fragmented MP4), and the saved stations |
 | `internal/quality` | The quality check: integrity, lossy source, fake hi-res, loudness and peaks, the spectrogram's analysis, verdicts, and the saved results |
 | `internal/trash` | Move to Trash, with each system's own Trash |
 | `internal/humanize`, `internal/gobfile` | Wording numbers ("1,204 songs", "38.2 MB"); saving files safely |

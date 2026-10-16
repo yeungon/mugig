@@ -92,10 +92,16 @@ func (p *Player) Play(path string, onEnd func(error)) error {
 		return err
 	}
 	d.level.set(p.levelOf(path))
+	return p.start(d, onEnd, wasPlaying)
+}
+
+// start plays d, from a song or a station, through the output and the
+// sound's adjustments, fading in if wanted and nothing was playing.
+func (p *Player) start(d *deck, onEnd func(error), wasPlaying bool) error {
 	if err := p.openOutput(int(d.format.SampleRate)); err != nil {
 		d.stream.Close()
 		p.letGo()
-		return fmt.Errorf("cannot play %s: %w", filepath.Base(path), err)
+		return fmt.Errorf("cannot play %s: %w", d.name(), err)
 	}
 
 	gen := p.gen
@@ -406,7 +412,9 @@ func (p *Player) SetSpeed(speed float64) {
 	}
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
-	p.decks.cur.stretch.setTempo(speed)
+	if !p.decks.cur.live {
+		p.decks.cur.stretch.setTempo(speed)
+	}
 	if p.decks.next != nil {
 		p.decks.next.stretch.setTempo(speed)
 	}
@@ -486,14 +494,14 @@ func (p *Player) relevel(which func(path string) bool) {
 	p.out.mu.Unlock()
 	var gains [2]float64
 	for i, d := range ds {
-		if d != nil && which(d.path) {
+		if d != nil && !d.live && which(d.path) {
 			gains[i] = p.levelOf(d.path)
 		}
 	}
 	p.out.mu.Lock()
 	defer p.out.mu.Unlock()
 	for i, d := range ds {
-		if d != nil && which(d.path) {
+		if d != nil && !d.live && which(d.path) {
 			d.level.target = gains[i]
 		}
 	}

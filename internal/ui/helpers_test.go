@@ -58,6 +58,15 @@ func (f *fakePlayer) Play(path string, onEnd func(error)) error {
 
 func (f *fakePlayer) Prepare(path string) { f.next = path }
 
+func (f *fakePlayer) PlayLive(l *audio.Live, onEnd func(error)) error {
+	if f.bad[l.Link] {
+		return errors.New("cannot play the station")
+	}
+	f.played = append(f.played, l.Link)
+	f.onEnd, f.paused, f.pos, f.next = onEnd, false, 0, ""
+	return nil
+}
+
 func (f *fakePlayer) TogglePause() bool                   { f.paused = !f.paused; return f.paused }
 func (f *fakePlayer) Stop()                               { f.onEnd, f.next = nil, "" }
 func (f *fakePlayer) Position() time.Duration             { return f.pos }

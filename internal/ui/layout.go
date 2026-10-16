@@ -28,7 +28,9 @@ import (
 const sidebarWidth = 220
 
 // buildSidebar creates the left column: app name, page navigation, the
-// library's folders, the playlists, and the scan's progress.
+// library's folders, the playlists, the radio stations, and the scan's
+// progress. Folders, playlists and stations scroll together, headings and
+// all, so a heading never sits above another section's rows.
 func (u *ui) buildSidebar() fyne.CanvasObject {
 	logo := canvas.NewImageFromResource(appIcon)
 	logo.FillMode = canvas.ImageFillContain
@@ -40,6 +42,7 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 	u.navNowPlaying = navButton("Now Playing", graphicEqIcon, func() { u.showVisualizer(true) })
 	foldersHeader, folders := u.buildFolderSection()
 	playlistsHeader, playlists := u.buildPlaylistSection()
+	radioHeader, stations := u.buildRadioSection()
 
 	top := container.NewVBox(
 		brand,
@@ -47,7 +50,6 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 		sectionLabel("LIBRARY"),
 		u.navSongs,
 		u.navNowPlaying,
-		foldersHeader,
 	)
 	bottom := container.NewVBox(
 		u.cancelBtn,
@@ -60,7 +62,7 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 		newSurface(colorNameSurface),
 		width,
 		container.NewPadded(container.NewBorder(top, bottom, nil, nil,
-			container.NewVScroll(container.NewVBox(folders, playlistsHeader, playlists)))),
+			container.NewVScroll(container.NewVBox(foldersHeader, folders, playlistsHeader, playlists, radioHeader, stations)))),
 	)
 }
 
@@ -303,6 +305,11 @@ func newArtTile(size float32) *artTile {
 		t.img,
 	))
 	return t
+}
+
+// setPlaceholder sets the icon shown when there's no image.
+func (t *artTile) setPlaceholder(icon fyne.Resource) {
+	t.placeholder.SetResource(theme.NewColoredResource(icon, theme.ColorNamePlaceHolder))
 }
 
 // set shows the encoded image data, or the placeholder for nil.

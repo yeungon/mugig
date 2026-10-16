@@ -1,5 +1,5 @@
-// package ui is Mugig's window, made with Fyne: the sidebar of folders and
-// playlists, the song list, the player bar, Now Playing, the quality
+// package ui is Mugig's window, made with Fyne: the sidebar of folders,
+// playlists and radio stations, the song list, the player bar, Now Playing, the quality
 // check's window, the equalizer and the menus. Run opens it.
 //
 // The work itself is done by the packages beside it: library finds the
@@ -34,6 +34,7 @@ import (
 	"mugig/internal/humanize"
 	"mugig/internal/library"
 	"mugig/internal/quality"
+	"mugig/internal/radio"
 	"mugig/internal/trash"
 )
 
@@ -163,6 +164,14 @@ type ui struct {
 	eqView         *eqView          // the Equalizer window, while open
 	crossfeedItems []*fyne.MenuItem // one per level, in the Controls menu
 
+	stations      []*radio.Station // internet radio (see radio.go)
+	stationsPath  string           // where they are saved; "" for nowhere
+	stationList   *fyne.Container
+	stationRows   map[*radio.Station]*folderRow
+	newStationBtn *widget.Button
+	station       *stationNow // the station in the player bar, or nil
+	openLive      func(link string, onInfo func(audio.LiveInfo)) (*audio.Live, error)
+
 	playlists       []*library.Playlist
 	playlistsPath   string            // where they are saved; "" for nowhere
 	playlist        *library.Playlist // the playlist shown in the song list, or nil
@@ -274,6 +283,7 @@ func Run(icon []byte) {
 		saved:     quality.LoadStore(filepath.Join(a.Storage().RootURI().Path(), "quality.gob")),
 		media:     media,
 		playlists: filepath.Join(a.Storage().RootURI().Path(), "playlists.json"),
+		stations:  filepath.Join(a.Storage().RootURI().Path(), "stations.json"),
 	})
 	media.Start(u.remote)
 	audio.WatchDevices(func() { onUI(u.devicesChanged) })
@@ -328,6 +338,10 @@ type uiDeps struct {
 	pick   picker         // optional; defaults to the system's Open panel
 	// playlists is where playlists are saved; "" keeps them in memory.
 	playlists string
+	// stations is where radio stations are saved; "" keeps them in memory.
+	stations string
+	// openLive connects to a radio station; tests replace it.
+	openLive func(link string, onInfo func(audio.LiveInfo)) (*audio.Live, error)
 }
 
 func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
@@ -341,6 +355,11 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	u.canHog = audio.CanHogDevice
 	u.playlistsPath = d.playlists
 	u.playlists = library.LoadPlaylists(d.playlists)
+	u.stationsPath = d.stations
+	u.stations = radio.LoadStations(d.stations)
+	if u.openLive = d.openLive; u.openLive == nil {
+		u.openLive = audio.OpenLive
+	}
 	u.selected = map[string]bool{}
 	u.measuring = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {

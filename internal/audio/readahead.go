@@ -40,6 +40,10 @@ type readAhead struct {
 	err      error
 	closed   bool
 	underran int // times playback caught up with decoding
+
+	// interrupt, if set, stops src waiting, as for a radio station, so
+	// closing needn't wait for it.
+	interrupt func()
 }
 
 func newReadAhead(src beep.StreamSeekCloser, rate beep.SampleRate) *readAhead {
@@ -213,5 +217,8 @@ func (r *readAhead) Close() error {
 	r.closed = true
 	r.mu.Unlock()
 	r.more.Broadcast()
+	if r.interrupt != nil {
+		r.interrupt()
+	}
 	return nil
 }

@@ -142,7 +142,7 @@ func (u *ui) jump(t library.Track) {
 // remember adds the playing track to the history "previous" walks back
 // through in shuffle mode.
 func (u *ui) remember() {
-	if u.playing.Path != "" {
+	if u.playing.Path != "" && u.station == nil {
 		u.history = append(u.history, u.playing.Path)
 		if len(u.history) > maxHistory {
 			u.history = u.history[1:]
@@ -159,6 +159,7 @@ func (u *ui) play(t library.Track) {
 // start plays t. queued says it comes from Up Next, so the list carries on
 // afterwards from where it was rather than from t.
 func (u *ui) start(t library.Track, queued bool) {
+	u.leaveStation()
 	u.levelSong(t.Path)
 	if err := u.player.Play(t.Path, u.trackEnded); err != nil {
 		u.setStopped()
@@ -216,8 +217,15 @@ func (u *ui) start(t library.Track, queued bool) {
 	u.publishNowPlaying()
 }
 
-// showArt shows the cover image data, or a placeholder for nil.
+// showArt shows the cover image data, or a placeholder for nil: a radio
+// for a station.
 func (u *ui) showArt(data []byte) {
+	icon := theme.MediaMusicIcon()
+	if u.station != nil {
+		icon = radioIcon
+	}
+	u.art.setPlaceholder(icon)
+	u.bigArt.setPlaceholder(icon)
 	u.artData = data
 	u.art.set(data)
 	u.bigArt.set(data)
@@ -231,6 +239,14 @@ func (u *ui) togglePlay() {
 			u.playCued()
 		} else {
 			u.advance()
+		}
+		return
+	}
+	if u.station != nil { // radio hangs up, and joins the broadcast again
+		if u.paused {
+			u.playStation(u.station.s)
+		} else {
+			u.pauseStation()
 		}
 		return
 	}
@@ -270,8 +286,13 @@ func (u *ui) trackEnded(err error) {
 }
 
 // next plays the following track, or stops at the end of the list. Unlike a
-// track ending, pressing next moves on even in repeat-one mode.
+// track ending, pressing next moves on even in repeat-one mode. With a
+// station playing, it plays the next station.
 func (u *ui) next() {
+	if u.station != nil {
+		u.stepStation(1)
+		return
+	}
 	if !u.advance() {
 		u.stop()
 	}
@@ -378,7 +399,7 @@ func (u *ui) following() (t library.Track, ok bool) {
 // near its end, so the two join without a gap. Asked again as the end
 // nears, it follows changes to Up Next, shuffle, repeat or the list.
 func (u *ui) prepareNext() {
-	if u.playing.Path == "" {
+	if u.playing.Path == "" || u.station != nil {
 		return
 	}
 	if d := u.player.Duration(); d <= 0 || d-u.player.Position() > audio.GaplessLead {
@@ -410,8 +431,13 @@ func (u *ui) refillQueue(followOn bool) {
 }
 
 // prev restarts the current track if it is under way. Otherwise it goes
-// back: through play history in shuffle mode, or up the list.
+// back: through play history in shuffle mode, or up the list. With a
+// station playing, it plays the station before.
 func (u *ui) prev() {
+	if u.station != nil {
+		u.stepStation(-1)
+		return
+	}
 	if u.player.Position() >= restartThreshold {
 		u.restart()
 		return
@@ -452,8 +478,12 @@ func (u *ui) restart() {
 	u.seekTo(0)
 }
 
-// seekTo jumps to d within the playing track.
+// seekTo jumps to d within the playing track. Radio can't be moved
+// through.
 func (u *ui) seekTo(d time.Duration) {
+	if u.station != nil {
+		return
+	}
 	if u.playing.Path == "" {
 		if u.cued != nil { // moves where Play will start
 			u.cued.at = min(max(d, 0), u.cued.track.Length)
@@ -540,6 +570,7 @@ func (u *ui) toggleMute() {
 // selection, since Fyne doesn't fire OnSelected for an already-selected
 // cell and the user should be able to click the same row to play it again.
 func (u *ui) setStopped() {
+	u.leaveStation()
 	u.playing = library.Track{}
 	u.paused = false
 	u.cued = nil
@@ -570,7 +601,10 @@ func (u *ui) setStopped() {
 func (u *ui) trackProgress() {
 	for range time.Tick(250 * time.Millisecond) {
 		onUI(func() {
-			if u.playing.Path != "" && !u.seeking {
+			switch {
+			case u.station != nil: // how long it has played, with nothing to seek
+				u.elapsed.SetText(humanize.Clock(u.player.Position()))
+			case u.playing.Path != "" && !u.seeking:
 				u.setSeek(u.player.Position())
 			}
 			u.prepareNext()
@@ -700,6 +734,9 @@ type audioPlayer interface {
 	Devices() []audio.Device
 	SetDevice(id string)
 	SetMatchRate(on bool)
+	// PlayLive plays a radio station, connected with audio.OpenLive, as
+	// Play plays a song; onEnd is called if it stops by itself.
+	PlayLive(l *audio.Live, onEnd func(error)) error
 	// SetExclusive turns taking the device for Mugig alone on or off, and
 	// Exclusive reports whether Mugig has it now.
 	SetExclusive(on bool)

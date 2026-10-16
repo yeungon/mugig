@@ -119,8 +119,12 @@ func (u *ui) updateOutputInfo() {
 	}
 	var text string
 	levelled := u.levellingNote()
+	speed := u.speed
+	if u.station != nil {
+		speed = 1 // radio plays as it comes
+	}
 	switch {
-	case device == track && u.speed == 1 && u.crossfeed == audio.CrossfeedOff && !u.eq.Active() && !strings.HasPrefix(levelled, ", levelled"):
+	case device == track && speed == 1 && u.crossfeed == audio.CrossfeedOff && !u.eq.Active() && !strings.HasPrefix(levelled, ", levelled"):
 		text = fmt.Sprintf("Playing on %s at %s, unconverted", name, humanize.KHz(float64(track)))
 	case device == track:
 		text = fmt.Sprintf("Playing on %s at %s", name, humanize.KHz(float64(track)))
@@ -128,8 +132,8 @@ func (u *ui) updateOutputInfo() {
 		text = fmt.Sprintf("Playing on %s, converted from %s to %s", name,
 			humanize.KHz(float64(track)), humanize.KHz(float64(device)))
 	}
-	if u.speed != 1 {
-		text += fmt.Sprintf(", at %s speed with the pitch kept", speedLabel(u.speed))
+	if speed != 1 {
+		text += fmt.Sprintf(", at %s speed with the pitch kept", speedLabel(speed))
 	}
 	if u.eq.Active() {
 		text += ", with the equalizer"

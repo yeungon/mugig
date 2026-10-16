@@ -171,6 +171,7 @@
       <a href="#quality">Quality check</a>
       <a href="#playback">Playback</a>
       <a href="#library">Library</a>
+      <a href="#radio">Radio</a>
       <a href="#download">Download</a>
       <a href="https://github.com/yeungon/mugig">GitHub</a>
     </nav>
@@ -181,7 +182,7 @@
 
 <div class="page intro">
   <h1>A music player that checks your files.</h1>
-  <p class="lead">Mugig plays FLAC, MP3, WAV and Ogg Vorbis, and on macOS Apple Lossless and AAC, unconverted and without gaps between songs. It can also tell you whether a FLAC is really lossless or was made from an MP3, whether it is damaged, and how loud it is.</p>
+  <p class="lead">Mugig plays FLAC, MP3, WAV and Ogg Vorbis, and on macOS Apple Lossless and AAC, unconverted and without gaps between songs, and internet radio too. It can also tell you whether a FLAC is really lossless or was made from an MP3, whether it is damaged, and how loud it is.</p>
   <div class="actions">
     <a class="button" href="#download">Download Mugig</a>
     <a href="https://github.com/yeungon/mugig">Source code on GitHub</a>
@@ -304,6 +305,22 @@
   </div>
 </section>
 
+<section id="radio">
+  <div class="page">
+    <div class="prose">
+      <h2>Internet radio</h2>
+      <p>Add a station with the + beside Radio in the sidebar: a name, and its link. Mugig follows the link to the sound, whether it is an Icecast or Shoutcast stream, an HLS playlist (<code>.m3u8</code>) like the BBC’s, or a <code>.pls</code> or <code>.m3u</code> playlist pointing to one. A station plays like a song that never ends: LIVE in the player bar, the song on air when the station names it, and Next and Previous to change station.</p>
+    </div>
+
+    <dl class="features">
+      <div><dt>A shaky connection</dt><dd>If the connection drops, Mugig connects again by itself while the sound already received plays out, and only gives up after about 40 seconds.</dd></div>
+      <div><dt>Pause and play</dt><dd>Pause hangs up; Play joins the broadcast as it is now, as a radio does.</dd></div>
+      <div><dt>Formats</dt><dd>MP3, AAC (HE-AAC included) and Ogg Vorbis. AAC, which most HLS stations send, plays on macOS only for now; MP3 and Ogg stations play everywhere.</dd></div>
+      <div><dt>Your stations</dt><dd>Saved with your playlists. Right-click one to edit it, copy its link or remove it.<span class="how">File → Add Radio Station…</span></dd></div>
+    </dl>
+  </div>
+</section>
+
 <section id="shortcuts">
   <div class="page">
     <div class="prose">
@@ -396,7 +413,7 @@ make install    <span class="c"># macOS: also copy it to /Applications</span></p
       </div>
       <div>
         <h3>Platform support</h3>
-        <p style="color:var(--ink-2)">Mugig is developed on macOS, and that’s where it has been tested most. The Windows and Linux builds work but have seen much less use. Sample-rate switching, exclusive access, the system Now Playing controls and the native Open panel are macOS only.</p>
+        <p style="color:var(--ink-2)">Mugig is developed on macOS, and that’s where it has been tested most. The Windows and Linux builds work but have seen much less use. Sample-rate switching, exclusive access, the system Now Playing controls, the native Open panel and AAC radio stations are macOS only.</p>
       </div>
     </div>
   </div>

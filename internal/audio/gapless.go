@@ -11,6 +11,7 @@ package audio
 import (
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gopxl/beep/v2"
@@ -27,6 +28,7 @@ type deck struct {
 	format  beep.Format
 	stretch *stretcher
 	level   level // volume levelling's gain for this song
+	live    bool  // a radio station: always at normal speed, never levelled
 }
 
 func openDeck(path string, speed float64) (*deck, error) {
@@ -34,10 +36,13 @@ func openDeck(path string, speed float64) (*deck, error) {
 	if err != nil {
 		return nil, err
 	}
-	ra := newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate)
+	return newDeck(path, newReadAhead(&safeStream{StreamSeekCloser: s}, format.SampleRate), format, speed), nil
+}
+
+func newDeck(path string, ra *readAhead, format beep.Format, speed float64) *deck {
 	d := &deck{path: path, stream: ra, format: format, stretch: newStretcher(ra, int(format.SampleRate), speed)}
 	d.level = level{gain: 1, target: 1, step: math.Pow(10, levelGlideDB/20/float64(max(int(format.SampleRate), 1)))}
-	return d, nil
+	return d
 }
 
 // levelGlideDB is how fast, in dB a second, a song's levelling gain moves
@@ -196,4 +201,12 @@ func (m *mp3Stream) Seek(p int) error {
 	}
 	m.discard(p - from)
 	return nil
+}
+
+// name is how errors name the deck: a song's file name, or "the station".
+func (d *deck) name() string {
+	if d.live {
+		return "the station"
+	}
+	return filepath.Base(d.path)
 }

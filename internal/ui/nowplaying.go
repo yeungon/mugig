@@ -32,6 +32,7 @@ type nowPlayingInfo struct {
 	Title, Artist, Album string
 	Duration, Elapsed    time.Duration
 	Rate                 float64 // playback speed: 1 is normal
+	Live                 bool    // a radio station, with no length
 	State                playState
 	Art                  []byte // encoded image, or nil
 }
@@ -54,6 +55,14 @@ func (u *ui) publishNowPlaying() {
 	state := statePlaying
 	if u.paused {
 		state = statePaused
+	}
+	if n := u.station; n != nil { // the song on, if the station says, by the station
+		info := nowPlayingInfo{Title: n.s.Name, Artist: n.line(), Rate: 1, State: state, Live: true}
+		if n.title != "" {
+			info.Title, info.Artist = n.title, n.s.Name
+		}
+		u.media.Update(info)
+		return
 	}
 	u.media.Update(nowPlayingInfo{
 		Title:    u.playing.Title,

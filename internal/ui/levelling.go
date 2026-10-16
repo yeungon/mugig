@@ -72,7 +72,7 @@ func (u *ui) levelGain(path string) float64 {
 // on and its loudness isn't known, it is measured in the background, and
 // the player told when it is.
 func (u *ui) levelSong(path string) {
-	if !u.levellingItem.Checked || u.measuring[path] {
+	if !u.levellingItem.Checked || u.measuring[path] || isLink(path) {
 		return
 	}
 	if _, ok := u.loudness(path); ok {
@@ -104,6 +104,9 @@ func (u *ui) levelSong(path string) {
 func (u *ui) levellingNote() string {
 	if !u.levellingItem.Checked || u.playing.Path == "" {
 		return ""
+	}
+	if u.station != nil {
+		return ", not levelled, as radio's loudness can't be measured ahead"
 	}
 	if l, ok := u.loudness(u.playing.Path); ok {
 		if g := l.Gain(); g != 0 {
