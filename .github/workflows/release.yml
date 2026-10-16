@@ -3,6 +3,9 @@
 # suffix, such as v0.1.0-rc.1, makes a pre-release, for trying a release
 # out first.
 #
+# What's new in a version goes in .github/whats-new/vX.Y.Z.md, which is put
+# above .github/release-notes.md on its release page.
+#
 # The file names are the same for every version, so links to
 # https://github.com/yeungon/mugig/releases/latest/download/<file> always
 # fetch the newest.
@@ -110,6 +113,11 @@ jobs:
           cat SHA256SUMS
           pre=""
           case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          # What's new in this version, if written, above the notes every
+          # release has. A pre-release uses its version's, as in v0.2.0-rc.1.
+          notes=../.github/whats-new/${GITHUB_REF_NAME%%-*}.md
+          [ -f "$notes" ] && cat "$notes" > ../notes.md
+          cat ../.github/release-notes.md >> ../notes.md
           gh release create "$GITHUB_REF_NAME" * $pre \
             --title "Mugig ${GITHUB_REF_NAME#v}" \
-            --notes-file ../.github/release-notes.md
+            --notes-file ../notes.md
