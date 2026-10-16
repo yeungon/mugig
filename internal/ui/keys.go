@@ -140,9 +140,9 @@ func (u *ui) buildMenu() *fyne.MainMenu {
 		fyne.NewMenuItemSeparator(),
 	)
 	controls.Items = append(controls.Items, outputItems...)
-	// On macOS, Fyne moves About to the app menu, leaving Help empty and so
-	// not shown.
-	help := fyne.NewMenu("Help", item("About", "", 0, func() { u.showAbout() }))
+	// On macOS, Fyne moves About to the app menu. A separator above it would
+	// be left at the foot of Help there.
+	help := fyne.NewMenu("Help", append(u.buildUpdateItems(), item("About", "", 0, func() { u.showAbout() }))...)
 	return fyne.NewMainMenu(file, view, controls, help)
 }
 

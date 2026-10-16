@@ -12,6 +12,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -36,6 +37,7 @@ import (
 	"mugig/internal/quality"
 	"mugig/internal/radio"
 	"mugig/internal/trash"
+	"mugig/internal/update"
 )
 
 var columns = []string{"Title", "Artist", "Album", "Time", "Year", "Format", "Size", "Quality", "Path"}
@@ -172,6 +174,12 @@ type ui struct {
 	station       *stationNow // the station in the player bar, or nil
 	openLive      func(link string, onInfo func(audio.LiveInfo)) (*audio.Live, error)
 
+	autoUpdateItem *fyne.MenuItem  // Help > Check for Updates Automatically (see updates.go)
+	updateNotice   *widget.Button  // in the sidebar, once a newer version is out
+	sidebarFoot    *fyne.Container // the notice, and the scan's progress
+	latestRelease  func(context.Context) (update.Release, error)
+	openURL        func(*url.URL) error // opens a web page; tests replace it
+
 	playlists       []*library.Playlist
 	playlistsPath   string            // where they are saved; "" for nowhere
 	playlist        *library.Playlist // the playlist shown in the song list, or nil
@@ -297,6 +305,7 @@ func Run(icon []byte) {
 		if u.cancel == nil { // nothing to scan
 			u.restoreSession()
 		}
+		u.startUpdateChecks()
 	})
 	w.SetOnDropped(u.dropped)
 
@@ -342,6 +351,8 @@ type uiDeps struct {
 	stations string
 	// openLive connects to a radio station; tests replace it.
 	openLive func(link string, onInfo func(audio.LiveInfo)) (*audio.Live, error)
+	// latestRelease asks GitHub for the newest release; tests replace it.
+	latestRelease func(context.Context) (update.Release, error)
 }
 
 func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
@@ -360,6 +371,10 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 	if u.openLive = d.openLive; u.openLive == nil {
 		u.openLive = audio.OpenLive
 	}
+	if u.latestRelease = d.latestRelease; u.latestRelease == nil {
+		u.latestRelease = update.Latest
+	}
+	u.openURL = func(l *url.URL) error { return fyne.CurrentApp().OpenURL(l) }
 	u.selected = map[string]bool{}
 	u.measuring = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {

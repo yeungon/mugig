@@ -33,5 +33,18 @@ system warns about it once.
   menu (or `sudo make install` for everyone on the computer). It needs
   OpenGL, which desktop systems have.
 
+## Updating
+
+Once a day, Mugig asks GitHub, where it is released, for the newest version's
+number (it sends nothing about you or your music). When a newer version is
+out, a button at the foot of the sidebar says so and opens its page. **Help →
+Check for Updates…** asks straight away, and **Help → Check for Updates
+Automatically** turns the daily check off.
+
+To update, download the new version from this page and put it in place of the old
+one; your library, playlists, radio stations and settings are kept. On macOS,
+a version downloaded with a browser needs **Open Anyway** once more; the
+Terminal command above installs it over the old one without asking.
+
 Mugig is developed on macOS; the Windows and Linux builds pass the same
 tests but have had less use.

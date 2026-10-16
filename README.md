@@ -45,6 +45,19 @@ warns about it the first time:
   `make user-install` to add it to your apps menu (or `sudo make install` for
   every user).
 
+### Updating
+
+Once a day, Mugig asks GitHub, where it is released, for the newest version's
+number (it sends nothing about you or your music). When a newer version is
+out, a button at the foot of the sidebar says so and opens its page. **Help →
+Check for Updates…** asks straight away, and **Help → Check for Updates
+Automatically** turns the daily check off.
+
+To update, download the new version as above and put it in place of the old
+one; your library, playlists, radio stations and settings are kept. On macOS,
+a version downloaded with a browser needs **Open Anyway** once more; the
+Terminal command above installs it over the old one without asking.
+
 ## Features
 
 ### Playing
@@ -309,9 +322,9 @@ AAC radio stations, which include most HLS ones.
 
 `main.go` only starts the app; the code is in packages under `internal/`,
 each with its own tests. They depend on each other in one direction only:
-`ui` uses `library`, `quality`, `audio` and `radio`; `library` uses
+`ui` uses `library`, `quality`, `audio`, `radio` and `update`; `library` uses
 `quality` (for smart playlists' rules) and `audio`; `quality` uses `audio`;
-`audio` uses `radio`, to play stations; `radio` uses none of them.
+`audio` uses `radio`, to play stations; `radio` and `update` use none of them.
 
 | Folder | What it does |
 |---|---|
@@ -319,6 +332,7 @@ each with its own tests. They depend on each other in one direction only:
 | `internal/library` | Finding songs: walking folders (leaving out what isn't music), tags, lengths, the saved library, CUE sheets, watching folders, cover art, playlists and smart playlists' rules |
 | `internal/audio` | Reading and playing audio: formats, decoding (with damaged FLAC played past the damage), gapless playback, read-ahead, speed, equalizer, crossfeed, volume, the output device, live radio with reconnecting, and on macOS CoreAudio and the system decoder |
 | `internal/radio` | Internet radio: following a station's link through playlists, Icecast and Shoutcast streams with their song titles, HLS (MPEG-TS, packed AAC and MP3, fragmented MP4), and the saved stations |
+| `internal/update` | Finding out from GitHub whether a newer version is out |
 | `internal/quality` | The quality check: integrity, lossy source, fake hi-res, loudness and peaks, the spectrogram's analysis, verdicts, and the saved results |
 | `internal/trash` | Move to Trash, with each system's own Trash |
 | `internal/humanize`, `internal/gobfile` | Wording numbers ("1,204 songs", "38.2 MB"); saving files safely |

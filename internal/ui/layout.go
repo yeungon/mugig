@@ -52,10 +52,12 @@ func (u *ui) buildSidebar() fyne.CanvasObject {
 		u.navNowPlaying,
 	)
 	bottom := container.NewVBox(
+		u.buildUpdateNotice(),
 		u.cancelBtn,
 		u.progress,
 		u.status,
 	)
+	u.sidebarFoot = bottom
 	width := canvas.NewRectangle(color.Transparent)
 	width.SetMinSize(fyne.NewSize(sidebarWidth, 0))
 	return container.NewStack(
