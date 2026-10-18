@@ -37,14 +37,21 @@ system warns about it once.
 
 Once a day, Mugig asks GitHub, where it is released, for the newest version's
 number (it sends nothing about you or your music). When a newer version is
-out, a button at the foot of the sidebar says so and opens its page. **Help →
-Check for Updates…** asks straight away, and **Help → Check for Updates
+out, a button at the foot of the sidebar says so. Click it, then **Update
+Now**: Mugig downloads the new version, checks that it is signed by Mugig's
+author, puts it in place of the old one, and opens it. Your library,
+playlists, radio stations and settings are kept. **Help → Check for
+Updates…** asks straight away, and **Help → Check for Updates
 Automatically** turns the daily check off.
 
-To update, download the new version from this page and put it in place of the old
-one; your library, playlists, radio stations and settings are kept. On macOS,
-a version downloaded with a browser needs **Open Anyway** once more; the
-Terminal command above installs it over the old one without asking.
+Mugig updates itself from version 0.3.0 on. Where it isn't allowed to change
+the folder it is in, as on Linux when installed for every user with `sudo
+make install`, it opens the new version's page instead: download it from this page
+and put it in place of the old one. On macOS, a version downloaded with a
+browser needs **Open Anyway** once more; the Terminal command above installs
+it without asking. As Mugig isn't signed with an Apple developer ID, macOS
+may also ask again, after an update, for access to folders such as an
+external disk's.
 
 Mugig is developed on macOS; the Windows and Linux builds pass the same
 tests but have had less use.

@@ -10,6 +10,7 @@ import (
 	_ "embed"
 
 	"mugig/internal/ui"
+	"mugig/internal/update"
 )
 
 // The app's icon, rounded, for the window, the taskbar and the sidebar.
@@ -19,5 +20,6 @@ import (
 var icon []byte
 
 func main() {
+	update.AfterRestart() // after updating itself, wait for the old copy to quit
 	ui.Run(icon)
 }

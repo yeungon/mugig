@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,49 @@ func newUpdateUI(t *testing.T, newest string) (*ui, *fakeGitHub) {
 		g.opened = append(g.opened, l.String())
 		return nil
 	}
+	u.updater = updater{asset: "Mugig-macOS.zip", target: func() (string, error) { return "", update.ErrFromSource }}
+	u.quit = func() { t.Error("quit") }
 	return u, g
+}
+
+// fakeInstall stands in for downloading, installing and restarting.
+type fakeInstall struct {
+	downloaded                          []string // the downloads fetched, as release/asset
+	installed                           []string // what was installed, as package -> target
+	restarted                           []string
+	quit                                bool
+	downloadErr, installErr, restartErr error
+	during                              func() // runs while downloading
+}
+
+// canInstall lets the UI install updates in place of /Applications/Mugig.app.
+func canInstall(u *ui) *fakeInstall {
+	f := &fakeInstall{}
+	u.updater = updater{
+		asset:  "Mugig-macOS.zip",
+		target: func() (string, error) { return "/Applications/Mugig.app", nil },
+		download: func(ctx context.Context, r update.Release, asset, dir string, progress func(int64, int64)) (string, error) {
+			f.downloaded = append(f.downloaded, r.Version+"/"+asset)
+			progress(5<<20, 20<<20)
+			if f.during != nil {
+				f.during()
+			}
+			if f.downloadErr != nil {
+				return "", f.downloadErr
+			}
+			return dir + "/" + asset, ctx.Err()
+		},
+		install: func(pkg, target string) error {
+			f.installed = append(f.installed, filepath.Base(pkg)+" -> "+target)
+			return f.installErr
+		},
+		restart: func(target string) error {
+			f.restarted = append(f.restarted, target)
+			return f.restartErr
+		},
+	}
+	u.quit = func() { f.quit = true }
+	return f
 }
 
 // Help > Check for Updates… says when a newer version is out, and opens
@@ -186,5 +229,115 @@ func TestNoDailyCheckFromSource(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if g.asked != 0 {
 		t.Error("checked")
+	}
+}
+
+// Where it can, Mugig installs the update itself, and restarts.
+func TestUpdateNow(t *testing.T) {
+	u, g := newUpdateUI(t, "0.2.0")
+	f := canInstall(u)
+	var during string
+	f.during = func() { during = aboutTexts(u) }
+	menuItem(t, u, "Check for Updates…").Action()
+	got := aboutTexts(u)
+	for _, want := range []string{"Mugig 0.2.0 is out. You have 0.1.0.", "puts it in place of this version",
+		"What's new in 0.2.0 <https://github.com/yeungon/mugig/releases/tag/v0.2.0>"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %q in %q", want, got)
+		}
+	}
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Update Now"))
+	if !strings.Contains(during, "Downloading Mugig 0.2.0… 5.24 MB of 21.0 MB") {
+		t.Errorf("while downloading: %q", during)
+	}
+	if strings.Join(f.downloaded, ",") != "0.2.0/Mugig-macOS.zip" ||
+		strings.Join(f.installed, ",") != "Mugig-macOS.zip -> /Applications/Mugig.app" ||
+		strings.Join(f.restarted, ",") != "/Applications/Mugig.app" || !f.quit {
+		t.Errorf("downloaded %v, installed %v, restarted %v, quit %v", f.downloaded, f.installed, f.restarted, f.quit)
+	}
+	if len(g.opened) != 0 {
+		t.Errorf("opened %v", g.opened)
+	}
+}
+
+// A failed update says why, and offers the page instead.
+func TestUpdateFails(t *testing.T) {
+	u, g := newUpdateUI(t, "0.2.0")
+	f := canInstall(u)
+	f.downloadErr = update.ErrBadSignature
+	u.showUpdate(g.newest)
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Update Now"))
+	if got := aboutTexts(u); !strings.Contains(got, "Mugig 0.2.0 couldn't be installed: the download's signature doesn't match") {
+		t.Errorf("says %q", got)
+	}
+	if len(f.installed) != 0 || f.quit {
+		t.Error("installed a download that failed its check")
+	}
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Open Its Page"))
+	if len(g.opened) != 1 {
+		t.Errorf("opened %v", g.opened)
+	}
+
+	// Offline, it says so plainly.
+	f.downloadErr = &url.Error{Op: "Get", URL: "https://github.com/…", Err: errors.New("dial tcp: no such host")}
+	u.showUpdate(g.newest)
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Update Now"))
+	if got := aboutTexts(u); !strings.Contains(got, "the download didn't finish. Check that you're online") || strings.Contains(got, "dial tcp") {
+		t.Errorf("says %q", got)
+	}
+}
+
+// The download can be cancelled.
+func TestCancelUpdate(t *testing.T) {
+	u, g := newUpdateUI(t, "0.2.0")
+	f := canInstall(u)
+	f.during = func() { test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Cancel")) }
+	u.showUpdate(g.newest)
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Update Now"))
+	if len(f.installed) != 0 || f.quit {
+		t.Error("installed after cancelling")
+	}
+	if top := u.win.Canvas().Overlays().Top(); top != nil {
+		t.Errorf("left %q showing", aboutTexts(u))
+	}
+}
+
+// Installed, but not restarted, it says to restart.
+func TestUpdateRestartFails(t *testing.T) {
+	u, g := newUpdateUI(t, "0.2.0")
+	f := canInstall(u)
+	f.restartErr = errors.New("no")
+	u.showUpdate(g.newest)
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Update Now"))
+	if got := aboutTexts(u); !strings.Contains(got, "Quit Mugig and open it again") || f.quit {
+		t.Errorf("says %q, quit %v", got, f.quit)
+	}
+}
+
+// Where Mugig can't replace itself, it says why, and offers the page.
+func TestCantUpdateHere(t *testing.T) {
+	u, g := newUpdateUI(t, "0.2.0")
+	u.updater.target = func() (string, error) { return "", errors.New("Mugig isn't allowed to change /Applications") }
+	u.showUpdate(g.newest)
+	got := aboutTexts(u)
+	if !strings.Contains(got, "Mugig can't update itself here: Mugig isn't allowed to change /Applications.") || strings.Contains(got, "What's new") {
+		t.Errorf("says %q", got)
+	}
+	test.Tap(findButton(t, u.win.Canvas().Overlays().Top(), "Open Its Page"))
+	if len(g.opened) != 1 {
+		t.Errorf("opened %v", g.opened)
+	}
+	// Built from source, or without a download for this system, it just
+	// offers the page.
+	for _, c := range []updater{
+		{asset: "Mugig-macOS.zip", target: func() (string, error) { return "", update.ErrFromSource }},
+		{asset: "", target: func() (string, error) { return "/usr/bin/mugig", nil }},
+	} {
+		u.updater = c
+		u.showUpdate(g.newest)
+		if got := aboutTexts(u); strings.Contains(got, "can't update itself") || !strings.Contains(got, "has the download for your computer") {
+			t.Errorf("says %q", got)
+		}
+		findButton(t, u.win.Canvas().Overlays().Top(), "Open Its Page")
 	}
 }

@@ -49,14 +49,21 @@ warns about it the first time:
 
 Once a day, Mugig asks GitHub, where it is released, for the newest version's
 number (it sends nothing about you or your music). When a newer version is
-out, a button at the foot of the sidebar says so and opens its page. **Help →
-Check for Updates…** asks straight away, and **Help → Check for Updates
+out, a button at the foot of the sidebar says so. Click it, then **Update
+Now**: Mugig downloads the new version, checks that it is signed by Mugig's
+author, puts it in place of the old one, and opens it. Your library,
+playlists, radio stations and settings are kept. **Help → Check for
+Updates…** asks straight away, and **Help → Check for Updates
 Automatically** turns the daily check off.
 
-To update, download the new version as above and put it in place of the old
-one; your library, playlists, radio stations and settings are kept. On macOS,
-a version downloaded with a browser needs **Open Anyway** once more; the
-Terminal command above installs it over the old one without asking.
+Mugig updates itself from version 0.3.0 on. Where it isn't allowed to change
+the folder it is in, as on Linux when installed for every user with `sudo
+make install`, it opens the new version's page instead: download it as above
+and put it in place of the old one. On macOS, a version downloaded with a
+browser needs **Open Anyway** once more; the Terminal command above installs
+it without asking. As Mugig isn't signed with an Apple developer ID, macOS
+may also ask again, after an update, for access to folders such as an
+external disk's.
 
 ## Features
 
@@ -286,6 +293,16 @@ git tag -a v0.2.0 -m "Mugig 0.2.0" && git push origin v0.2.0
 git tag -a v0.2.0-rc.1 -m "Mugig 0.2.0, release candidate 1"   # a pre-release
 ```
 
+What's new in a version goes in `.github/whats-new/vX.Y.Z.md`, which is put
+at the top of its release page.
+
+Each download is signed, and copies of Mugig install only updates whose
+signature matches the public key in `internal/update/verify.go`. The private
+key is the repository secret `MUGIG_SIGNING_KEY`; without it, the release
+fails. Keep a copy of it somewhere safe: updates signed with a new key aren't
+installed by copies made before it, so everyone would have to update by hand
+once. `go run ./tools/sign -new-key FILE` makes a new pair.
+
 ### Platform notes
 
 Mugig is developed and tested on macOS. On Windows and Linux it builds and
@@ -332,12 +349,13 @@ each with its own tests. They depend on each other in one direction only:
 | `internal/library` | Finding songs: walking folders (leaving out what isn't music), tags, lengths, the saved library, CUE sheets, watching folders, cover art, playlists and smart playlists' rules |
 | `internal/audio` | Reading and playing audio: formats, decoding (with damaged FLAC played past the damage), gapless playback, read-ahead, speed, equalizer, crossfeed, volume, the output device, live radio with reconnecting, and on macOS CoreAudio and the system decoder |
 | `internal/radio` | Internet radio: following a station's link through playlists, Icecast and Shoutcast streams with their song titles, HLS (MPEG-TS, packed AAC and MP3, fragmented MP4), and the saved stations |
-| `internal/update` | Finding out from GitHub whether a newer version is out |
+| `internal/update` | Updates: finding out from GitHub whether a newer version is out, downloading it, checking its signature, and putting it in place of the running copy |
 | `internal/quality` | The quality check: integrity, lossy source, fake hi-res, loudness and peaks, the spectrogram's analysis, verdicts, and the saved results |
 | `internal/trash` | Move to Trash, with each system's own Trash |
 | `internal/humanize`, `internal/gobfile` | Wording numbers ("1,204 songs", "38.2 MB"); saving files safely |
 | `internal/audiotest` | Test audio: shaped noise, FLAC and WAV files, CUE albums, the sample files in `testdata` |
 | `tools/mkicon` | Draws the app icon (`make icon`) |
+| `tools/sign` | Signs a release's downloads, and makes signing keys |
 | `docs/goui.md` | Lessons learned building a Go and Fyne app |
 
 ## License

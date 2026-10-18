@@ -179,6 +179,8 @@ type ui struct {
 	sidebarFoot    *fyne.Container // the notice, and the scan's progress
 	latestRelease  func(context.Context) (update.Release, error)
 	openURL        func(*url.URL) error // opens a web page; tests replace it
+	updater        updater
+	quit           func() // quits, as for an update; tests replace it
 
 	playlists       []*library.Playlist
 	playlistsPath   string            // where they are saved; "" for nowhere
@@ -375,6 +377,8 @@ func newUI(w fyne.Window, prefs fyne.Preferences, d uiDeps) *ui {
 		u.latestRelease = update.Latest
 	}
 	u.openURL = func(l *url.URL) error { return fyne.CurrentApp().OpenURL(l) }
+	u.updater = systemUpdater
+	u.quit = func() { u.win.Close() } // the master window: closing it quits, saving all
 	u.selected = map[string]bool{}
 	u.measuring = map[string]bool{}
 	if u.pick = d.pick; u.pick == nil {
